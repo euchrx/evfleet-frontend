@@ -10,12 +10,14 @@ import {
   Fuel,
   GitBranch,
   LayoutDashboard,
+  Menu,
   LogOut,
   Route,
   ShieldCheck,
   Truck,
   Users,
   Wrench,
+  X,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { getSystemLogs, type SystemLogEntry } from "../services/systemLogs";
@@ -96,6 +98,7 @@ export function AppLayout() {
   const { logout, user } = useAuth();
   const [isSystemLogsModalOpen, setIsSystemLogsModalOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(() => getMenuVisibilityMap());
@@ -254,6 +257,10 @@ export function AppLayout() {
     };
   }, []);
 
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
   function handleOpenNotification(notification: AppNotification) {
     setIsNotificationsModalOpen(false);
     if (!notification.link) return;
@@ -268,14 +275,37 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen bg-slate-100">
-      <aside className="flex w-72 flex-col bg-slate-900 text-white shadow-xl">
+      {isMobileMenuOpen ? (
+        <button
+          type="button"
+          aria-label="Fechar menu"
+          className="fixed inset-0 z-40 bg-slate-900/60 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-slate-900 text-white shadow-xl transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="border-b border-slate-800 px-6 py-6">
-          <h1 className="text-2xl font-bold tracking-tight">
-            Ev<span className="text-orange-500">Fleet</span>
-          </h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold tracking-tight">
+              Ev<span className="text-orange-500">Fleet</span>
+            </h1>
+            <button
+              type="button"
+              aria-label="Fechar menu"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="rounded-lg border border-slate-700 p-2 text-slate-300 lg:hidden"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
-        <nav className="flex-1 space-y-2 p-4">
+        <nav className="flex-1 space-y-2 overflow-y-auto p-4">
           {filteredMenu.map((item) => {
             const active = location.pathname === item.path;
             const Icon = item.icon;
@@ -283,6 +313,7 @@ export function AppLayout() {
               <Link
                 key={item.path}
                 to={item.path}
+                onClick={() => setIsMobileMenuOpen(false)}
                 className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
                   active
                     ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
@@ -309,12 +340,23 @@ export function AppLayout() {
       </aside>
 
       <div className="flex flex-1 flex-col">
-        <header className="border-b border-slate-200 bg-white px-6 py-4">
-          <div className="flex items-center justify-between gap-6">
+        <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+            <div className="flex items-center justify-between gap-3 lg:hidden">
+              <button
+                type="button"
+                aria-label="Abrir menu"
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700"
+              >
+                <Menu size={18} />
+              </button>
+              <p className="text-sm font-semibold text-slate-700">Painel EvFleet</p>
+            </div>
             <button
               type="button"
               onClick={() => setIsNotificationsModalOpen(true)}
-              className="w-full max-w-[300px] cursor-pointer rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3 text-left shadow-sm transition hover:border-orange-200"
+              className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3 text-left shadow-sm transition hover:border-orange-200 lg:max-w-[320px]"
             >
               <div className="flex items-center gap-3">
                 <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
@@ -336,7 +378,7 @@ export function AppLayout() {
               </div>
             </button>
 
-            <div className="w-full max-w-[320px] rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm">
+            <div className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm lg:max-w-[340px]">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white">
                   {initial}
@@ -355,17 +397,17 @@ export function AppLayout() {
 
                 <button
                   onClick={handleLogout}
-                  className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                  className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 sm:px-3"
                 >
                   <LogOut size={14} />
-                  Sair
+                  <span className="hidden sm:inline">Sair</span>
                 </button>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 bg-gradient-to-b from-slate-50 to-slate-100 p-8">
+        <main className="flex-1 bg-gradient-to-b from-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
