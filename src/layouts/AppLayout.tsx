@@ -1,0 +1,469 @@
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import {
+  BadgeAlert,
+  BarChart3,
+  Bell,
+  BookOpenCheck,
+  ClipboardList,
+  FileText,
+  Fuel,
+  GitBranch,
+  LayoutDashboard,
+  LogOut,
+  Route,
+  ShieldCheck,
+  Truck,
+  Users,
+  Wrench,
+} from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { getSystemLogs, type SystemLogEntry } from "../services/systemLogs";
+import { getFuelRecords } from "../services/fuelRecords";
+import { getVehicles } from "../services/vehicles";
+import { detectFuelAnomalies } from "../services/fuelAnomalies";
+import { getMaintenanceRecords } from "../services/maintenanceRecords";
+import { getDebts } from "../services/debts";
+import {
+  getMenuVisibilityMap,
+  isMenuPathVisible,
+  type MenuVisibilityMap,
+} from "../services/menuVisibility";
+
+type AppNotification = {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  link?: string;
+};
+
+function formatRole(role?: string) {
+  switch (role) {
+    case "ADMIN":
+      return "Administrador";
+    case "FLEET_MANAGER":
+      return "Gestor da Frota";
+    default:
+      return "Sem perfil";
+  }
+}
+
+function getRoleBadgeClasses(role?: string) {
+  switch (role) {
+    case "ADMIN":
+      return "bg-orange-100 text-orange-700 border-orange-200";
+    case "FLEET_MANAGER":
+      return "bg-blue-100 text-blue-700 border-blue-200";
+    default:
+      return "bg-slate-100 text-slate-600 border-slate-200";
+  }
+}
+
+function formatDateTime(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("pt-BR");
+}
+
+function formatDateOnly(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("pt-BR");
+}
+
+function parseLocalDate(value: string) {
+  const raw = String(value || "").slice(0, 10);
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return new Date(value);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+}
+
+function getDaysUntil(dateValue: string) {
+  const target = parseLocalDate(dateValue);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const diff = target.getTime() - today.getTime();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+export function AppLayout() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { logout, user } = useAuth();
+  const [isSystemLogsModalOpen, setIsSystemLogsModalOpen] = useState(false);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+  const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(() => getMenuVisibilityMap());
+
+  const menu = [
+    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Relatórios", path: "/reports", icon: BarChart3, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Veículos", path: "/vehicles", icon: Truck, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Motoristas", path: "/drivers", icon: Users, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Manutenções", path: "/maintenance-records", icon: Wrench, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Abastecimentos", path: "/fuel-records", icon: Fuel, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Débitos e Multas", path: "/debts", icon: BadgeAlert, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Gestão de Viagens", path: "/trips", icon: Route, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Gestão de Documentos", path: "/vehicle-documents", icon: FileText, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Filiais", path: "/branches", icon: GitBranch, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Como usar", path: "/how-to-use", icon: BookOpenCheck, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Usuários", path: "/users", icon: Users, roles: ["ADMIN"] },
+    { name: "Administração", path: "/administration", icon: ShieldCheck, roles: ["ADMIN"] },
+  ];
+
+  const filteredMenu = menu.filter(
+    (item) => (user ? item.roles.includes(user.role) : false) && isMenuPathVisible(item.path, menuVisibility)
+  );
+  const latestTopics = useMemo(
+    () =>
+      [...systemLogs]
+        .filter((log) => String(log.method || "").toUpperCase() === "MANUAL")
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 20),
+    [systemLogs]
+  );
+  const initial = user?.name?.charAt(0).toUpperCase() || "U";
+
+  function handleLogout() {
+    logout();
+    navigate("/login", { replace: true });
+  }
+
+  function handleOpenSystemLogsModal() {
+    setSystemLogs(getSystemLogs());
+    setIsSystemLogsModalOpen(true);
+  }
+
+  async function loadNotifications() {
+    const [fuelRecordsResult, vehiclesResult, maintenanceRecordsResult, debtsResult] =
+      await Promise.allSettled([getFuelRecords(), getVehicles(), getMaintenanceRecords(), getDebts()]);
+
+    const fuelRecords = fuelRecordsResult.status === "fulfilled" ? fuelRecordsResult.value : [];
+    const vehicles = vehiclesResult.status === "fulfilled" ? vehiclesResult.value : [];
+    const maintenanceRecords = maintenanceRecordsResult.status === "fulfilled" ? maintenanceRecordsResult.value : [];
+    const debts = debtsResult.status === "fulfilled" ? debtsResult.value : [];
+
+    const anomalyNotifications: AppNotification[] =
+      fuelRecords.length > 0 && vehicles.length > 0
+        ? detectFuelAnomalies(fuelRecords, vehicles).map((item) => ({
+            id: `fuel-anomaly-${item.id}`,
+            title: `Anomalia de consumo - ${item.vehicle}`,
+            description: `${item.reason} Motorista: ${item.driver}.`,
+            date: item.date,
+            link: "/fuel-records",
+          }))
+        : [];
+
+    const maintenanceNotifications: AppNotification[] = maintenanceRecords
+      .filter((record) => {
+        if (String(record.status || "").toUpperCase() !== "OPEN") return false;
+        const daysUntil = getDaysUntil(record.maintenanceDate);
+        return daysUntil >= 0 && daysUntil <= 5;
+      })
+      .map((record) => {
+        const daysUntil = getDaysUntil(record.maintenanceDate);
+        const vehicleLabel = record.vehicle ? `${record.vehicle.brand} ${record.vehicle.model}` : "Veículo";
+
+        return {
+          id: `maintenance-schedule-${record.id}`,
+          title: `Manutenção programada - ${vehicleLabel}`,
+          description:
+            daysUntil === 0
+              ? "A manutenção está programada para hoje."
+              : `Faltam ${daysUntil} dia(s) para a manutenção programada.`,
+          date: record.maintenanceDate,
+          link: `/maintenance-records?tab=records&highlight=${record.id}`,
+        };
+      });
+
+    const debtNotifications: AppNotification[] = debts
+      .filter((debt) => {
+        if (String(debt.status || "").toUpperCase() !== "PENDING") return false;
+        const daysUntil = getDaysUntil(debt.dueDate || debt.debtDate);
+        return daysUntil >= 0 && daysUntil <= 5;
+      })
+      .map((debt) => {
+        const daysUntil = getDaysUntil(debt.dueDate || debt.debtDate);
+        const vehicleLabel = debt.vehicle ? `${debt.vehicle.brand} ${debt.vehicle.model}` : "Veículo";
+
+        return {
+          id: `debt-due-${debt.id}`,
+          title: `Débito vencendo - ${vehicleLabel}`,
+          description:
+            daysUntil === 0
+              ? "O débito vence hoje."
+              : `Faltam ${daysUntil} dia(s) para o vencimento do débito.`,
+          date: debt.dueDate || debt.debtDate,
+          link: `/debts?highlight=${debt.id}`,
+        };
+      });
+
+    const overdueDebtNotifications: AppNotification[] = debts
+      .filter((debt) => {
+        if (String(debt.status || "").toUpperCase() !== "PENDING") return false;
+        const daysUntil = getDaysUntil(debt.dueDate || debt.debtDate);
+        return daysUntil < 0;
+      })
+      .map((debt) => {
+        const vehicleLabel = debt.vehicle ? `${debt.vehicle.brand} ${debt.vehicle.model}` : "Veículo";
+        const overdueDays = Math.abs(getDaysUntil(debt.dueDate || debt.debtDate));
+
+        return {
+          id: `debt-overdue-${debt.id}`,
+          title: `Débito vencido - ${vehicleLabel}`,
+          description: `Débito vencido há ${overdueDays} dia(s).`,
+          date: debt.dueDate || debt.debtDate,
+          link: `/debts?highlight=${debt.id}`,
+        };
+      });
+
+    setNotifications(
+      [...overdueDebtNotifications, ...maintenanceNotifications, ...debtNotifications, ...anomalyNotifications].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      )
+    );
+  }
+
+  useEffect(() => {
+    loadNotifications();
+
+    function refreshNotifications() {
+      loadNotifications();
+    }
+
+    window.addEventListener("evfleet-fuel-anomalies-updated", refreshNotifications);
+    window.addEventListener("evfleet-notifications-updated", refreshNotifications);
+    return () => {
+      window.removeEventListener("evfleet-fuel-anomalies-updated", refreshNotifications);
+      window.removeEventListener("evfleet-notifications-updated", refreshNotifications);
+    };
+  }, []);
+
+  useEffect(() => {
+    function refreshMenuVisibility() {
+      setMenuVisibility(getMenuVisibilityMap());
+    }
+    window.addEventListener("evfleet-menu-visibility-updated", refreshMenuVisibility);
+    return () => {
+      window.removeEventListener("evfleet-menu-visibility-updated", refreshMenuVisibility);
+    };
+  }, []);
+
+  function handleOpenNotification(notification: AppNotification) {
+    setIsNotificationsModalOpen(false);
+    if (!notification.link) return;
+
+    if (notification.link.startsWith("/")) {
+      navigate(notification.link);
+      return;
+    }
+
+    window.open(notification.link, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <div className="flex min-h-screen bg-slate-100">
+      <aside className="flex w-72 flex-col bg-slate-900 text-white shadow-xl">
+        <div className="border-b border-slate-800 px-6 py-6">
+          <h1 className="text-2xl font-bold tracking-tight">
+            Ev<span className="text-orange-500">Fleet</span>
+          </h1>
+        </div>
+
+        <nav className="flex-1 space-y-2 p-4">
+          {filteredMenu.map((item) => {
+            const active = location.pathname === item.path;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                  active
+                    ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                <Icon size={18} />
+                <span>{item.name}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="border-t border-slate-800 p-4">
+          <button
+            type="button"
+            onClick={handleOpenSystemLogsModal}
+            className="block w-full cursor-pointer rounded-2xl bg-slate-800/70 px-4 py-3 text-left transition hover:bg-slate-700/80"
+          >
+            <p className="text-xs uppercase tracking-wide text-slate-400">Ambiente</p>
+            <p className="mt-1 text-sm font-medium text-slate-200">EvFleet v1.0</p>
+          </button>
+        </div>
+      </aside>
+
+      <div className="flex flex-1 flex-col">
+        <header className="border-b border-slate-200 bg-white px-6 py-4">
+          <div className="flex items-center justify-between gap-6">
+            <button
+              type="button"
+              onClick={() => setIsNotificationsModalOpen(true)}
+              className="w-full max-w-[300px] cursor-pointer rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3 text-left shadow-sm transition hover:border-orange-200"
+            >
+              <div className="flex items-center gap-3">
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                  <Bell size={18} />
+                  {notifications.length > 0 ? (
+                    <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                      {notifications.length}
+                    </span>
+                  ) : null}
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Notificações</p>
+                  <p className="mt-1 text-sm font-medium text-slate-700">
+                    {notifications.length > 0
+                      ? `${notifications.length} notificação(ões) pendente(s)`
+                      : "Sem eventos no momento"}
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            <div className="w-full max-w-[320px] rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white">
+                  {initial}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] font-semibold text-slate-900">{user?.name || "Usuário"}</p>
+                  <span
+                    className={`mt-1 inline-flex rounded-full border px-2 py-[1px] text-[10px] font-semibold ${getRoleBadgeClasses(
+                      user?.role
+                    )}`}
+                  >
+                    {formatRole(user?.role)}
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                >
+                  <LogOut size={14} />
+                  Sair
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 bg-gradient-to-b from-slate-50 to-slate-100 p-8">
+          <Outlet />
+        </main>
+      </div>
+
+      {isSystemLogsModalOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-slate-600">Nome do sistema: EvFleet</p>
+                <p className="text-sm text-slate-600">Versão atual: v1.0</p>
+              </div>
+              <ClipboardList size={22} className="text-orange-600" />
+            </div>
+
+            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tópicos com as atualizações</p>
+              <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+                {latestTopics.length === 0 ? (
+                  <p className="text-sm text-slate-500">Nenhuma atualização registrada até o momento.</p>
+                ) : (
+                  latestTopics.map((log) => (
+                    <div key={log.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                      <p className="text-sm font-semibold text-slate-800">{log.action}</p>
+                      <p className="text-xs text-slate-500">
+                        {formatDateTime(log.timestamp)} - {log.actor}
+                      </p>
+                      <p className="text-xs text-slate-600">
+                        {log.endpoint}
+                        {log.details ? ` - ${log.details}` : ""}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-3">
+              <p className="text-xs text-slate-500">Produzido por EvTech | Soluções em Sistemas</p>
+              <button
+                type="button"
+                onClick={() => setIsSystemLogsModalOpen(false)}
+                className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isNotificationsModalOpen ? (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Notificações</p>
+                <p className="mt-1 text-sm text-slate-700">{notifications.length} item(ns) pendente(s)</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNotificationsModalOpen(false)}
+                className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="mt-4 max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+              {notifications.length === 0 ? (
+                <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  Nenhuma notificação no momento.
+                </p>
+              ) : (
+                notifications.map((notification) => (
+                  <button
+                    key={notification.id}
+                    type="button"
+                    onClick={() => handleOpenNotification(notification)}
+                    className={`w-full rounded-xl border px-4 py-3 text-left ${
+                      notification.link
+                        ? "cursor-pointer border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/40"
+                        : "cursor-default border-slate-200 bg-slate-50"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
+                    <p className="mt-1 text-sm text-slate-600">{notification.description}</p>
+                    <p className="mt-1 text-xs text-slate-500">{formatDateOnly(notification.date)}</p>
+                    {notification.link ? (
+                      <p className="mt-2 text-xs font-semibold text-orange-600">Abrir notificação</p>
+                    ) : null}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

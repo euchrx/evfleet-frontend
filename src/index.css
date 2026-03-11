@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+:root {
+  font-family: Inter, system-ui, Arial, sans-serif;
+  color: #1f2937;
+  background-color: #f5f7fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: #f5f7fa;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.btn-ui {
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-ui-neutral {
+  border-color: #e2e8f0;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.btn-ui-neutral:hover {
+  background: #e2e8f0;
+}
+
+.btn-ui-danger {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.btn-ui-danger:hover {
+  background: #fee2e2;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1rem;
+}
+
+.status-active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status-inactive {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+.status-anomaly {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+@keyframes notificationHighlightPulse {
+  0% {
+    background-color: #fff7ed;
+  }
+  50% {
+    background-color: #ffedd5;
+  }
+  100% {
+    background-color: #fff7ed;
+  }
+}
+
+.notification-highlight td {
+  animation: notificationHighlightPulse 1.2s ease-in-out infinite;
+  border-top: 2px solid #fb923c;
+  border-bottom: 2px solid #fb923c;
+}
+
+.notification-highlight td:first-child {
+  border-left: 4px solid #f97316;
+}
+
+.notification-highlight td:last-child {
+  border-right: 2px solid #fb923c;
+}
