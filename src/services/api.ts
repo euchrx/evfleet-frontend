@@ -2,11 +2,7 @@ import axios from "axios";
 
 const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 
-const baseURL =
-  envBaseUrl ||
-  (typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:3000`
-    : "http://localhost:3000");
+const baseURL = envBaseUrl || "/api";
 
 function normalizeToken(value: string | null | undefined) {
   if (!value || typeof value !== "string") return null;
