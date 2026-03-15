@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { BellRing, Building2, FileCog, Lock, Settings2, ShieldCheck } from "lucide-react";
 import { addSystemLog } from "../../services/systemLogs";
+import { getBranches } from "../../services/branches";
+import type { Branch } from "../../types/branch";
+import {
+  defaultSoftwareSettings,
+  readSoftwareSettings,
+  saveSoftwareSettings,
+  type SoftwareSettings,
+} from "../../services/adminSettings";
 import {
   MENU_VISIBILITY_ITEMS,
   fetchMenuVisibilityMap,
@@ -9,57 +17,9 @@ import {
   type MenuVisibilityMap,
 } from "../../services/menuVisibility";
 
-type SoftwareSettings = {
-  companyName: string;
-  timezone: string;
-  language: string;
-  currency: string;
-  alertDaysBeforeCnh: number;
-  alertDaysBeforeDocument: number;
-  alertKmBeforeMaintenance: number;
-  enableSystemNotifications: boolean;
-  enableEmailNotifications: boolean;
-  enableWhatsappNotifications: boolean;
-  allowFleetManagerDeleteRecords: boolean;
-  enforceStrongPassword: boolean;
-  sessionTimeoutMinutes: number;
-  defaultReportFormat: "PDF";
-  defaultDashboardPeriod: "CURRENT_MONTH" | "CURRENT_YEAR" | "LAST_30_DAYS" | "ALL";
-};
-
-const STORAGE_KEY = "evfleet_admin_settings_v1";
-
-const defaultSettings: SoftwareSettings = {
-  companyName: "EvFleet",
-  timezone: "America/Sao_Paulo",
-  language: "pt-BR",
-  currency: "BRL",
-  alertDaysBeforeCnh: 30,
-  alertDaysBeforeDocument: 15,
-  alertKmBeforeMaintenance: 500,
-  enableSystemNotifications: true,
-  enableEmailNotifications: false,
-  enableWhatsappNotifications: false,
-  allowFleetManagerDeleteRecords: false,
-  enforceStrongPassword: true,
-  sessionTimeoutMinutes: 60,
-  defaultReportFormat: "PDF",
-  defaultDashboardPeriod: "CURRENT_YEAR",
-};
-
-function readSettings() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultSettings;
-    const parsed = JSON.parse(raw) as Partial<SoftwareSettings>;
-    return { ...defaultSettings, ...parsed };
-  } catch {
-    return defaultSettings;
-  }
-}
-
 export function AdministrationPage() {
-  const [settings, setSettings] = useState<SoftwareSettings>(defaultSettings);
+  const [settings, setSettings] = useState<SoftwareSettings>(defaultSoftwareSettings);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(getDefaultMenuVisibilityMap());
   const [savedAt, setSavedAt] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
@@ -68,8 +28,9 @@ export function AdministrationPage() {
   const [updateFeedback, setUpdateFeedback] = useState("");
 
   useEffect(() => {
-    setSettings(readSettings());
+    setSettings(readSoftwareSettings());
     fetchMenuVisibilityMap().then(setMenuVisibility);
+    getBranches().then((items) => setBranches(Array.isArray(items) ? items : []));
   }, []);
 
   function handleChange<K extends keyof SoftwareSettings>(field: K, value: SoftwareSettings[K]) {
@@ -77,7 +38,8 @@ export function AdministrationPage() {
   }
 
   function saveSettings() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    saveSoftwareSettings(settings);
+    window.dispatchEvent(new CustomEvent("evfleet-default-branch-updated"));
     const now = new Date().toLocaleString("pt-BR");
     setSavedAt(now);
     setSaveMessage("Configurações salvas com sucesso.");
@@ -85,8 +47,9 @@ export function AdministrationPage() {
   }
 
   function restoreDefaults() {
-    setSettings(defaultSettings);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultSettings));
+    setSettings(defaultSoftwareSettings);
+    saveSoftwareSettings(defaultSoftwareSettings);
+    window.dispatchEvent(new CustomEvent("evfleet-default-branch-updated"));
     const now = new Date().toLocaleString("pt-BR");
     setSavedAt(now);
     setSaveMessage("Configurações padrão restauradas.");
@@ -204,6 +167,26 @@ export function AdministrationPage() {
             >
               <option value="BRL">Real (BRL)</option>
             </select>
+          </label>
+          <label className="space-y-1 md:col-span-2 lg:col-span-2">
+            <span className="text-sm font-medium text-slate-700">
+              Estabelecimento padrão do sistema
+            </span>
+            <select
+              value={settings.defaultBranchId}
+              onChange={(e) => handleChange("defaultBranchId", e.target.value)}
+              className="w-full cursor-pointer rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            >
+              <option value="">Nenhum (rede inteira)</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-slate-500">
+              Quando definido, formulários com campo de filial serão preenchidos automaticamente.
+            </span>
           </label>
         </div>
 

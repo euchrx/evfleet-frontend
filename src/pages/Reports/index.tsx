@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileDown, RefreshCw } from "lucide-react";
+import { FileDown } from "lucide-react";
 import { useBranch } from "../../contexts/BranchContext";
 import { getBranches } from "../../services/branches";
 import { getDebts } from "../../services/debts";
@@ -18,10 +18,7 @@ type VehicleTypeFilter = "LIGHT" | "HEAVY";
 type SelectOption = { id: string; label: string };
 
 function toCurrency(value: number) {
-  return value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function parseDateSafe(dateValue: string) {
@@ -89,16 +86,16 @@ function MultiSelectField({
   const [open, setOpen] = useState(false);
 
   const selectedOptions = useMemo(
-    () => options.filter((option) => selectedIds.includes(option.id)),
+    () => options.filter((item) => selectedIds.includes(item.id)),
     [options, selectedIds]
   );
 
   const filteredOptions = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return options.filter((option) => {
-      if (selectedIds.includes(option.id)) return false;
+    return options.filter((item) => {
+      if (selectedIds.includes(item.id)) return false;
       if (!normalized) return true;
-      return option.label.toLowerCase().includes(normalized);
+      return item.label.toLowerCase().includes(normalized);
     });
   }, [options, selectedIds, query]);
 
@@ -107,10 +104,6 @@ function MultiSelectField({
     onChange([...selectedIds, id]);
     setQuery("");
     setOpen(true);
-  }
-
-  function removeItem(id: string) {
-    onChange(selectedIds.filter((item) => item !== id));
   }
 
   return (
@@ -132,7 +125,7 @@ function MultiSelectField({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    removeItem(item.id);
+                    onChange(selectedIds.filter((id) => id !== item.id));
                   }}
                   className="cursor-pointer text-slate-500 hover:text-red-600"
                 >
@@ -147,9 +140,7 @@ function MultiSelectField({
                 setOpen(true);
               }}
               onFocus={() => setOpen(true)}
-              onBlur={() => {
-                setTimeout(() => setOpen(false), 120);
-              }}
+              onBlur={() => setTimeout(() => setOpen(false), 120)}
               placeholder={selectedOptions.length === 0 ? placeholder : "Digite para buscar..."}
               className="min-w-[180px] flex-1 bg-transparent px-1 py-1 text-sm outline-none"
             />
@@ -157,7 +148,7 @@ function MultiSelectField({
         </div>
 
         {open && filteredOptions.length > 0 ? (
-          <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+          <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
             {filteredOptions.map((option) => (
               <button
                 key={option.id}
@@ -199,7 +190,6 @@ export function ReportsPage() {
     "MAINTENANCE",
     "DEBTS",
   ]);
-  const [plateFilter, setPlateFilter] = useState("");
   const [format, setFormat] = useState("PDF");
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
@@ -246,14 +236,6 @@ export function ReportsPage() {
     );
   }, [selectedBranchId]);
 
-  const branchOptions = useMemo<SelectOption[]>(
-    () =>
-      [...branches]
-        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
-        .map((branch) => ({ id: branch.id, label: branch.name })),
-    [branches]
-  );
-
   const availableVehicles = useMemo(() => {
     const scoped = selectedBranchId
       ? vehicles.filter((item) => item.branchId === selectedBranchId)
@@ -263,20 +245,20 @@ export function ReportsPage() {
     );
   }, [vehicles, selectedBranchId]);
 
+  const branchOptions = useMemo<SelectOption[]>(
+    () => branches.map((item) => ({ id: item.id, label: item.name })),
+    [branches]
+  );
   const vehicleOptions = useMemo<SelectOption[]>(
     () =>
-      availableVehicles.map((vehicle) => ({
-        id: vehicle.id,
-        label: `${vehicle.brand} ${vehicle.model} (${vehicle.plate})`,
+      availableVehicles.map((item) => ({
+        id: item.id,
+        label: `${item.plate} - ${item.brand} ${item.model}`,
       })),
     [availableVehicles]
   );
-
   const driverOptions = useMemo<SelectOption[]>(
-    () =>
-      [...drivers]
-        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
-        .map((driver) => ({ id: driver.id, label: driver.name })),
+    () => drivers.map((item) => ({ id: item.id, label: item.name })),
     [drivers]
   );
 
@@ -284,7 +266,6 @@ export function ReportsPage() {
     { id: "LIGHT", label: "Leve" },
     { id: "HEAVY", label: "Pesado" },
   ];
-
   const moduleOptions: SelectOption[] = [
     { id: "FUEL", label: "Abastecimentos" },
     { id: "MAINTENANCE", label: "Manutenções" },
@@ -292,29 +273,6 @@ export function ReportsPage() {
   ];
 
   const filteredData = useMemo(() => {
-    const vehicleByBranch = availableVehicles.filter((vehicle) =>
-      selectedBranchIds.length > 0 ? selectedBranchIds.includes(vehicle.branchId) : true
-    );
-
-    const vehicleByType = vehicleByBranch.filter((vehicle) =>
-      selectedVehicleTypes.length > 0
-        ? selectedVehicleTypes.includes(vehicle.vehicleType as VehicleTypeFilter)
-        : true
-    );
-
-    const vehicleByPlate = vehicleByType.filter((vehicle) =>
-      plateFilter.trim()
-        ? vehicle.plate.toLowerCase().includes(plateFilter.trim().toLowerCase())
-        : true
-    );
-
-    const vehiclesFinal = vehicleByPlate.filter((vehicle) =>
-      selectedVehicleIds.length > 0 ? selectedVehicleIds.includes(vehicle.id) : true
-    );
-
-    const selectedVehicleSet = new Set(vehiclesFinal.map((vehicle) => vehicle.id));
-    const selectedDriversSet = new Set(selectedDriverIds);
-
     const start = parseDateSafe(startDate);
     const end = parseDateSafe(endDate);
     start.setHours(0, 0, 0, 0);
@@ -322,42 +280,44 @@ export function ReportsPage() {
 
     const inRange = (dateValue: string) => {
       const date = parseDateSafe(dateValue);
-      if (Number.isNaN(date.getTime())) return false;
-      return date >= start && date <= end;
+      return !Number.isNaN(date.getTime()) && date >= start && date <= end;
     };
+
+    const baseVehicles = availableVehicles.filter((vehicle) =>
+      selectedBranchIds.length > 0 ? selectedBranchIds.includes(vehicle.branchId) : true
+    );
+    const byType = baseVehicles.filter((vehicle) =>
+      selectedVehicleTypes.length > 0
+        ? selectedVehicleTypes.includes(vehicle.vehicleType as VehicleTypeFilter)
+        : true
+    );
+    const vehiclesFinal = byType.filter((vehicle) =>
+      selectedVehicleIds.length > 0 ? selectedVehicleIds.includes(vehicle.id) : true
+    );
+    const vehicleSet = new Set(vehiclesFinal.map((item) => item.id));
+    const driverSet = new Set(selectedDriverIds);
 
     const fuel = fuelRecords.filter((item) => {
-      if (!selectedVehicleSet.has(item.vehicleId)) return false;
-      if (!inRange(item.fuelDate)) return false;
-      if (selectedDriversSet.size === 0) return true;
-      return item.driverId ? selectedDriversSet.has(item.driverId) : false;
+      if (!vehicleSet.has(item.vehicleId) || !inRange(item.fuelDate)) return false;
+      if (driverSet.size === 0) return true;
+      return item.driverId ? driverSet.has(item.driverId) : false;
     });
 
-    const maintenance = maintenanceRecords.filter((item) => {
-      if (!selectedVehicleSet.has(item.vehicleId)) return false;
-      if (!inRange(item.maintenanceDate)) return false;
-      return true;
-    });
+    const maintenance = maintenanceRecords.filter(
+      (item) => vehicleSet.has(item.vehicleId) && inRange(item.maintenanceDate)
+    );
 
-    const debtsFiltered = debts.filter((item) => {
-      if (!selectedVehicleSet.has(item.vehicleId)) return false;
-      if (!inRange(item.debtDate)) return false;
-      return true;
-    });
+    const debtsFiltered = debts.filter(
+      (item) => vehicleSet.has(item.vehicleId) && inRange(item.debtDate)
+    );
 
-    return {
-      vehicles: vehiclesFinal,
-      fuel,
-      maintenance,
-      debts: debtsFiltered,
-    };
+    return { fuel, maintenance, debts: debtsFiltered };
   }, [
     availableVehicles,
     selectedBranchIds,
     selectedVehicleTypes,
     selectedVehicleIds,
     selectedDriverIds,
-    plateFilter,
     startDate,
     endDate,
     fuelRecords,
@@ -369,26 +329,27 @@ export function ReportsPage() {
     const fuelCost = filteredData.fuel.reduce((sum, item) => sum + (item.totalValue || 0), 0);
     const maintenanceCost = filteredData.maintenance.reduce((sum, item) => sum + (item.cost || 0), 0);
     const debtsCost = filteredData.debts.reduce((sum, item) => sum + (item.amount || 0), 0);
+    const vehicleIdsWithActivity = new Set<string>();
+    const driverIdsWithActivity = new Set<string>();
+
+    filteredData.fuel.forEach((item) => {
+      vehicleIdsWithActivity.add(item.vehicleId);
+      if (item.driverId) driverIdsWithActivity.add(item.driverId);
+    });
+    filteredData.maintenance.forEach((item) => vehicleIdsWithActivity.add(item.vehicleId));
+    filteredData.debts.forEach((item) => vehicleIdsWithActivity.add(item.vehicleId));
+
     return {
-      fuelCost,
-      maintenanceCost,
-      debtsCost,
       total: fuelCost + maintenanceCost + debtsCost,
+      vehicles: vehicleIdsWithActivity.size,
+      drivers: driverIdsWithActivity.size,
+      fuel: filteredData.fuel.length,
+      maintenance: filteredData.maintenance.length,
+      debts: filteredData.debts.length,
     };
   }, [filteredData]);
 
   function exportReport() {
-    const generatedAt = new Date().toLocaleString("pt-BR");
-    const selectedBranchNames = branchOptions
-      .filter((option) => selectedBranchIds.includes(option.id))
-      .map((option) => option.label);
-    const selectedModulesLabels = moduleOptions
-      .filter((option) => selectedModules.includes(option.id as ReportModule))
-      .map((option) => option.label);
-    const selectedTypesLabels = vehicleTypeOptions
-      .filter((option) => selectedVehicleTypes.includes(option.id as VehicleTypeFilter))
-      .map((option) => option.label);
-
     const showFuel = selectedModules.length === 0 || selectedModules.includes("FUEL");
     const showMaintenance =
       selectedModules.length === 0 || selectedModules.includes("MAINTENANCE");
@@ -410,79 +371,59 @@ export function ReportsPage() {
         </head>
         <body>
           <h1>Relatório operacional</h1>
-          <div class="meta">Gerado em: ${generatedAt}</div>
-          <div class="meta">Formato: ${escapeHtml(format)}</div>
-          <div class="meta">Módulos: ${escapeHtml(selectedModulesLabels.join(", ") || "Todos")}</div>
-          <div class="meta">Categoria de veículo: ${escapeHtml(selectedTypesLabels.join(", ") || "Todas")}</div>
           <div class="meta">Período: ${escapeHtml(formatDate(startDate))} até ${escapeHtml(formatDate(endDate))}</div>
-          <div class="meta">Estabelecimentos: ${escapeHtml(selectedBranchNames.join(", ") || "Todos")}</div>
-          <div class="meta">Placa (filtro): ${escapeHtml(plateFilter || "Todas")}</div>
-          <div class="meta">Total despesas: ${metrics.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div>
+          <div class="meta">Total de despesas: ${toCurrency(metrics.total)}</div>
 
           ${
             showFuel
               ? `<h2>Abastecimentos (${filteredData.fuel.length})</h2>
-                 <table>
-                   <thead><tr><th>Data</th><th>Veículo</th><th>Motorista</th><th>Litros</th><th>Valor</th><th>KM</th></tr></thead>
-                   <tbody>
-                     ${filteredData.fuel
-                       .map(
-                         (item) =>
-                           `<tr><td>${escapeHtml(formatDate(item.fuelDate))}</td><td>${escapeHtml(
-                             `${item.vehicle?.brand || ""} ${item.vehicle?.model || ""} (${item.vehicle?.plate || item.vehicleId})`
-                           )}</td><td>${escapeHtml(item.driver?.name || "-")}</td><td>${(item.liters || 0).toFixed(
-                             2
-                           )}</td><td>${toCurrency(item.totalValue || 0)}</td><td>${(item.km || 0).toLocaleString(
-                             "pt-BR"
-                           )}</td></tr>`
-                       )
-                       .join("")}
-                   </tbody>
-                 </table>`
+                 <table><thead><tr><th>Data</th><th>Veículo</th><th>Motorista</th><th>Litros</th><th>Valor</th><th>KM</th></tr></thead>
+                 <tbody>${filteredData.fuel
+                   .map(
+                     (item) =>
+                       `<tr><td>${escapeHtml(formatDate(item.fuelDate))}</td><td>${escapeHtml(
+                         `${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`
+                       )}</td><td>${escapeHtml(item.driver?.name || "-")}</td><td>${(item.liters || 0).toFixed(
+                         2
+                       )}</td><td>${toCurrency(item.totalValue || 0)}</td><td>${(item.km || 0).toLocaleString(
+                         "pt-BR"
+                       )}</td></tr>`
+                   )
+                   .join("")}</tbody></table>`
               : ""
           }
-
           ${
             showMaintenance
               ? `<h2>Manutenções (${filteredData.maintenance.length})</h2>
-                 <table>
-                   <thead><tr><th>Data</th><th>Veículo</th><th>Tipo</th><th>Status</th><th>Custo</th><th>KM</th></tr></thead>
-                   <tbody>
-                     ${filteredData.maintenance
-                       .map(
-                         (item) =>
-                           `<tr><td>${escapeHtml(formatDate(item.maintenanceDate))}</td><td>${escapeHtml(
-                             `${item.vehicle?.brand || ""} ${item.vehicle?.model || ""} (${item.vehicle?.plate || item.vehicleId})`
-                           )}</td><td>${escapeHtml(labelMaintenanceType(item.type))}</td><td>${escapeHtml(
-                             item.status || "-"
-                           )}</td><td>${toCurrency(item.cost || 0)}</td><td>${(item.km || 0).toLocaleString(
-                             "pt-BR"
-                           )}</td></tr>`
-                       )
-                       .join("")}
-                   </tbody>
-                 </table>`
+                 <table><thead><tr><th>Data</th><th>Veículo</th><th>Tipo</th><th>Status</th><th>Custo</th><th>KM</th></tr></thead>
+                 <tbody>${filteredData.maintenance
+                   .map(
+                     (item) =>
+                       `<tr><td>${escapeHtml(formatDate(item.maintenanceDate))}</td><td>${escapeHtml(
+                         `${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`
+                       )}</td><td>${escapeHtml(labelMaintenanceType(item.type))}</td><td>${escapeHtml(
+                         item.status || "-"
+                       )}</td><td>${toCurrency(item.cost || 0)}</td><td>${(item.km || 0).toLocaleString(
+                         "pt-BR"
+                       )}</td></tr>`
+                   )
+                   .join("")}</tbody></table>`
               : ""
           }
-
           ${
             showDebts
               ? `<h2>Débitos e multas (${filteredData.debts.length})</h2>
-                 <table>
-                   <thead><tr><th>Data</th><th>Veículo</th><th>Categoria</th><th>Descrição</th><th>Status</th><th>Valor</th></tr></thead>
-                   <tbody>
-                     ${filteredData.debts
-                       .map(
-                         (item) =>
-                           `<tr><td>${escapeHtml(formatDate(item.debtDate))}</td><td>${escapeHtml(
-                             `${item.vehicle?.brand || ""} ${item.vehicle?.model || ""} (${item.vehicle?.plate || item.vehicleId})`
-                           )}</td><td>${escapeHtml(labelDebtCategory(item.category))}</td><td>${escapeHtml(
-                             item.description || "-"
-                           )}</td><td>${escapeHtml(item.status || "-")}</td><td>${toCurrency(item.amount || 0)}</td></tr>`
-                       )
-                       .join("")}
-                   </tbody>
-                 </table>`
+                 <table><thead><tr><th>Data</th><th>Veículo</th><th>Categoria</th><th>Descrição</th><th>Status</th><th>Valor</th></tr></thead>
+                 <tbody>${filteredData.debts
+                   .map(
+                     (item) =>
+                       `<tr><td>${escapeHtml(formatDate(item.debtDate))}</td><td>${escapeHtml(
+                         `${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`
+                       )}</td><td>${escapeHtml(labelDebtCategory(item.category))}</td><td>${escapeHtml(
+                         item.description || "-"
+                       )}</td><td>${escapeHtml(item.status || "-")}</td><td>${toCurrency(item.amount || 0)}</td></tr>`
+                   )
+                   .join("")}</tbody></table>`
               : ""
           }
         </body>
@@ -508,11 +449,11 @@ export function ReportsPage() {
         </p>
       </div>
 
-      {errorMessage && (
+      {errorMessage ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {errorMessage}
         </div>
-      )}
+      ) : null}
 
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="grid gap-4 lg:grid-cols-3">
@@ -547,22 +488,12 @@ export function ReportsPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700">Placa</label>
-            <input
-              value={plateFilter}
-              onChange={(event) => setPlateFilter(event.target.value.toUpperCase())}
-              placeholder="AAA1234 ou AAA1A34"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            />
-          </div>
-
-          <div>
             <MultiSelectField
               label="Veículos"
               options={vehicleOptions}
               selectedIds={selectedVehicleIds}
               onChange={setSelectedVehicleIds}
-              placeholder="Digite para buscar veículo"
+              placeholder="Buscar por placa, marca ou modelo"
             />
           </div>
 
@@ -586,7 +517,7 @@ export function ReportsPage() {
             />
           </div>
 
-          <div>
+          <div className="lg:col-span-3">
             <MultiSelectField
               label="Módulos"
               options={moduleOptions}
@@ -596,7 +527,7 @@ export function ReportsPage() {
             />
           </div>
 
-          <div>
+          <div className="lg:col-span-1">
             <label className="mb-1 block text-sm font-semibold text-slate-700">Formato</label>
             <select
               value={format}
@@ -610,13 +541,6 @@ export function ReportsPage() {
 
         <div className="mt-5 flex flex-wrap gap-2">
           <button
-            onClick={loadData}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            <RefreshCw size={16} />
-            Atualizar dados
-          </button>
-          <button
             onClick={exportReport}
             className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
           >
@@ -624,6 +548,12 @@ export function ReportsPage() {
             Exportar {format}
           </button>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        {loading
+          ? "Sincronizando dados para geração dos relatórios..."
+          : "Use os campos multi-select para cruzar 1, 2 ou mais veículos, motoristas, tipos e módulos."}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -634,31 +564,31 @@ export function ReportsPage() {
           <p className="mt-2 text-2xl font-bold text-slate-900">{toCurrency(metrics.total)}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Veículos</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics.vehicles}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Motoristas</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics.drivers}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Abastecimentos
           </p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{filteredData.fuel.length}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics.fuel}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Manutenções
           </p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
-            {filteredData.maintenance.length}
-          </p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics.maintenance}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Débitos e multas
           </p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{filteredData.debts.length}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics.debts}</p>
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        {loading
-          ? "Sincronizando dados para geração dos relatórios..."
-          : "Use os campos multi-select para cruzar 1, 2 ou mais veículos, motoristas, tipos e módulos."}
       </div>
     </div>
   );

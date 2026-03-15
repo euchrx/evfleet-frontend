@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { getBranches } from "../services/branches";
+import { readSoftwareSettings } from "../services/adminSettings";
 import type { Branch } from "../types/branch";
 import { useAuth } from "./AuthContext";
 
@@ -64,6 +65,17 @@ export function BranchProvider({ children }: BranchProviderProps) {
   useEffect(() => {
     if (!user || branches.length === 0) return;
 
+    const settings = readSoftwareSettings();
+    const fixedBranchId = settings.defaultBranchId;
+    const fixedBranchExists =
+      fixedBranchId && branches.some((branch) => branch.id === fixedBranchId);
+
+    if (fixedBranchExists) {
+      setSelectedBranchIdState(fixedBranchId);
+      localStorage.setItem("selectedBranchId", fixedBranchId);
+      return;
+    }
+
     const savedBranchId = localStorage.getItem("selectedBranchId");
     const savedBranchExists = branches.some((branch) => branch.id === savedBranchId);
 
@@ -77,7 +89,41 @@ export function BranchProvider({ children }: BranchProviderProps) {
     localStorage.removeItem("selectedBranchId");
   }, [user, branches]);
 
+  useEffect(() => {
+    function handleDefaultBranchUpdate() {
+      if (branches.length === 0) return;
+      const settings = readSoftwareSettings();
+      const fixedBranchId = settings.defaultBranchId;
+      const fixedBranchExists =
+        fixedBranchId && branches.some((branch) => branch.id === fixedBranchId);
+
+      if (fixedBranchExists) {
+        setSelectedBranchIdState(fixedBranchId);
+        localStorage.setItem("selectedBranchId", fixedBranchId);
+        return;
+      }
+
+      setSelectedBranchIdState("");
+      localStorage.removeItem("selectedBranchId");
+    }
+
+    window.addEventListener("evfleet-default-branch-updated", handleDefaultBranchUpdate);
+    return () =>
+      window.removeEventListener("evfleet-default-branch-updated", handleDefaultBranchUpdate);
+  }, [branches]);
+
   function setSelectedBranchId(branchId: string) {
+    const settings = readSoftwareSettings();
+    const fixedBranchId = settings.defaultBranchId;
+    const fixedBranchExists =
+      fixedBranchId && branches.some((branch) => branch.id === fixedBranchId);
+
+    if (fixedBranchExists) {
+      setSelectedBranchIdState(fixedBranchId);
+      localStorage.setItem("selectedBranchId", fixedBranchId);
+      return;
+    }
+
     setSelectedBranchIdState(branchId);
 
     if (branchId) {
