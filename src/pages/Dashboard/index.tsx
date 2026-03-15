@@ -371,21 +371,21 @@ export function DashboardPage() {
         description: `${(item.liters || 0).toLocaleString("pt-BR", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
-        })} L â€¢ KM ${item.km}`,
+        })} L • KM ${item.km}`,
       })),
       ...maintenance.map((item) => ({
         id: `maintenance-${item.id}`,
         date: item.maintenanceDate,
         type: "Manutenção",
         value: item.cost || 0,
-        description: `${item.type || "Servico"} â€¢ KM ${item.km}`,
+        description: `${item.type || "Servico"} • KM ${item.km}`,
       })),
       ...debts.map((item) => ({
         id: `debt-${item.id}`,
         date: item.debtDate,
         type: "Débito/Multa",
         value: item.amount || 0,
-        description: `${item.description || "Registro"} â€¢ ${item.points || 0} pontos`,
+        description: `${item.description || "Registro"} • ${item.points || 0} pontos`,
       })),
     ].sort((a, b) => parseDateSafe(b.date).getTime() - parseDateSafe(a.date).getTime());
 
@@ -1082,8 +1082,8 @@ export function DashboardPage() {
                   Detalhes de custo do veículo
                 </h3>
                 <p className="text-sm text-slate-500">
-                  {vehicleCostModal.label} â€¢{" "}
-                  {vehicleCostModal.category === "LIGHT" ? "Categoria Leve" : "Categoria Pesado"}
+                  {vehicleCostModal.label} •{" "}
+                  {vehicleCostModal.category === "LIGHT" ? "Categoria Leve" : "Categoria Pesada"}
                 </p>
               </div>
               <button
@@ -1167,7 +1167,7 @@ export function DashboardPage() {
                   Detalhes do motorista
                 </h3>
                 <p className="text-sm text-slate-500">
-                  {bestDriverModal.category === "LIGHT" ? "Categoria Leve" : "Categoria Pesado"}
+                  {bestDriverModal.category === "LIGHT" ? "Categoria Leve" : "Categoria Pesada"}
                 </p>
               </div>
               <button
@@ -1252,7 +1252,7 @@ export function DashboardPage() {
                       : "Detalhamento - Custo com débitos e multas"}
                 </h3>
                 <p className="text-sm text-slate-500">
-                  {periodLabel} â€¢ {selectedVehicleLabel}
+                  {periodLabel} • {selectedVehicleLabel}
                 </p>
               </div>
               <button
@@ -1267,7 +1267,7 @@ export function DashboardPage() {
             {costModal === "FUEL" ? (
               <div>
                 <p className="mb-3 text-sm text-slate-700">
-                  Total: <span className="font-semibold">{toCurrency(metrics.fuelCostPeriod)}</span> â€¢ Registros:{" "}
+                  Total: <span className="font-semibold">{toCurrency(metrics.fuelCostPeriod)}</span> • Registros:{" "}
                   <span className="font-semibold">{costDetails.fuel.length}</span>
                 </p>
                 <div className="overflow-x-auto rounded-2xl border border-slate-200">
@@ -1323,7 +1323,7 @@ export function DashboardPage() {
             {costModal === "MAINTENANCE" ? (
               <div>
                 <p className="mb-3 text-sm text-slate-700">
-                  Total: <span className="font-semibold">{toCurrency(metrics.maintenanceCostPeriod)}</span> â€¢ Registros:{" "}
+                  Total: <span className="font-semibold">{toCurrency(metrics.maintenanceCostPeriod)}</span> • Registros:{" "}
                   <span className="font-semibold">{costDetails.maintenance.length}</span>
                 </p>
                 <div className="overflow-x-auto rounded-2xl border border-slate-200">
@@ -1379,7 +1379,7 @@ export function DashboardPage() {
             {costModal === "DEBTS" ? (
               <div>
                 <p className="mb-3 text-sm text-slate-700">
-                  Total: <span className="font-semibold">{toCurrency(metrics.debtsCostPeriod)}</span> â€¢ Registros:{" "}
+                  Total: <span className="font-semibold">{toCurrency(metrics.debtsCostPeriod)}</span> • Registros:{" "}
                   <span className="font-semibold">{costDetails.debts.length}</span>
                 </p>
                 <div className="overflow-x-auto rounded-2xl border border-slate-200">
