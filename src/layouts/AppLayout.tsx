@@ -245,7 +245,7 @@ export function AppLayout() {
       .filter((document) => {
         if (!document.expiryDate) return false;
         const daysUntil = getDaysUntil(document.expiryDate);
-        return daysUntil >= 0 && daysUntil <= 5;
+        return daysUntil >= 0 && daysUntil <= 30;
       })
       .map((document) => {
         const daysUntil = getDaysUntil(document.expiryDate || document.updatedAt || document.createdAt);
