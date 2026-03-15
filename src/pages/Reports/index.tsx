@@ -595,7 +595,12 @@ export function ReportsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-slate-900">Pré-visualização</h2>
+          <p className="text-sm text-slate-500">Resumo do período selecionado.</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Total despesas
@@ -627,6 +632,7 @@ export function ReportsPage() {
             Débitos e multas
           </p>
           <p className="mt-2 text-2xl font-bold text-slate-900">{metrics.debts}</p>
+        </div>
         </div>
       </div>
     </div>
