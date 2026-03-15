@@ -311,10 +311,6 @@ export function FuelRecordsPage() {
     }
   }
 
-  function handleDelete(record: FuelRecord) {
-    setRecordToDelete(record);
-  }
-
   async function confirmDeleteRecord() {
     if (!recordToDelete) return;
 
@@ -989,4 +985,3 @@ export function FuelRecordsPage() {
     return sortDirection === "asc" ? "â†‘" : "â†“";
   }
 }
-

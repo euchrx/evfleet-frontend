@@ -46,10 +46,13 @@ export function SystemLogsPage() {
   }, [logs, search, statusFilter]);
 
   function handleClearLogs() {
-    const confirmed = window.confirm("Deseja limpar todo o histórico de logs?");
-    if (!confirmed) return;
+    setIsClearModalOpen(true);
+  }
+
+  function confirmClearLogs() {
     clearSystemLogs();
     loadLogs();
+    setIsClearModalOpen(false);
   }
 
   return (
@@ -58,7 +61,7 @@ export function SystemLogsPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">System Logs</h1>
           <p className="text-sm text-slate-500">
-            Histórico de atualizacoes e operacoes executadas no sistema.
+            Histórico de atualizações e operações executadas no sistema.
           </p>
         </div>
         <div className="flex gap-2">
@@ -85,7 +88,7 @@ export function SystemLogsPage() {
         <div className="flex flex-col gap-3 md:flex-row">
           <input
             type="text"
-            placeholder="Buscar por usuario, a??o, endpoint ou detalhe"
+            placeholder="Buscar por usuário, ação, endpoint ou detalhe"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
@@ -109,9 +112,9 @@ export function SystemLogsPage() {
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Data/Hora</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Usuario</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Metodo</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">A??o</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Usuário</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Método</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ação</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Endpoint</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Status</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Detalhes</th>
@@ -157,9 +160,18 @@ export function SystemLogsPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <Database size={16} className="text-orange-600" />
-          Produzido por EvTech | Solu??es em Sistemas
+          Produzido por EvTech | Soluções em Sistemas
         </div>
       </div>
+
+      <ConfirmDeleteModal
+        isOpen={isClearModalOpen}
+        title="Limpar histórico de logs"
+        description="Deseja limpar todo o histórico de logs?"
+        confirmText="Limpar logs"
+        onCancel={() => setIsClearModalOpen(false)}
+        onConfirm={confirmClearLogs}
+      />
     </div>
   );
 }

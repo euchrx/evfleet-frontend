@@ -27,6 +27,7 @@ import {
   type CreateTireInput,
   type CreateTireReadingInput,
 } from "../../services/tires";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import type { Vehicle } from "../../types/vehicle";
 import type { MaintenanceRecord } from "../../types/maintenance-record";
 import type { MaintenancePlan } from "../../types/maintenance-plan";
@@ -260,6 +261,9 @@ export function MaintenanceRecordsPage() {
   const [selectedTire, setSelectedTire] = useState<Tire | null>(null);
   const [readingForm, setReadingForm] = useState<TireReadingFormState>(initialReadingForm);
   const [tireReadings, setTireReadings] = useState<TireReading[]>([]);
+  const [recordToDelete, setRecordToDelete] = useState<MaintenanceRecord | null>(null);
+  const [planToDelete, setPlanToDelete] = useState<MaintenancePlan | null>(null);
+  const [tireToDelete, setTireToDelete] = useState<Tire | null>(null);
 
   async function loadData() {
     try {
@@ -590,10 +594,7 @@ export function MaintenanceRecordsPage() {
   }
 
   async function removeRecord(record: MaintenanceRecord) {
-    if (!window.confirm("Deseja excluir esta manutenção?")) return;
-    await deleteMaintenanceRecord(record.id);
-    await loadData();
-    window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+    setRecordToDelete(record);
   }
 
   function openCreatePlan() {
@@ -660,10 +661,7 @@ export function MaintenanceRecordsPage() {
   }
 
   async function removePlan(plan: MaintenancePlan) {
-    if (!window.confirm("Deseja excluir este plano de manutenção?")) return;
-    await deleteMaintenancePlan(plan.id);
-    await loadData();
-    window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+    setPlanToDelete(plan);
   }
 
   function openCreateTire() {
@@ -742,8 +740,29 @@ export function MaintenanceRecordsPage() {
   }
 
   async function removeTire(tire: Tire) {
-    if (!window.confirm("Deseja excluir este pneu?")) return;
-    await deleteTire(tire.id);
+    setTireToDelete(tire);
+  }
+
+  async function confirmRemoveRecord() {
+    if (!recordToDelete) return;
+    await deleteMaintenanceRecord(recordToDelete.id);
+    setRecordToDelete(null);
+    await loadData();
+    window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+  }
+
+  async function confirmRemovePlan() {
+    if (!planToDelete) return;
+    await deleteMaintenancePlan(planToDelete.id);
+    setPlanToDelete(null);
+    await loadData();
+    window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+  }
+
+  async function confirmRemoveTire() {
+    if (!tireToDelete) return;
+    await deleteTire(tireToDelete.id);
+    setTireToDelete(null);
     await loadData();
     window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
   }
@@ -1185,6 +1204,30 @@ export function MaintenanceRecordsPage() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(recordToDelete)}
+        title="Excluir manutenção"
+        description="Deseja excluir esta manutenção?"
+        onCancel={() => setRecordToDelete(null)}
+        onConfirm={confirmRemoveRecord}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(planToDelete)}
+        title="Excluir plano de manutenção"
+        description="Deseja excluir este plano de manutenção?"
+        onCancel={() => setPlanToDelete(null)}
+        onConfirm={confirmRemovePlan}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(tireToDelete)}
+        title="Excluir pneu"
+        description="Deseja excluir este pneu?"
+        onCancel={() => setTireToDelete(null)}
+        onConfirm={confirmRemoveTire}
+      />
 
     </div>
   );
