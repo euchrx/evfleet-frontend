@@ -275,6 +275,10 @@ export function AppLayout() {
     }
   }, [filteredMenu, isLoadingMenuVisibility, location.pathname, menuVisibility, navigate, user]);
 
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
   if (isLoadingMenuVisibility) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100">
@@ -282,10 +286,6 @@ export function AppLayout() {
       </div>
     );
   }
-
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [location.pathname]);
 
   function handleOpenNotification(notification: AppNotification) {
     setIsNotificationsModalOpen(false);
