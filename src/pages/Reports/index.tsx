@@ -113,9 +113,7 @@ function MultiSelectField({
     function handleOutsideClick(event: MouseEvent) {
       if (!containerRef.current) return;
       const target = event.target as Node;
-      if (!containerRef.current.contains(target)) {
-        setOpen(false);
-      }
+      if (!containerRef.current.contains(target)) setOpen(false);
     }
 
     function handleEscape(event: KeyboardEvent) {
@@ -218,7 +216,10 @@ export function ReportsPage() {
     "MAINTENANCE",
     "DEBTS",
   ]);
-  const [fieldErrors, setFieldErrors] = useState<{ modules?: string; vehicleTypes?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{
+    modules?: string;
+    vehicleTypes?: string;
+  }>({});
   const [format, setFormat] = useState("PDF");
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
@@ -248,7 +249,6 @@ export function ReportsPage() {
     } catch (error) {
       console.error("Erro ao carregar relatórios:", error);
       setErrorMessage("Não foi possível carregar os dados para geração dos relatórios.");
-    } finally {
     }
   }
 
@@ -333,7 +333,6 @@ export function ReportsPage() {
     const maintenance = maintenanceRecords.filter(
       (item) => vehicleSet.has(item.vehicleId) && inRange(item.maintenanceDate)
     );
-
     const debtsFiltered = debts.filter(
       (item) => vehicleSet.has(item.vehicleId) && inRange(item.debtDate)
     );
@@ -356,41 +355,21 @@ export function ReportsPage() {
     const fuelCost = filteredData.fuel.reduce((sum, item) => sum + (item.totalValue || 0), 0);
     const maintenanceCost = filteredData.maintenance.reduce((sum, item) => sum + (item.cost || 0), 0);
     const debtsCost = filteredData.debts.reduce((sum, item) => sum + (item.amount || 0), 0);
-    const vehicleIdsWithActivity = new Set<string>();
-    const driverIdsWithActivity = new Set<string>();
-
-    filteredData.fuel.forEach((item) => {
-      vehicleIdsWithActivity.add(item.vehicleId);
-      if (item.driverId) driverIdsWithActivity.add(item.driverId);
-    });
-    filteredData.maintenance.forEach((item) => vehicleIdsWithActivity.add(item.vehicleId));
-    filteredData.debts.forEach((item) => vehicleIdsWithActivity.add(item.vehicleId));
-
-    return {
-      total: fuelCost + maintenanceCost + debtsCost,
-      vehicles: vehicleIdsWithActivity.size,
-      drivers: driverIdsWithActivity.size,
-      fuel: filteredData.fuel.length,
-      maintenance: filteredData.maintenance.length,
-      debts: filteredData.debts.length,
-    };
+    return { total: fuelCost + maintenanceCost + debtsCost };
   }, [filteredData]);
 
   function exportReport() {
     const nextErrors: { modules?: string; vehicleTypes?: string } = {};
-    if (selectedModules.length === 0) {
-      nextErrors.modules = "Selecione ao menos um módulo.";
-    }
+    if (selectedModules.length === 0) nextErrors.modules = "Selecione ao menos um módulo.";
     if (selectedVehicleTypes.length === 0) {
       nextErrors.vehicleTypes = "Selecione ao menos uma categoria de veículo.";
     }
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    const showFuel = selectedModules.length === 0 || selectedModules.includes("FUEL");
-    const showMaintenance =
-      selectedModules.length === 0 || selectedModules.includes("MAINTENANCE");
-    const showDebts = selectedModules.length === 0 || selectedModules.includes("DEBTS");
+    const showFuel = selectedModules.includes("FUEL");
+    const showMaintenance = selectedModules.includes("MAINTENANCE");
+    const showDebts = selectedModules.includes("DEBTS");
 
     const html = `
       <html>
@@ -592,47 +571,6 @@ export function ReportsPage() {
             <FileDown size={16} />
             Exportar {format}
           </button>
-        </div>
-      </div>
-
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-slate-900">Pré-visualização</h2>
-          <p className="text-sm text-slate-500">Resumo do período selecionado.</p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Total despesas
-          </p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{toCurrency(metrics.total)}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Veículos</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics.vehicles}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Motoristas</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics.drivers}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Abastecimentos
-          </p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics.fuel}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Manutenções
-          </p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics.maintenance}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Débitos e multas
-          </p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics.debts}</p>
-        </div>
         </div>
       </div>
     </div>
