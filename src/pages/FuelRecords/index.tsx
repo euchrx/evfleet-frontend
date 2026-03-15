@@ -311,22 +311,29 @@ export function FuelRecordsPage() {
     }
   }
 
-  async function handleDelete(record: FuelRecord) {`r`n    setRecordToDelete(record);`r`n  }`r`n`r`n  async function confirmDeleteRecord() {
+  function handleDelete(record: FuelRecord) {
+    setRecordToDelete(record);
+  }
+
+  async function confirmDeleteRecord() {
     if (!recordToDelete) return;
+
     try {
       setDeletingRecord(true);
       setPageErrorMessage("");
+
       await deleteFuelRecord(recordToDelete.id);
       setRecordToDelete(null);
       await loadData();
       notifyHeaderNotifications();
     } catch (error) {
       console.error("Erro ao excluir abastecimento:", error);
-      setPageErrorMessage("NÃƒÂ£o foi possÃƒÂ­vel excluir o abastecimento.");
+      setPageErrorMessage("Não foi possível excluir o abastecimento.");
     } finally {
       setDeletingRecord(false);
     }
   }
+
 
   const availableVehicles = useMemo(() => {
     let filtered = vehicles;
@@ -378,7 +385,7 @@ export function FuelRecordsPage() {
         (record) =>
           record.vehicle?.branchId === selectedBranchId ||
           vehicles.find((vehicle) => vehicle.id === record.vehicleId)?.branchId ===
-            selectedBranchId
+          selectedBranchId
       );
     }
 
@@ -389,9 +396,9 @@ export function FuelRecordsPage() {
         (record) => {
           const avgText = record.averageConsumptionKmPerLiter
             ? record.averageConsumptionKmPerLiter.toLocaleString("pt-BR", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })
             : "";
           const haystack = [
             getRecordBranchName(record),
@@ -639,9 +646,9 @@ export function FuelRecordsPage() {
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {record.averageConsumptionKmPerLiter
                         ? `${record.averageConsumptionKmPerLiter.toLocaleString("pt-BR", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })} km/L`
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })} km/L`
                         : "-"}
                       {anomalyMapByRecordId[record.id] && (
                         <span className="status-pill status-anomaly ml-2">
@@ -873,8 +880,8 @@ export function FuelRecordsPage() {
                   {saving
                     ? "Salvando..."
                     : editingRecord
-                    ? "Salvar alteraÃ§Ãµes"
-                    : "Cadastrar abastecimento"}
+                      ? "Salvar alteraÃ§Ãµes"
+                      : "Cadastrar abastecimento"}
                 </button>
               </div>
             </form>
@@ -901,9 +908,9 @@ export function FuelRecordsPage() {
                   <p className="text-slate-600">
                     {item.averageConsumptionKmPerLiter
                       ? `${item.averageConsumptionKmPerLiter.toLocaleString("pt-BR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })} km/L`
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })} km/L`
                       : "Sem consumo medio"}{" "}
                     â€¢{" "}
                     {item.totalValue.toLocaleString("pt-BR", {
