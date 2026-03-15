@@ -579,7 +579,7 @@ export function FuelRecordsPage() {
                   <button type="button" onClick={() => handleSort("km")} className="cursor-pointer">KM {getSortArrow("km")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <button type="button" onClick={() => handleSort("avgConsumption")} className="cursor-pointer">Consumo medio {getSortArrow("avgConsumption")}</button>
+                  <button type="button" onClick={() => handleSort("avgConsumption")} className="cursor-pointer">Consumo médio {getSortArrow("avgConsumption")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   Ações
@@ -908,7 +908,7 @@ export function FuelRecordsPage() {
                         maximumFractionDigits: 2,
                       })} km/L`
                       : "Sem consumo medio"}{" "}
-                    â€¢{" "}
+                    •{" "}
                     {item.totalValue.toLocaleString("pt-BR", {
                       style: "currency",
                       currency: "BRL",
@@ -981,7 +981,7 @@ export function FuelRecordsPage() {
   }
 
   function getSortArrow(column: FuelSortBy) {
-    if (sortBy !== column) return "â†•";
-    return sortDirection === "asc" ? "â†‘" : "â†“";
+    if (sortBy !== column) return "↕";
+    return sortDirection === "asc" ? "↑" : "↓";
   }
 }
