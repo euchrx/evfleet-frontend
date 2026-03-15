@@ -13,7 +13,9 @@ import type { Driver } from "../../types/driver";
 import type { MaintenanceRecord } from "../../types/maintenance-record";
 import type { Vehicle } from "../../types/vehicle";
 
-type ReportCategory = "ALL" | "FUEL" | "MAINTENANCE" | "DEBTS";
+type ReportModule = "FUEL" | "MAINTENANCE" | "DEBTS";
+type VehicleTypeFilter = "LIGHT" | "HEAVY";
+type SelectOption = { id: string; label: string };
 
 function toCurrency(value: number) {
   return value.toLocaleString("pt-BR", {
@@ -70,6 +72,112 @@ function labelDebtCategory(value?: string) {
   return value || "-";
 }
 
+function MultiSelectField({
+  label,
+  options,
+  selectedIds,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  options: SelectOption[];
+  selectedIds: string[];
+  onChange: (value: string[]) => void;
+  placeholder: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const selectedOptions = useMemo(
+    () => options.filter((option) => selectedIds.includes(option.id)),
+    [options, selectedIds]
+  );
+
+  const filteredOptions = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return options.filter((option) => {
+      if (selectedIds.includes(option.id)) return false;
+      if (!normalized) return true;
+      return option.label.toLowerCase().includes(normalized);
+    });
+  }, [options, selectedIds, query]);
+
+  function addItem(id: string) {
+    if (selectedIds.includes(id)) return;
+    onChange([...selectedIds, id]);
+    setQuery("");
+    setOpen(true);
+  }
+
+  function removeItem(id: string) {
+    onChange(selectedIds.filter((item) => item !== id));
+  }
+
+  return (
+    <div className="space-y-1">
+      <label className="block text-sm font-semibold text-slate-700">{label}</label>
+      <div className="relative">
+        <div
+          className="min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-sm focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-200"
+          onClick={() => setOpen(true)}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedOptions.map((item) => (
+              <span
+                key={item.id}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700"
+              >
+                {item.label}
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    removeItem(item.id);
+                  }}
+                  className="cursor-pointer text-slate-500 hover:text-red-600"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <input
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setOpen(true);
+              }}
+              onFocus={() => setOpen(true)}
+              onBlur={() => {
+                setTimeout(() => setOpen(false), 120);
+              }}
+              placeholder={selectedOptions.length === 0 ? placeholder : "Digite para buscar..."}
+              className="min-w-[180px] flex-1 bg-transparent px-1 py-1 text-sm outline-none"
+            />
+          </div>
+        </div>
+
+        {open && filteredOptions.length > 0 ? (
+          <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+            {filteredOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  addItem(option.id);
+                }}
+                className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function ReportsPage() {
   const { selectedBranchId } = useBranch();
   const [loading, setLoading] = useState(true);
@@ -85,8 +193,13 @@ export function ReportsPage() {
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
+  const [selectedVehicleTypes, setSelectedVehicleTypes] = useState<VehicleTypeFilter[]>([]);
+  const [selectedModules, setSelectedModules] = useState<ReportModule[]>([
+    "FUEL",
+    "MAINTENANCE",
+    "DEBTS",
+  ]);
   const [plateFilter, setPlateFilter] = useState("");
-  const [category, setCategory] = useState<ReportCategory>("ALL");
   const [format, setFormat] = useState("PDF");
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
@@ -133,6 +246,14 @@ export function ReportsPage() {
     );
   }, [selectedBranchId]);
 
+  const branchOptions = useMemo<SelectOption[]>(
+    () =>
+      [...branches]
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+        .map((branch) => ({ id: branch.id, label: branch.name })),
+    [branches]
+  );
+
   const availableVehicles = useMemo(() => {
     const scoped = selectedBranchId
       ? vehicles.filter((item) => item.branchId === selectedBranchId)
@@ -142,15 +263,51 @@ export function ReportsPage() {
     );
   }, [vehicles, selectedBranchId]);
 
+  const vehicleOptions = useMemo<SelectOption[]>(
+    () =>
+      availableVehicles.map((vehicle) => ({
+        id: vehicle.id,
+        label: `${vehicle.brand} ${vehicle.model} (${vehicle.plate})`,
+      })),
+    [availableVehicles]
+  );
+
+  const driverOptions = useMemo<SelectOption[]>(
+    () =>
+      [...drivers]
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+        .map((driver) => ({ id: driver.id, label: driver.name })),
+    [drivers]
+  );
+
+  const vehicleTypeOptions: SelectOption[] = [
+    { id: "LIGHT", label: "Leve" },
+    { id: "HEAVY", label: "Pesado" },
+  ];
+
+  const moduleOptions: SelectOption[] = [
+    { id: "FUEL", label: "Abastecimentos" },
+    { id: "MAINTENANCE", label: "Manutenções" },
+    { id: "DEBTS", label: "Débitos e multas" },
+  ];
+
   const filteredData = useMemo(() => {
     const vehicleByBranch = availableVehicles.filter((vehicle) =>
       selectedBranchIds.length > 0 ? selectedBranchIds.includes(vehicle.branchId) : true
     );
-    const vehicleByPlate = vehicleByBranch.filter((vehicle) =>
+
+    const vehicleByType = vehicleByBranch.filter((vehicle) =>
+      selectedVehicleTypes.length > 0
+        ? selectedVehicleTypes.includes(vehicle.vehicleType as VehicleTypeFilter)
+        : true
+    );
+
+    const vehicleByPlate = vehicleByType.filter((vehicle) =>
       plateFilter.trim()
         ? vehicle.plate.toLowerCase().includes(plateFilter.trim().toLowerCase())
         : true
     );
+
     const vehiclesFinal = vehicleByPlate.filter((vehicle) =>
       selectedVehicleIds.length > 0 ? selectedVehicleIds.includes(vehicle.id) : true
     );
@@ -197,6 +354,7 @@ export function ReportsPage() {
   }, [
     availableVehicles,
     selectedBranchIds,
+    selectedVehicleTypes,
     selectedVehicleIds,
     selectedDriverIds,
     plateFilter,
@@ -221,21 +379,20 @@ export function ReportsPage() {
 
   function exportReport() {
     const generatedAt = new Date().toLocaleString("pt-BR");
-    const branchNames = branches
-      .filter((branch) => selectedBranchIds.includes(branch.id))
-      .map((branch) => branch.name);
-    const categoryLabel =
-      category === "ALL"
-        ? "Geral"
-        : category === "FUEL"
-          ? "Abastecimentos"
-          : category === "MAINTENANCE"
-            ? "Manutenções"
-            : "Débitos e multas";
+    const selectedBranchNames = branchOptions
+      .filter((option) => selectedBranchIds.includes(option.id))
+      .map((option) => option.label);
+    const selectedModulesLabels = moduleOptions
+      .filter((option) => selectedModules.includes(option.id as ReportModule))
+      .map((option) => option.label);
+    const selectedTypesLabels = vehicleTypeOptions
+      .filter((option) => selectedVehicleTypes.includes(option.id as VehicleTypeFilter))
+      .map((option) => option.label);
 
-    const showFuel = category === "ALL" || category === "FUEL";
-    const showMaintenance = category === "ALL" || category === "MAINTENANCE";
-    const showDebts = category === "ALL" || category === "DEBTS";
+    const showFuel = selectedModules.length === 0 || selectedModules.includes("FUEL");
+    const showMaintenance =
+      selectedModules.length === 0 || selectedModules.includes("MAINTENANCE");
+    const showDebts = selectedModules.length === 0 || selectedModules.includes("DEBTS");
 
     const html = `
       <html>
@@ -255,9 +412,10 @@ export function ReportsPage() {
           <h1>Relatório operacional</h1>
           <div class="meta">Gerado em: ${generatedAt}</div>
           <div class="meta">Formato: ${escapeHtml(format)}</div>
-          <div class="meta">Categoria: ${escapeHtml(categoryLabel)}</div>
+          <div class="meta">Módulos: ${escapeHtml(selectedModulesLabels.join(", ") || "Todos")}</div>
+          <div class="meta">Categoria de veículo: ${escapeHtml(selectedTypesLabels.join(", ") || "Todas")}</div>
           <div class="meta">Período: ${escapeHtml(formatDate(startDate))} até ${escapeHtml(formatDate(endDate))}</div>
-          <div class="meta">Estabelecimentos: ${escapeHtml(branchNames.join(", ") || "Todos")}</div>
+          <div class="meta">Estabelecimentos: ${escapeHtml(selectedBranchNames.join(", ") || "Todos")}</div>
           <div class="meta">Placa (filtro): ${escapeHtml(plateFilter || "Todas")}</div>
           <div class="meta">Total despesas: ${metrics.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div>
 
@@ -359,101 +517,90 @@ export function ReportsPage() {
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-3">
-            <label className="mb-1 block text-sm font-semibold text-slate-700">Estabelecimento</label>
-            <select
-              multiple
-              value={selectedBranchIds}
-              onChange={(event) =>
-                setSelectedBranchIds(Array.from(event.currentTarget.selectedOptions).map((item) => item.value))
-              }
-              className="h-28 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            >
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
+            <MultiSelectField
+              label="Estabelecimento"
+              options={branchOptions}
+              selectedIds={selectedBranchIds}
+              onChange={setSelectedBranchIds}
+              placeholder="Digite para buscar estabelecimento"
+            />
           </div>
+
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-700">Data inicial *</label>
             <input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(event) => setStartDate(event.target.value)}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
           </div>
+
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-700">Data final *</label>
             <input
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(event) => setEndDate(event.target.value)}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
           </div>
+
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-700">Placa</label>
             <input
               value={plateFilter}
-              onChange={(e) => setPlateFilter(e.target.value.toUpperCase())}
+              onChange={(event) => setPlateFilter(event.target.value.toUpperCase())}
               placeholder="AAA1234 ou AAA1A34"
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
           </div>
+
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700">Veículos</label>
-            <select
-              multiple
-              value={selectedVehicleIds}
-              onChange={(event) =>
-                setSelectedVehicleIds(Array.from(event.currentTarget.selectedOptions).map((item) => item.value))
-              }
-              className="h-28 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            >
-              {availableVehicles.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicle.brand} {vehicle.model} ({vehicle.plate})
-                </option>
-              ))}
-            </select>
+            <MultiSelectField
+              label="Veículos"
+              options={vehicleOptions}
+              selectedIds={selectedVehicleIds}
+              onChange={setSelectedVehicleIds}
+              placeholder="Digite para buscar veículo"
+            />
           </div>
+
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700">Motoristas</label>
-            <select
-              multiple
-              value={selectedDriverIds}
-              onChange={(event) =>
-                setSelectedDriverIds(Array.from(event.currentTarget.selectedOptions).map((item) => item.value))
-              }
-              className="h-28 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            >
-              {drivers.map((driver) => (
-                <option key={driver.id} value={driver.id}>
-                  {driver.name}
-                </option>
-              ))}
-            </select>
+            <MultiSelectField
+              label="Motoristas"
+              options={driverOptions}
+              selectedIds={selectedDriverIds}
+              onChange={setSelectedDriverIds}
+              placeholder="Digite para buscar motorista"
+            />
           </div>
+
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700">Categoria</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as ReportCategory)}
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            >
-              <option value="ALL">Geral</option>
-              <option value="FUEL">Abastecimentos</option>
-              <option value="MAINTENANCE">Manutenções</option>
-              <option value="DEBTS">Débitos e multas</option>
-            </select>
+            <MultiSelectField
+              label="Categoria de veículo"
+              options={vehicleTypeOptions}
+              selectedIds={selectedVehicleTypes}
+              onChange={(value) => setSelectedVehicleTypes(value as VehicleTypeFilter[])}
+              placeholder="Selecione Leve/Pesado"
+            />
           </div>
+
+          <div>
+            <MultiSelectField
+              label="Módulos"
+              options={moduleOptions}
+              selectedIds={selectedModules}
+              onChange={(value) => setSelectedModules(value as ReportModule[])}
+              placeholder="Selecione os módulos"
+            />
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-700">Formato</label>
             <select
               value={format}
-              onChange={(e) => setFormat(e.target.value)}
+              onChange={(event) => setFormat(event.target.value)}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             >
               <option value="PDF">PDF</option>
@@ -481,19 +628,29 @@ export function ReportsPage() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total despesas</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Total despesas
+          </p>
           <p className="mt-2 text-2xl font-bold text-slate-900">{toCurrency(metrics.total)}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Abastecimentos</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Abastecimentos
+          </p>
           <p className="mt-2 text-2xl font-bold text-slate-900">{filteredData.fuel.length}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Manutenções</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{filteredData.maintenance.length}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Manutenções
+          </p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">
+            {filteredData.maintenance.length}
+          </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Débitos e multas</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Débitos e multas
+          </p>
           <p className="mt-2 text-2xl font-bold text-slate-900">{filteredData.debts.length}</p>
         </div>
       </div>
@@ -501,7 +658,7 @@ export function ReportsPage() {
       <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
         {loading
           ? "Sincronizando dados para geração dos relatórios..."
-          : "Selecione múltiplos itens com Ctrl (Windows) para confronto entre 2 ou mais veículos e motoristas."}
+          : "Use os campos multi-select para cruzar 1, 2 ou mais veículos, motoristas, tipos e módulos."}
       </div>
     </div>
   );
