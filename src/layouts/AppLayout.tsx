@@ -27,7 +27,8 @@ import { detectFuelAnomalies } from "../services/fuelAnomalies";
 import { getMaintenanceRecords } from "../services/maintenanceRecords";
 import { getDebts } from "../services/debts";
 import {
-  getMenuVisibilityMap,
+  fetchMenuVisibilityMap,
+  getCachedMenuVisibilityMap,
   isMenuPathVisible,
   type MenuVisibilityMap,
 } from "../services/menuVisibility";
@@ -101,7 +102,7 @@ export function AppLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(() => getMenuVisibilityMap());
+  const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(() => getCachedMenuVisibilityMap());
 
   const menu = [
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN", "FLEET_MANAGER"] },
@@ -248,14 +249,27 @@ export function AppLayout() {
   }, []);
 
   useEffect(() => {
-    function refreshMenuVisibility() {
-      setMenuVisibility(getMenuVisibilityMap());
+    async function refreshMenuVisibility() {
+      const visibility = await fetchMenuVisibilityMap();
+      setMenuVisibility(visibility);
     }
+    refreshMenuVisibility();
     window.addEventListener("evfleet-menu-visibility-updated", refreshMenuVisibility);
     return () => {
       window.removeEventListener("evfleet-menu-visibility-updated", refreshMenuVisibility);
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    if (location.pathname === "/login") return;
+    if (isMenuPathVisible(location.pathname, menuVisibility)) return;
+
+    const fallbackPath = filteredMenu[0]?.path || "/dashboard";
+    if (location.pathname !== fallbackPath) {
+      navigate(fallbackPath, { replace: true });
+    }
+  }, [filteredMenu, location.pathname, menuVisibility, navigate, user]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);

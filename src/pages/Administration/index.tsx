@@ -3,8 +3,8 @@ import { BellRing, Building2, FileCog, Lock, Settings2, ShieldCheck } from "luci
 import { addSystemLog } from "../../services/systemLogs";
 import {
   MENU_VISIBILITY_ITEMS,
+  fetchMenuVisibilityMap,
   getDefaultMenuVisibilityMap,
-  getMenuVisibilityMap,
   saveMenuVisibilityMap,
   type MenuVisibilityMap,
 } from "../../services/menuVisibility";
@@ -69,7 +69,7 @@ export function AdministrationPage() {
 
   useEffect(() => {
     setSettings(readSettings());
-    setMenuVisibility(getMenuVisibilityMap());
+    fetchMenuVisibilityMap().then(setMenuVisibility);
   }, []);
 
   function handleChange<K extends keyof SoftwareSettings>(field: K, value: SoftwareSettings[K]) {
@@ -97,17 +97,18 @@ export function AdministrationPage() {
     setMenuVisibility((prev) => ({ ...prev, [path]: value }));
   }
 
-  function saveMenuVisibility() {
-    saveMenuVisibilityMap(menuVisibility);
+  async function saveMenuVisibility() {
+    const saved = await saveMenuVisibilityMap(menuVisibility);
+    setMenuVisibility(saved);
     window.dispatchEvent(new CustomEvent("evfleet-menu-visibility-updated"));
     setSaveMessage("Visibilidade do menu lateral atualizada.");
     window.setTimeout(() => setSaveMessage(""), 2500);
   }
 
-  function restoreMenuVisibilityDefaults() {
+  async function restoreMenuVisibilityDefaults() {
     const defaults = getDefaultMenuVisibilityMap();
-    setMenuVisibility(defaults);
-    saveMenuVisibilityMap(defaults);
+    const saved = await saveMenuVisibilityMap(defaults);
+    setMenuVisibility(saved);
     window.dispatchEvent(new CustomEvent("evfleet-menu-visibility-updated"));
     setSaveMessage("Visibilidade do menu restaurada para padrão.");
     window.setTimeout(() => setSaveMessage(""), 2500);
