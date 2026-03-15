@@ -1,7 +1,6 @@
 ﻿import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowUpRight,
-  Building2,
   CarFront,
   CircleAlert,
   Fuel,
@@ -265,7 +264,6 @@ export function DashboardPage() {
       maintenanceTotal: filteredData.maintenance.length,
       fuelTotal: filteredData.fuel.length,
       debtsTotal: filteredData.debts.length,
-      branchesTotal: filteredData.branches.length,
       fuelOperationsPeriod: fuelInPeriod.length,
       fuelCostPeriod,
       maintenanceCostPeriod,
@@ -1109,23 +1107,6 @@ export function DashboardPage() {
           </div>
         </DashboardCard>
 
-        <DashboardCard
-          title="Filiais"
-          icon={
-            <div className="rounded-xl bg-violet-100 p-2 text-violet-700">
-              <Building2 size={16} />
-            </div>
-          }
-        >
-          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.branchesTotal}</p>
-          <div className="mt-3 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Filiais no escopo</span>
-            <span className="font-semibold text-slate-700">{selectedBranchId ? "Filial selecionada" : "Toda a rede"}</span>
-          </div>
-          <div className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
-            <span className="inline-flex items-center gap-1"><Gauge size={12} /> Painel corporativo em tempo real</span>
-          </div>
-        </DashboardCard>
       </div>
 
       {vehicleCostModal && vehicleCostModalData ? (

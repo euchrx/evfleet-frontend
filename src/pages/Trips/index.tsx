@@ -7,6 +7,7 @@ import type { Trip, TripStatus } from "../../types/trip";
 import type { Vehicle } from "../../types/vehicle";
 import type { Driver } from "../../types/driver";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
 
 type TripFormData = {
   vehicleId: string;
@@ -124,6 +125,11 @@ export function TripsPage() {
     return [...filtered].sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
   }, [drivers, selectedBranchId, form.driverId]);
 
+  const latestKmByVehicle = useMemo(
+    () => resolveLatestVehicleKmMap({ vehicles, trips }),
+    [vehicles, trips],
+  );
+
   const filteredTrips = useMemo(() => {
     let filtered = trips;
     if (selectedBranchId) filtered = filtered.filter((trip) => trip.vehicle?.branchId === selectedBranchId);
@@ -222,6 +228,20 @@ export function TripsPage() {
 
   function handleChange<K extends keyof TripFormData>(field: K, value: TripFormData[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleVehicleChange(vehicleId: string) {
+    if (editingTrip) {
+      handleChange("vehicleId", vehicleId);
+      return;
+    }
+    const latestKm = latestKmByVehicle.get(vehicleId);
+    setForm((prev) => ({
+      ...prev,
+      vehicleId,
+      departureKm: typeof latestKm === "number" ? String(latestKm) : "",
+      returnKm: "",
+    }));
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -351,13 +371,13 @@ export function TripsPage() {
                 <h2 className="text-xl font-bold text-slate-900">{editingTrip ? "Editar viagem" : "Registrar viagem"}</h2>
                 <p className="text-sm text-slate-500">Preencha os dados operacionais da viagem.</p>
               </div>
-              <button onClick={closeModal} className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100">Fechar</button>
+              <button onClick={closeModal} className="btn-ui btn-ui-neutral">Fechar</button>
             </div>
             <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto p-6">
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Planejamento</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select></div>
+                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleVehicleChange(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select></div>
                   <div><label className="block text-sm font-medium text-slate-700">Motorista</label><select value={form.driverId} onChange={(e) => handleChange("driverId", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um motorista</option>{availableDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></div>
                   <div><label className="block text-sm font-medium text-slate-700">Origem</label><input value={form.origin} onChange={(e) => handleChange("origin", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Cidade/filial de saída" /></div>
                   <div><label className="block text-sm font-medium text-slate-700">Destino</label><input value={form.destination} onChange={(e) => handleChange("destination", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Cidade/filial de destino" /></div>

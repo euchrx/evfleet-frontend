@@ -9,6 +9,7 @@ import {
   type CreateMaintenanceRecordInput,
 } from "../../services/maintenanceRecords";
 import type { Vehicle } from "../../types/vehicle";
+import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
 
 type RegisterForm = {
   recordId?: string;
@@ -65,6 +66,10 @@ export function MaintenanceRegisterPage() {
       );
       const nextRecords = Array.isArray(recordsData) ? recordsData : [];
       setVehicles(nextVehicles);
+      const latestKmByVehicle = resolveLatestVehicleKmMap({
+        vehicles: nextVehicles,
+        maintenanceRecords: nextRecords,
+      });
 
       const vehicleIdParam = searchParams.get("vehicleId") || "";
       const recordIdParam = searchParams.get("recordId") || "";
@@ -95,8 +100,16 @@ export function MaintenanceRegisterPage() {
         (selectedBranchId
           ? nextActiveVehicles.find((vehicle) => vehicle.branchId === selectedBranchId)?.id || ""
           : nextActiveVehicles[0]?.id || "");
+      const latestKm = defaultVehicleId
+        ? latestKmByVehicle.get(defaultVehicleId)
+        : undefined;
 
-      setForm((prev) => ({ ...initialForm, vehicleId: defaultVehicleId, maintenanceDate: prev.maintenanceDate }));
+      setForm((prev) => ({
+        ...initialForm,
+        vehicleId: defaultVehicleId,
+        km: typeof latestKm === "number" ? String(latestKm) : "",
+        maintenanceDate: prev.maintenanceDate,
+      }));
     } catch {
       setErrorMessage("Não foi possível carregar os dados para registro de manutenção.");
     } finally {
@@ -126,6 +139,11 @@ export function MaintenanceRegisterPage() {
   const selectedVehicle = useMemo(
     () => vehicles.find((vehicle) => vehicle.id === form.vehicleId) || null,
     [vehicles, form.vehicleId]
+  );
+
+  const latestKmByVehicle = useMemo(
+    () => resolveLatestVehicleKmMap({ vehicles }),
+    [vehicles],
   );
 
   function notifyHeaderNotifications() {
@@ -222,7 +240,17 @@ export function MaintenanceRegisterPage() {
                 Veículo
                 <select
                   value={form.vehicleId}
-                  onChange={(e) => updateField("vehicleId", e.target.value)}
+                  onChange={(e) => {
+                    const vehicleId = e.target.value;
+                    updateField("vehicleId", vehicleId);
+                    if (!isEditing) {
+                      const latestKm = latestKmByVehicle.get(vehicleId);
+                      updateField(
+                        "km",
+                        typeof latestKm === "number" ? String(latestKm) : "",
+                      );
+                    }
+                  }}
                   className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200"
                 >
                   <option value="">Selecione</option>

@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import type { Debt } from "../../types/debt";
 import type { Vehicle } from "../../types/vehicle";
-import type { FuelRecord } from "../../services/fuelRecords";
-import type { MaintenanceRecord } from "../../types/maintenance-record";
 import {
   createDebt,
   deleteDebt,
@@ -11,8 +9,6 @@ import {
   updateDebt,
 } from "../../services/debts";
 import { getVehicles } from "../../services/vehicles";
-import { getFuelRecords } from "../../services/fuelRecords";
-import { getMaintenanceRecords } from "../../services/maintenanceRecords";
 import { useBranch } from "../../contexts/BranchContext";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
@@ -135,10 +131,6 @@ export function DebtsPage() {
 
   const [debts, setDebts] = useState<Debt[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
-  const [maintenanceRecords, setMaintenanceRecords] = useState<
-    MaintenanceRecord[]
-  >([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
@@ -168,22 +160,15 @@ export function DebtsPage() {
       try {
         setLoading(true);
         setPageErrorMessage("");
-        const [debtsData, vehiclesData, fuelData, maintenanceData] =
-          await Promise.all([
-            getDebts(),
-            getVehicles(),
-            getFuelRecords(),
-            getMaintenanceRecords(),
-          ]);
+        const [debtsData, vehiclesData] = await Promise.all([
+          getDebts(),
+          getVehicles(),
+        ]);
         setDebts(Array.isArray(debtsData) ? debtsData : []);
         setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
-        setFuelRecords(Array.isArray(fuelData) ? fuelData : []);
-        setMaintenanceRecords(
-          Array.isArray(maintenanceData) ? maintenanceData : [],
-        );
       } catch (error) {
-        console.error("Erro ao carregar débitos:", error);
-        setPageErrorMessage("Não foi possível carregar os débitos.");
+        console.error("Erro ao carregar dÃ©bitos:", error);
+        setPageErrorMessage("NÃ£o foi possÃ­vel carregar os dÃ©bitos.");
       } finally {
         setLoading(false);
       }
@@ -338,36 +323,6 @@ export function DebtsPage() {
     return totals;
   }, [debts, selectedBranchId]);
 
-  const vehicleCosts = useMemo(() => {
-    const scopedVehicles = selectedBranchId
-      ? vehicles.filter((v) => v.branchId === selectedBranchId)
-      : vehicles;
-    return scopedVehicles
-      .map((vehicle) => {
-        const fuel = fuelRecords
-          .filter((item) => item.vehicleId === vehicle.id)
-          .reduce((sum, item) => sum + (item.totalValue || 0), 0);
-        const maintenance = maintenanceRecords
-          .filter((item) => item.vehicleId === vehicle.id)
-          .reduce((sum, item) => sum + (item.cost || 0), 0);
-        const debtTotal = debts
-          .filter((item) => item.vehicleId === vehicle.id)
-          .reduce((sum, item) => sum + (item.amount || 0), 0);
-        return {
-          id: vehicle.id,
-          label: `${vehicle.brand} ${vehicle.model}`,
-          plate: vehicle.plate,
-          fuel,
-          maintenance,
-          debts: debtTotal,
-          total: fuel + maintenance + debtTotal,
-        };
-      })
-      .filter((row) => row.total > 0)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 20);
-  }, [vehicles, selectedBranchId, fuelRecords, maintenanceRecords, debts]);
-
   function handleSort(column: DebtSortBy) {
     if (sortBy === column) {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -378,8 +333,8 @@ export function DebtsPage() {
   }
 
   function getSortArrow(column: DebtSortBy) {
-    if (sortBy !== column) return "↕";
-    return sortDirection === "asc" ? "↑" : "↓";
+    if (sortBy !== column) return "â†•";
+    return sortDirection === "asc" ? "â†‘" : "â†“";
   }
 
   function openCreateModal() {
@@ -439,12 +394,12 @@ export function DebtsPage() {
         vehicleId: form.vehicleId,
       };
       const nextErrors: Record<string, string> = {};
-      if (!payload.description) nextErrors.description = "Informe a descrição.";
-      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veículo.";
+      if (!payload.description) nextErrors.description = "Informe a descriÃ§Ã£o.";
+      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veÃ­culo.";
       if (!payload.debtDate)
         nextErrors.debtDate = "Informe a data de lancamento.";
       if (Number.isNaN(payload.amount) || payload.amount <= 0)
-        nextErrors.amount = "Informe um valor válido.";
+        nextErrors.amount = "Informe um valor vÃ¡lido.";
       if (Object.keys(nextErrors).length > 0) {
         return;
       }
@@ -454,18 +409,10 @@ export function DebtsPage() {
 
       closeModal();
       notifyHeaderNotifications();
-      const [debtsData, fuelData, maintenanceData] = await Promise.all([
-        getDebts(),
-        getFuelRecords(),
-        getMaintenanceRecords(),
-      ]);
+      const [debtsData] = await Promise.all([getDebts()]);
       setDebts(Array.isArray(debtsData) ? debtsData : []);
-      setFuelRecords(Array.isArray(fuelData) ? fuelData : []);
-      setMaintenanceRecords(
-        Array.isArray(maintenanceData) ? maintenanceData : [],
-      );
     } catch (error: any) {
-      console.error("Erro ao salvar débito:", error);
+      console.error("Erro ao salvar dÃ©bito:", error);
       const apiMessage =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
@@ -474,7 +421,7 @@ export function DebtsPage() {
       setFormErrorMessage(
         Array.isArray(apiMessage)
           ? apiMessage.join(", ")
-          : String(apiMessage || "Não foi possível salvar o débito."),
+          : String(apiMessage || "NÃ£o foi possÃ­vel salvar o dÃ©bito."),
       );
     } finally {
       setSaving(false);
@@ -494,8 +441,8 @@ export function DebtsPage() {
       notifyHeaderNotifications();
       setDebts((prev) => prev.filter((item) => item.id !== debtToDelete.id));
     } catch (error) {
-      console.error("Erro ao excluir débito:", error);
-      setPageErrorMessage("Não foi possível excluir o débito.");
+      console.error("Erro ao excluir dÃ©bito:", error);
+      setPageErrorMessage("NÃ£o foi possÃ­vel excluir o dÃ©bito.");
     } finally {
       setDeletingDebt(false);
     }
@@ -506,17 +453,17 @@ export function DebtsPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">
-            Débitos e Multas
+            DÃ©bitos e Multas
           </h1>
           <p className="text-sm text-slate-500">
-            Gestão completa de IPVA, multas e demais custos do veículo.
+            GestÃ£o completa de IPVA, multas e demais custos do veÃ­culo.
           </p>
         </div>
         <button
           onClick={openCreateModal}
           className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
         >
-          + Cadastrar débito
+          + Cadastrar dÃ©bito
         </button>
       </div>
 
@@ -578,7 +525,7 @@ export function DebtsPage() {
         <div className="flex flex-col gap-3 md:flex-row">
           <input
             type="text"
-            placeholder="Buscar por descrição, categoria, status ou placa"
+            placeholder="Buscar por descriÃ§Ã£o, categoria, status ou placa"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
@@ -637,7 +584,7 @@ export function DebtsPage() {
                     onClick={() => handleSort("description")}
                     className="cursor-pointer"
                   >
-                    Descrição {getSortArrow("description")}
+                    DescriÃ§Ã£o {getSortArrow("description")}
                   </button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
@@ -646,7 +593,7 @@ export function DebtsPage() {
                     onClick={() => handleSort("vehicle")}
                     className="cursor-pointer"
                   >
-                    Veículo {getSortArrow("vehicle")}
+                    VeÃ­culo {getSortArrow("vehicle")}
                   </button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
@@ -686,7 +633,7 @@ export function DebtsPage() {
                   </button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Ações
+                  AÃ§Ãµes
                 </th>
               </tr>
             </thead>
@@ -697,7 +644,7 @@ export function DebtsPage() {
                     colSpan={8}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
-                    Carregando débitos...
+                    Carregando dÃ©bitos...
                   </td>
                 </tr>
               ) : filteredDebts.length === 0 ? (
@@ -706,7 +653,7 @@ export function DebtsPage() {
                     colSpan={8}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
-                    Nenhum débito encontrado.
+                    Nenhum dÃ©bito encontrado.
                   </td>
                 </tr>
               ) : (
@@ -773,83 +720,6 @@ export function DebtsPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Custos totais por veículo
-          </h2>
-          <span className="text-xs text-slate-500">
-            Combustível + manutenção + débitos
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">
-                  Veículo
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">
-                  Combustível
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">
-                  Manutenção
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">
-                  Débitos
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {vehicleCosts.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-6 text-center text-sm text-slate-500"
-                  >
-                    Sem custos consolidados no escopo atual.
-                  </td>
-                </tr>
-              ) : (
-                vehicleCosts.map((row) => (
-                  <tr key={row.id} className="border-t border-slate-200">
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {row.label} ({row.plate})
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {row.fuel.toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {row.maintenance.toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {row.debts.toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">
-                      {row.total.toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {isModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
@@ -857,10 +727,10 @@ export function DebtsPage() {
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">
-                  {editingDebt ? "Editar débito" : "Cadastrar débito"}
+                  {editingDebt ? "Editar dÃ©bito" : "Cadastrar dÃ©bito"}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Registre IPVA, multa e demais custos por veículo.
+                  Registre IPVA, multa e demais custos por veÃ­culo.
                 </p>
               </div>
               <button
@@ -906,7 +776,7 @@ export function DebtsPage() {
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">
-                    Descrição
+                    DescriÃ§Ã£o
                   </label>
                   <input
                     type="text"
@@ -970,7 +840,7 @@ export function DebtsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">
-                    Credor/órgão
+                    Credor/Ã³rgÃ£o
                   </label>
                   <input
                     type="text"
@@ -982,14 +852,14 @@ export function DebtsPage() {
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">
-                    Veículo
+                    VeÃ­culo
                   </label>
                   <select
                     value={form.vehicleId}
                     onChange={(e) => handleChange("vehicleId", e.target.value)}
                     className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                   >
-                    <option value="">Selecione um veículo</option>
+                    <option value="">Selecione um veÃ­culo</option>
                     {availableVehicles.map((vehicle) => (
                       <option key={vehicle.id} value={vehicle.id}>
                         {vehicle.brand} {vehicle.model} ({vehicle.plate})
@@ -1006,7 +876,7 @@ export function DebtsPage() {
                     }
                     className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
                   />
-                  Débito recorrente
+                  DÃ©bito recorrente
                 </label>
               </div>
               {formErrorMessage ? (
@@ -1030,8 +900,8 @@ export function DebtsPage() {
                   {saving
                     ? "Salvando..."
                     : editingDebt
-                      ? "Salvar alterações"
-                      : "Cadastrar débito"}
+                      ? "Salvar alteraÃ§Ãµes"
+                      : "Cadastrar dÃ©bito"}
                 </button>
               </div>
             </form>
@@ -1040,10 +910,10 @@ export function DebtsPage() {
       ) : null}
       <ConfirmDeleteModal
         isOpen={Boolean(debtToDelete)}
-        title="Excluir débito"
+        title="Excluir dÃ©bito"
         description={
           debtToDelete
-            ? `Deseja excluir o débito "${debtToDelete.description}"?`
+            ? `Deseja excluir o dÃ©bito "${debtToDelete.description}"?`
             : ""
         }
         loading={deletingDebt}

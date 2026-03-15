@@ -26,6 +26,7 @@ import { getVehicles } from "../services/vehicles";
 import { detectFuelAnomalies } from "../services/fuelAnomalies";
 import { getMaintenanceRecords } from "../services/maintenanceRecords";
 import { getDebts } from "../services/debts";
+import { getVehicleDocuments } from "../services/vehicleDocuments";
 import {
   fetchMenuVisibilityMap,
   getCachedMenuVisibilityMap,
@@ -145,13 +146,26 @@ export function AppLayout() {
   }
 
   async function loadNotifications() {
-    const [fuelRecordsResult, vehiclesResult, maintenanceRecordsResult, debtsResult] =
-      await Promise.allSettled([getFuelRecords(), getVehicles(), getMaintenanceRecords(), getDebts()]);
+    const [
+      fuelRecordsResult,
+      vehiclesResult,
+      maintenanceRecordsResult,
+      debtsResult,
+      vehicleDocumentsResult,
+    ] = await Promise.allSettled([
+      getFuelRecords(),
+      getVehicles(),
+      getMaintenanceRecords(),
+      getDebts(),
+      getVehicleDocuments(),
+    ]);
 
     const fuelRecords = fuelRecordsResult.status === "fulfilled" ? fuelRecordsResult.value : [];
     const vehicles = vehiclesResult.status === "fulfilled" ? vehiclesResult.value : [];
     const maintenanceRecords = maintenanceRecordsResult.status === "fulfilled" ? maintenanceRecordsResult.value : [];
     const debts = debtsResult.status === "fulfilled" ? debtsResult.value : [];
+    const vehicleDocuments =
+      vehicleDocumentsResult.status === "fulfilled" ? vehicleDocumentsResult.value : [];
 
     const anomalyNotifications: AppNotification[] =
       fuelRecords.length > 0 && vehicles.length > 0
@@ -227,8 +241,64 @@ export function AppLayout() {
         };
       });
 
+    const expiringDocumentNotifications: AppNotification[] = vehicleDocuments
+      .filter((document) => {
+        if (!document.expiryDate) return false;
+        const daysUntil = getDaysUntil(document.expiryDate);
+        return daysUntil >= 0 && daysUntil <= 5;
+      })
+      .map((document) => {
+        const daysUntil = getDaysUntil(document.expiryDate || document.updatedAt || document.createdAt);
+        const vehicleLabel = document.vehicle
+          ? `${document.vehicle.brand} ${document.vehicle.model}`
+          : "Veículo";
+
+        return {
+          id: `document-expiring-${document.id}`,
+          title: `Documento vencendo - ${vehicleLabel}`,
+          description:
+            daysUntil === 0
+              ? `${document.name} vence hoje.`
+              : `${document.name} vence em ${daysUntil} dia(s).`,
+          date: document.expiryDate || document.updatedAt || document.createdAt,
+          link: `/vehicle-documents?highlight=${document.id}`,
+        };
+      });
+
+    const expiredDocumentNotifications: AppNotification[] = vehicleDocuments
+      .filter((document) => {
+        if (!document.expiryDate) return String(document.status || "").toUpperCase() === "EXPIRED";
+        const daysUntil = getDaysUntil(document.expiryDate);
+        return daysUntil < 0 || String(document.status || "").toUpperCase() === "EXPIRED";
+      })
+      .map((document) => {
+        const vehicleLabel = document.vehicle
+          ? `${document.vehicle.brand} ${document.vehicle.model}`
+          : "Veículo";
+        const overdueDays = document.expiryDate
+          ? Math.abs(getDaysUntil(document.expiryDate))
+          : 0;
+
+        return {
+          id: `document-expired-${document.id}`,
+          title: `Documento vencido - ${vehicleLabel}`,
+          description: document.expiryDate
+            ? `${document.name} está vencido há ${overdueDays} dia(s).`
+            : `${document.name} está marcado como vencido.`,
+          date: document.expiryDate || document.updatedAt || document.createdAt,
+          link: `/vehicle-documents?highlight=${document.id}`,
+        };
+      });
+
     setNotifications(
-      [...overdueDebtNotifications, ...maintenanceNotifications, ...debtNotifications, ...anomalyNotifications].sort(
+      [
+        ...overdueDebtNotifications,
+        ...expiredDocumentNotifications,
+        ...maintenanceNotifications,
+        ...debtNotifications,
+        ...expiringDocumentNotifications,
+        ...anomalyNotifications,
+      ].sort(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
       )
     );

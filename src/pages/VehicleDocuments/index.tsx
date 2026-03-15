@@ -6,6 +6,7 @@ import type { Vehicle } from "../../types/vehicle";
 import type { VehicleDocument, VehicleDocumentStatus, VehicleDocumentType } from "../../types/vehicle-document";
 import { api } from "../../services/api";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { useLocation } from "react-router-dom";
 
 type DocumentFormData = {
   type: VehicleDocumentType;
@@ -92,6 +93,7 @@ function statusClass(status: VehicleDocumentStatus) {
 }
 
 export function VehicleDocumentsPage() {
+  const location = useLocation();
   const { selectedBranchId } = useBranch();
   const [documents, setDocuments] = useState<VehicleDocument[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -106,6 +108,7 @@ export function VehicleDocumentsPage() {
   const [editingDocument, setEditingDocument] = useState<VehicleDocument | null>(null);
   const [documentToDelete, setDocumentToDelete] = useState<VehicleDocument | null>(null);
   const [deletingDocument, setDeletingDocument] = useState(false);
+  const [highlightedDocumentId, setHighlightedDocumentId] = useState<string | null>(null);
   const [form, setForm] = useState<DocumentFormData>(initialForm);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -127,6 +130,37 @@ export function VehicleDocumentsPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    const query = new URLSearchParams(location.search);
+    const incomingHighlight = query.get("highlight");
+    if (!incomingHighlight) return;
+
+    setHighlightedDocumentId(incomingHighlight);
+    const timer = window.setTimeout(() => {
+      document
+        .getElementById(`vehicle-document-row-${incomingHighlight}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+
+    query.delete("highlight");
+    const next = query.toString();
+    const nextUrl = `${window.location.pathname}${next ? `?${next}` : ""}${window.location.hash || ""}`;
+    window.history.replaceState({}, "", nextUrl);
+
+    return () => window.clearTimeout(timer);
+  }, [location.search]);
+
+  useEffect(() => {
+    if (!highlightedDocumentId) return;
+    const clear = () => setHighlightedDocumentId(null);
+    document.addEventListener("pointerdown", clear, { passive: true });
+    document.addEventListener("keydown", clear);
+    return () => {
+      document.removeEventListener("pointerdown", clear);
+      document.removeEventListener("keydown", clear);
+    };
+  }, [highlightedDocumentId]);
 
   const availableVehicles = useMemo(() => {
     let filtered = vehicles;
@@ -273,6 +307,7 @@ export function VehicleDocumentsPage() {
 
       closeModal();
       await loadData();
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
     } catch (error: any) {
       const apiMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "";
       setFormErrorMessage(Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage || "Não foi possível salvar o documento."));
@@ -299,6 +334,7 @@ export function VehicleDocumentsPage() {
       await deleteVehicleDocument(documentToDelete.id);
       setDocumentToDelete(null);
       await loadData();
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
     } catch (error) {
       console.error("Erro ao excluir documento:", error);
       setPageErrorMessage("Não foi possível excluir o documento.");
@@ -346,8 +382,9 @@ export function VehicleDocumentsPage() {
             <tbody>
               {loading ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Carregando documentos...</td></tr> : filteredDocuments.length === 0 ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum documento encontrado.</td></tr> : filteredDocuments.map((item) => {
                 const effectiveStatus = getEffectiveStatus(item);
+                const isHighlighted = highlightedDocumentId === item.id;
                 return (
-                  <tr key={item.id} className="border-t border-slate-200">
+                  <tr id={`vehicle-document-row-${item.id}`} key={item.id} className={`border-t border-slate-200 ${isHighlighted ? "notification-highlight" : ""}`}>
                     <td className="px-6 py-4 text-sm text-slate-700">{documentTypeLabel(item.type)}</td>
                     <td className="px-6 py-4 text-sm text-slate-700"><p className="font-medium text-slate-900">{item.name}</p><p className="text-xs text-slate-500">{item.number || "Sem numero"}</p>{item.fileUrl ? <a href={resolveFileUrl(item.fileUrl)} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-blue-700 hover:underline">Ver anexo</a> : null}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{item.vehicle ? `${item.vehicle.brand} ${item.vehicle.model} (${item.vehicle.plate})` : item.vehicleId}</td>
@@ -370,7 +407,7 @@ export function VehicleDocumentsPage() {
                 <h2 className="text-xl font-bold text-slate-900">{editingDocument ? "Editar documento" : "Cadastrar documento"}</h2>
                 <p className="text-sm text-slate-500">Gerencie validade e rastreabilidade documental do veículo.</p>
               </div>
-              <button onClick={closeModal} className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100">Fechar</button>
+              <button onClick={closeModal} className="btn-ui btn-ui-neutral">Fechar</button>
             </div>
             <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto p-6">
               <div className="rounded-2xl border border-slate-200 p-4">

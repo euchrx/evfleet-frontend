@@ -32,6 +32,7 @@ import type { Vehicle } from "../../types/vehicle";
 import type { MaintenanceRecord } from "../../types/maintenance-record";
 import type { MaintenancePlan } from "../../types/maintenance-plan";
 import type { Tire, TireAlert, TireReading, TireStatus } from "../../types/tire";
+import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
 
 type Tab = "records" | "plans" | "tires";
 type SortDirection = "asc" | "desc";
@@ -521,13 +522,22 @@ export function MaintenanceRecordsPage() {
     return { total: scopedTires.length, installed, alerts: tireAlerts.length, invested };
   }, [scopedTires, tireAlerts]);
 
+  const latestKmByVehicle = useMemo(
+    () => resolveLatestVehicleKmMap({ vehicles, maintenanceRecords: records }),
+    [vehicles, records],
+  );
+
   function openCreateRecord() {
     setEditingRecord(null);
     setRecordError("");
+    const defaultVehicleId = activeVehicles[0]?.id || "";
+    const latestKm = defaultVehicleId
+      ? latestKmByVehicle.get(defaultVehicleId)
+      : undefined;
     setRecordForm({
       ...initialRecordForm,
-      vehicleId: activeVehicles[0]?.id || "",
-      km: activeVehicles[0]?.currentKm ? String(activeVehicles[0].currentKm) : "",
+      vehicleId: defaultVehicleId,
+      km: typeof latestKm === "number" ? String(latestKm) : "",
     });
     setRecordModalOpen(true);
   }
@@ -667,7 +677,15 @@ export function MaintenanceRecordsPage() {
   function openCreateTire() {
     setEditingTire(null);
     setTireError("");
-    setTireForm({ ...initialTireForm, vehicleId: activeVehicles[0]?.id || "" });
+    const defaultVehicleId = activeVehicles[0]?.id || "";
+    const latestKm = defaultVehicleId
+      ? latestKmByVehicle.get(defaultVehicleId)
+      : undefined;
+    setTireForm({
+      ...initialTireForm,
+      vehicleId: defaultVehicleId,
+      currentKm: typeof latestKm === "number" ? String(latestKm) : "",
+    });
     setTireModalOpen(true);
   }
 
@@ -1034,7 +1052,7 @@ export function MaintenanceRecordsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">Veículo</label>
-                  <select value={recordForm.vehicleId} onChange={(event) => setRecordForm((prev) => ({ ...prev, vehicleId: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                  <select value={recordForm.vehicleId} onChange={(event) => setRecordForm((prev) => { const vehicleId = event.target.value; if (editingRecord) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, km: typeof latestKm === "number" ? String(latestKm) : "" }; })} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
                     <option value="">Selecione um veículo</option>
                     {(editingRecord ? scopedVehicles : activeVehicles).map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}
                   </select>
@@ -1145,7 +1163,7 @@ export function MaintenanceRecordsPage() {
                 <div><label className="block text-sm font-medium text-slate-700">Marca</label><input value={tireForm.brand} onChange={(event) => setTireForm((prev) => ({ ...prev, brand: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Modelo</label><input value={tireForm.model} onChange={(event) => setTireForm((prev) => ({ ...prev, model: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Medida</label><input value={tireForm.size} onChange={(event) => setTireForm((prev) => ({ ...prev, size: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 295/80R22.5" /></div>
-                <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => setTireForm((prev) => ({ ...prev, vehicleId: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Sem vínculo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select></div>
+                <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => setTireForm((prev) => { const vehicleId = event.target.value; if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; })} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Sem vínculo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select></div>
                 <div><label className="block text-sm font-medium text-slate-700">Posição do eixo</label><input value={tireForm.axlePosition} onChange={(event) => setTireForm((prev) => ({ ...prev, axlePosition: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Traseiro" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Posição da roda</label><input value={tireForm.wheelPosition} onChange={(event) => setTireForm((prev) => ({ ...prev, wheelPosition: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Dianteira direita" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">KM atual</label><input type="number" min={0} value={tireForm.currentKm} onChange={(event) => setTireForm((prev) => ({ ...prev, currentKm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>

@@ -19,6 +19,7 @@ import { getDrivers } from "../../services/drivers";
 import { useBranch } from "../../contexts/BranchContext";
 import { useLocation } from "react-router-dom";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
 
 type FuelFormData = {
   liters: string;
@@ -373,6 +374,25 @@ export function FuelRecordsPage() {
     return sorted.filter((driver) => driver.status === "ACTIVE");
   }, [drivers, selectedBranchId, editingRecord, form.driverId]);
 
+  const latestKmByVehicle = useMemo(
+    () => resolveLatestVehicleKmMap({ vehicles, fuelRecords: records }),
+    [vehicles, records],
+  );
+
+  function handleVehicleChange(vehicleId: string) {
+    if (editingRecord) {
+      handleChange("vehicleId", vehicleId);
+      return;
+    }
+    const latestKm = latestKmByVehicle.get(vehicleId);
+    setForm((prev) => ({
+      ...prev,
+      vehicleId,
+      km: typeof latestKm === "number" ? String(latestKm) : "",
+    }));
+    setFieldErrors((prev) => ({ ...prev, vehicleId: undefined, km: undefined }));
+  }
+
   const filteredRecords = useMemo(() => {
     let filtered = records;
 
@@ -705,7 +725,7 @@ export function FuelRecordsPage() {
                   </label>
                   <select
                     value={form.vehicleId}
-                    onChange={(e) => handleChange("vehicleId", e.target.value)}
+                    onChange={(e) => handleVehicleChange(e.target.value)}
                     className={inputClass("vehicleId")}
                   >
                     <option value="">Selecione um veículo</option>
