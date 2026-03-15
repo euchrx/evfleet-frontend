@@ -63,7 +63,9 @@ const debtCategoryOptions: Array<{ value: DebtCategory; label: string }> = [
 ];
 
 function categoryLabel(value?: DebtCategory | null) {
-  return debtCategoryOptions.find((item) => item.value === value)?.label || "Outro";
+  return (
+    debtCategoryOptions.find((item) => item.value === value)?.label || "Outro"
+  );
 }
 
 function formatMoney(value: string) {
@@ -97,7 +99,15 @@ function getEffectiveDebtStatus(debt: Debt) {
   const dueDate = parseLocalDate(debt.dueDate || debt.debtDate);
   if (!dueDate) return debt.status;
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    0,
+    0,
+    0,
+    0,
+  );
   return debt.status === "PENDING" && dueDate.getTime() < today.getTime()
     ? "OVERDUE"
     : debt.status;
@@ -126,14 +136,18 @@ export function DebtsPage() {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
-  const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
+  const [maintenanceRecords, setMaintenanceRecords] = useState<
+    MaintenanceRecord[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [categoryFilter, setCategoryFilter] = useState<"ALL" | DebtCategory>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState<"ALL" | DebtCategory>(
+    "ALL",
+  );
   const [sortBy, setSortBy] = useState<DebtSortBy>("debtDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -141,7 +155,9 @@ export function DebtsPage() {
   const [debtToDelete, setDebtToDelete] = useState<Debt | null>(null);
   const [deletingDebt, setDeletingDebt] = useState(false);
   const [form, setForm] = useState<DebtFormData>(initialForm);
-  const [highlightedDebtId, setHighlightedDebtId] = useState<string | null>(null);
+  const [highlightedDebtId, setHighlightedDebtId] = useState<string | null>(
+    null,
+  );
 
   function notifyHeaderNotifications() {
     window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
@@ -152,16 +168,19 @@ export function DebtsPage() {
       try {
         setLoading(true);
         setPageErrorMessage("");
-        const [debtsData, vehiclesData, fuelData, maintenanceData] = await Promise.all([
-          getDebts(),
-          getVehicles(),
-          getFuelRecords(),
-          getMaintenanceRecords(),
-        ]);
+        const [debtsData, vehiclesData, fuelData, maintenanceData] =
+          await Promise.all([
+            getDebts(),
+            getVehicles(),
+            getFuelRecords(),
+            getMaintenanceRecords(),
+          ]);
         setDebts(Array.isArray(debtsData) ? debtsData : []);
         setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
         setFuelRecords(Array.isArray(fuelData) ? fuelData : []);
-        setMaintenanceRecords(Array.isArray(maintenanceData) ? maintenanceData : []);
+        setMaintenanceRecords(
+          Array.isArray(maintenanceData) ? maintenanceData : [],
+        );
       } catch (error) {
         console.error("Erro ao carregar débitos:", error);
         setPageErrorMessage("Não foi possível carregar os débitos.");
@@ -205,17 +224,32 @@ export function DebtsPage() {
 
   const availableVehicles = useMemo(() => {
     let filtered = vehicles;
-    if (selectedBranchId) filtered = filtered.filter((vehicle) => vehicle.branchId === selectedBranchId);
+    if (selectedBranchId)
+      filtered = filtered.filter(
+        (vehicle) => vehicle.branchId === selectedBranchId,
+      );
     return filtered
-      .filter((vehicle) => vehicle.status === "ACTIVE" || vehicle.id === form.vehicleId)
-      .sort((a, b) => a.plate.localeCompare(b.plate, "pt-BR", { sensitivity: "base" }));
+      .filter(
+        (vehicle) =>
+          vehicle.status === "ACTIVE" || vehicle.id === form.vehicleId,
+      )
+      .sort((a, b) =>
+        a.plate.localeCompare(b.plate, "pt-BR", { sensitivity: "base" }),
+      );
   }, [vehicles, selectedBranchId, form.vehicleId]);
 
   const filteredDebts = useMemo(() => {
     let filtered = debts;
-    if (selectedBranchId) filtered = filtered.filter((debt) => debt.vehicle?.branchId === selectedBranchId);
-    if (statusFilter !== "ALL") filtered = filtered.filter((debt) => getEffectiveDebtStatus(debt) === statusFilter);
-    if (categoryFilter !== "ALL") filtered = filtered.filter((debt) => debt.category === categoryFilter);
+    if (selectedBranchId)
+      filtered = filtered.filter(
+        (debt) => debt.vehicle?.branchId === selectedBranchId,
+      );
+    if (statusFilter !== "ALL")
+      filtered = filtered.filter(
+        (debt) => getEffectiveDebtStatus(debt) === statusFilter,
+      );
+    if (categoryFilter !== "ALL")
+      filtered = filtered.filter((debt) => debt.category === categoryFilter);
     if (search.trim()) {
       const term = search.toLowerCase();
       filtered = filtered.filter((debt) => {
@@ -237,23 +271,62 @@ export function DebtsPage() {
 
     const direction = sortDirection === "asc" ? 1 : -1;
     return [...filtered].sort((a, b) => {
-      if (sortBy === "category") return categoryLabel(a.category).localeCompare(categoryLabel(b.category), "pt-BR") * direction;
+      if (sortBy === "category")
+        return (
+          categoryLabel(a.category).localeCompare(
+            categoryLabel(b.category),
+            "pt-BR",
+          ) * direction
+        );
       if (sortBy === "vehicle") {
         const av = a.vehicle ? `${a.vehicle.brand} ${a.vehicle.model}` : "";
         const bv = b.vehicle ? `${b.vehicle.brand} ${b.vehicle.model}` : "";
         return av.localeCompare(bv, "pt-BR") * direction;
       }
-      if (sortBy === "debtDate") return ((parseLocalDate(a.debtDate)?.getTime() || 0) - (parseLocalDate(b.debtDate)?.getTime() || 0)) * direction;
-      if (sortBy === "dueDate") return ((parseLocalDate(a.dueDate || a.debtDate)?.getTime() || 0) - (parseLocalDate(b.dueDate || b.debtDate)?.getTime() || 0)) * direction;
+      if (sortBy === "debtDate")
+        return (
+          ((parseLocalDate(a.debtDate)?.getTime() || 0) -
+            (parseLocalDate(b.debtDate)?.getTime() || 0)) *
+          direction
+        );
+      if (sortBy === "dueDate")
+        return (
+          ((parseLocalDate(a.dueDate || a.debtDate)?.getTime() || 0) -
+            (parseLocalDate(b.dueDate || b.debtDate)?.getTime() || 0)) *
+          direction
+        );
       if (sortBy === "amount") return (a.amount - b.amount) * direction;
-      if (sortBy === "status") return statusLabel(getEffectiveDebtStatus(a)).localeCompare(statusLabel(getEffectiveDebtStatus(b)), "pt-BR") * direction;
+      if (sortBy === "status")
+        return (
+          statusLabel(getEffectiveDebtStatus(a)).localeCompare(
+            statusLabel(getEffectiveDebtStatus(b)),
+            "pt-BR",
+          ) * direction
+        );
       return a.description.localeCompare(b.description, "pt-BR") * direction;
     });
-  }, [debts, selectedBranchId, statusFilter, categoryFilter, search, sortBy, sortDirection]);
+  }, [
+    debts,
+    selectedBranchId,
+    statusFilter,
+    categoryFilter,
+    search,
+    sortBy,
+    sortDirection,
+  ]);
 
   const summary = useMemo(() => {
-    const scoped = selectedBranchId ? debts.filter((debt) => debt.vehicle?.branchId === selectedBranchId) : debts;
-    const totals = { total: scoped.length, overdue: 0, pending: 0, paid: 0, appealed: 0, totalAmount: 0 };
+    const scoped = selectedBranchId
+      ? debts.filter((debt) => debt.vehicle?.branchId === selectedBranchId)
+      : debts;
+    const totals = {
+      total: scoped.length,
+      overdue: 0,
+      pending: 0,
+      paid: 0,
+      appealed: 0,
+      totalAmount: 0,
+    };
     scoped.forEach((debt) => {
       const status = getEffectiveDebtStatus(debt);
       totals.totalAmount += debt.amount || 0;
@@ -266,13 +339,29 @@ export function DebtsPage() {
   }, [debts, selectedBranchId]);
 
   const vehicleCosts = useMemo(() => {
-    const scopedVehicles = selectedBranchId ? vehicles.filter((v) => v.branchId === selectedBranchId) : vehicles;
+    const scopedVehicles = selectedBranchId
+      ? vehicles.filter((v) => v.branchId === selectedBranchId)
+      : vehicles;
     return scopedVehicles
       .map((vehicle) => {
-        const fuel = fuelRecords.filter((item) => item.vehicleId === vehicle.id).reduce((sum, item) => sum + (item.totalValue || 0), 0);
-        const maintenance = maintenanceRecords.filter((item) => item.vehicleId === vehicle.id).reduce((sum, item) => sum + (item.cost || 0), 0);
-        const debtTotal = debts.filter((item) => item.vehicleId === vehicle.id).reduce((sum, item) => sum + (item.amount || 0), 0);
-        return { id: vehicle.id, label: `${vehicle.brand} ${vehicle.model}`, plate: vehicle.plate, fuel, maintenance, debts: debtTotal, total: fuel + maintenance + debtTotal };
+        const fuel = fuelRecords
+          .filter((item) => item.vehicleId === vehicle.id)
+          .reduce((sum, item) => sum + (item.totalValue || 0), 0);
+        const maintenance = maintenanceRecords
+          .filter((item) => item.vehicleId === vehicle.id)
+          .reduce((sum, item) => sum + (item.cost || 0), 0);
+        const debtTotal = debts
+          .filter((item) => item.vehicleId === vehicle.id)
+          .reduce((sum, item) => sum + (item.amount || 0), 0);
+        return {
+          id: vehicle.id,
+          label: `${vehicle.brand} ${vehicle.model}`,
+          plate: vehicle.plate,
+          fuel,
+          maintenance,
+          debts: debtTotal,
+          total: fuel + maintenance + debtTotal,
+        };
       })
       .filter((row) => row.total > 0)
       .sort((a, b) => b.total - a.total)
@@ -325,7 +414,10 @@ export function DebtsPage() {
     setIsModalOpen(false);
   }
 
-  function handleChange<K extends keyof DebtFormData>(field: K, value: DebtFormData[K]) {
+  function handleChange<K extends keyof DebtFormData>(
+    field: K,
+    value: DebtFormData[K],
+  ) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -349,8 +441,10 @@ export function DebtsPage() {
       const nextErrors: Record<string, string> = {};
       if (!payload.description) nextErrors.description = "Informe a descrição.";
       if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veículo.";
-      if (!payload.debtDate) nextErrors.debtDate = "Informe a data de lancamento.";
-      if (Number.isNaN(payload.amount) || payload.amount <= 0) nextErrors.amount = "Informe um valor válido.";
+      if (!payload.debtDate)
+        nextErrors.debtDate = "Informe a data de lancamento.";
+      if (Number.isNaN(payload.amount) || payload.amount <= 0)
+        nextErrors.amount = "Informe um valor válido.";
       if (Object.keys(nextErrors).length > 0) {
         return;
       }
@@ -360,14 +454,28 @@ export function DebtsPage() {
 
       closeModal();
       notifyHeaderNotifications();
-      const [debtsData, fuelData, maintenanceData] = await Promise.all([getDebts(), getFuelRecords(), getMaintenanceRecords()]);
+      const [debtsData, fuelData, maintenanceData] = await Promise.all([
+        getDebts(),
+        getFuelRecords(),
+        getMaintenanceRecords(),
+      ]);
       setDebts(Array.isArray(debtsData) ? debtsData : []);
       setFuelRecords(Array.isArray(fuelData) ? fuelData : []);
-      setMaintenanceRecords(Array.isArray(maintenanceData) ? maintenanceData : []);
+      setMaintenanceRecords(
+        Array.isArray(maintenanceData) ? maintenanceData : [],
+      );
     } catch (error: any) {
       console.error("Erro ao salvar débito:", error);
-      const apiMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "";
-      setFormErrorMessage(Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage || "Não foi possível salvar o débito."));
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "";
+      setFormErrorMessage(
+        Array.isArray(apiMessage)
+          ? apiMessage.join(", ")
+          : String(apiMessage || "Não foi possível salvar o débito."),
+      );
     } finally {
       setSaving(false);
     }
@@ -397,87 +505,546 @@ export function DebtsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Débitos e Multas</h1>
-          <p className="text-sm text-slate-500">Gestão completa de IPVA, multas e demais custos do veículo.</p>
+          <h1 className="text-3xl font-bold text-slate-900">
+            Débitos e Multas
+          </h1>
+          <p className="text-sm text-slate-500">
+            Gestão completa de IPVA, multas e demais custos do veículo.
+          </p>
         </div>
-        <button onClick={openCreateModal} className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600">+ Cadastrar débito</button>
+        <button
+          onClick={openCreateModal}
+          className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+        >
+          + Cadastrar débito
+        </button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Totais</p><p className="mt-1 text-2xl font-bold text-slate-900">{summary.total}</p></div>
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-red-700">Vencidas</p><p className="mt-1 text-2xl font-bold text-red-800">{summary.overdue}</p></div>
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Pendentes</p><p className="mt-1 text-2xl font-bold text-amber-800">{summary.pending}</p></div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Pagas</p><p className="mt-1 text-2xl font-bold text-emerald-800">{summary.paid}</p></div>
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Recorridas</p><p className="mt-1 text-2xl font-bold text-blue-800">{summary.appealed}</p></div>
-        <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Valor total</p><p className="mt-1 text-lg font-bold text-violet-900">{summary.totalAmount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p></div>
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Totais
+          </p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">
+            {summary.total}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+            Vencidas
+          </p>
+          <p className="mt-1 text-2xl font-bold text-red-800">
+            {summary.overdue}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+            Pendentes
+          </p>
+          <p className="mt-1 text-2xl font-bold text-amber-800">
+            {summary.pending}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+            Pagas
+          </p>
+          <p className="mt-1 text-2xl font-bold text-emerald-800">
+            {summary.paid}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+            Recorridas
+          </p>
+          <p className="mt-1 text-2xl font-bold text-blue-800">
+            {summary.appealed}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+            Valor total
+          </p>
+          <p className="mt-1 text-lg font-bold text-violet-900">
+            {summary.totalAmount.toLocaleString("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            })}
+          </p>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row">
-          <input type="text" placeholder="Buscar por descrição, categoria, status ou placa" value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as "ALL" | DebtCategory)} className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="ALL">Todas as categorias</option>{debtCategoryOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="ALL">Todos os status</option><option value="PENDING">Pendente</option><option value="OVERDUE">Vencida</option><option value="PAID">Paga</option><option value="APPEALED">Recorrida</option></select>
+          <input
+            type="text"
+            placeholder="Buscar por descrição, categoria, status ou placa"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+          />
+          <select
+            value={categoryFilter}
+            onChange={(e) =>
+              setCategoryFilter(e.target.value as "ALL" | DebtCategory)
+            }
+            className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+          >
+            <option value="ALL">Todas as categorias</option>
+            {debtCategoryOptions.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+          >
+            <option value="ALL">Todos os status</option>
+            <option value="PENDING">Pendente</option>
+            <option value="OVERDUE">Vencida</option>
+            <option value="PAID">Paga</option>
+            <option value="APPEALED">Recorrida</option>
+          </select>
         </div>
       </div>
 
-      {pageErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{pageErrorMessage}</div> : null}
+      {pageErrorMessage ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {pageErrorMessage}
+        </div>
+      ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full">
-            <thead className="bg-slate-50"><tr><th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("category")} className="cursor-pointer">Categoria {getSortArrow("category")}</button></th><th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("description")} className="cursor-pointer">Descrição {getSortArrow("description")}</button></th><th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("vehicle")} className="cursor-pointer">Veículo {getSortArrow("vehicle")}</button></th><th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("debtDate")} className="cursor-pointer">Lancamento {getSortArrow("debtDate")}</button></th><th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("dueDate")} className="cursor-pointer">Vencimento {getSortArrow("dueDate")}</button></th><th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("amount")} className="cursor-pointer">Valor {getSortArrow("amount")}</button></th><th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("status")} className="cursor-pointer">Status {getSortArrow("status")}</button></th><th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ações</th></tr></thead>
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("category")}
+                    className="cursor-pointer"
+                  >
+                    Categoria {getSortArrow("category")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("description")}
+                    className="cursor-pointer"
+                  >
+                    Descrição {getSortArrow("description")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("vehicle")}
+                    className="cursor-pointer"
+                  >
+                    Veículo {getSortArrow("vehicle")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("debtDate")}
+                    className="cursor-pointer"
+                  >
+                    Lancamento {getSortArrow("debtDate")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("dueDate")}
+                    className="cursor-pointer"
+                  >
+                    Vencimento {getSortArrow("dueDate")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("amount")}
+                    className="cursor-pointer"
+                  >
+                    Valor {getSortArrow("amount")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("status")}
+                    className="cursor-pointer"
+                  >
+                    Status {getSortArrow("status")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  Ações
+                </th>
+              </tr>
+            </thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Carregando débitos...</td></tr> : filteredDebts.length === 0 ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum débito encontrado.</td></tr> : filteredDebts.map((debt) => {
-                const effectiveStatus = getEffectiveDebtStatus(debt);
-                return (
-                  <tr id={`debt-row-${debt.id}`} key={debt.id} className={`border-t border-slate-200 transition-colors ${highlightedDebtId === debt.id ? "notification-highlight" : ""}`}>
-                    <td className="px-6 py-4 text-sm text-slate-700">{categoryLabel(debt.category)}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{debt.description}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{debt.vehicle ? `${debt.vehicle.brand} ${debt.vehicle.model}` : debt.vehicleId}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{toDateText(debt.debtDate)}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{toDateText(debt.dueDate || debt.debtDate)}</td>
-                    <td className="px-6 py-4 text-sm text-slate-900">{debt.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
-                    <td className="px-6 py-4 text-sm"><span className={`status-pill ${statusClass(effectiveStatus)}`}>{statusLabel(effectiveStatus)}</span></td>
-                    <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openEditModal(debt)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => handleDelete(debt)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
-                  </tr>
-                );
-              })}
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-6 py-8 text-center text-sm text-slate-500"
+                  >
+                    Carregando débitos...
+                  </td>
+                </tr>
+              ) : filteredDebts.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-6 py-8 text-center text-sm text-slate-500"
+                  >
+                    Nenhum débito encontrado.
+                  </td>
+                </tr>
+              ) : (
+                filteredDebts.map((debt) => {
+                  const effectiveStatus = getEffectiveDebtStatus(debt);
+                  return (
+                    <tr
+                      id={`debt-row-${debt.id}`}
+                      key={debt.id}
+                      className={`border-t border-slate-200 transition-colors ${highlightedDebtId === debt.id ? "notification-highlight" : ""}`}
+                    >
+                      <td className="px-6 py-4 text-sm text-slate-700">
+                        {categoryLabel(debt.category)}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                        {debt.description}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-700">
+                        {debt.vehicle
+                          ? `${debt.vehicle.brand} ${debt.vehicle.model}`
+                          : debt.vehicleId}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-700">
+                        {toDateText(debt.debtDate)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-700">
+                        {toDateText(debt.dueDate || debt.debtDate)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-900">
+                        {debt.amount.toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <span
+                          className={`status-pill ${statusClass(effectiveStatus)}`}
+                        >
+                          {statusLabel(effectiveStatus)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openEditModal(debt)}
+                            className="btn-ui btn-ui-neutral"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDelete(debt)}
+                            className="btn-ui btn-ui-danger"
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-slate-900">Custos totais por veículo</h2><span className="text-xs text-slate-500">Combustível + manutenção + débitos</span></div>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Custos totais por veículo
+          </h2>
+          <span className="text-xs text-slate-500">
+            Combustível + manutenção + débitos
+          </span>
+        </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full"><thead className="bg-slate-50"><tr><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Veículo</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Combustível</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Manutenção</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Débitos</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Total</th></tr></thead>
-            <tbody>{vehicleCosts.length === 0 ? <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">Sem custos consolidados no escopo atual.</td></tr> : vehicleCosts.map((row) => <tr key={row.id} className="border-t border-slate-200"><td className="px-4 py-3 text-sm text-slate-700">{row.label} ({row.plate})</td><td className="px-4 py-3 text-sm text-slate-700">{row.fuel.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td><td className="px-4 py-3 text-sm text-slate-700">{row.maintenance.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td><td className="px-4 py-3 text-sm text-slate-700">{row.debts.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td><td className="px-4 py-3 text-sm font-semibold text-slate-900">{row.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td></tr>)}</tbody>
+          <table className="min-w-full">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">
+                  Veículo
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">
+                  Combustível
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">
+                  Manutenção
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">
+                  Débitos
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {vehicleCosts.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-6 text-center text-sm text-slate-500"
+                  >
+                    Sem custos consolidados no escopo atual.
+                  </td>
+                </tr>
+              ) : (
+                vehicleCosts.map((row) => (
+                  <tr key={row.id} className="border-t border-slate-200">
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                      {row.label} ({row.plate})
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                      {row.fuel.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                      {row.maintenance.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                      {row.debts.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                      {row.total.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
           </table>
         </div>
       </div>
 
-      {isModalOpen ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 px-6 py-4"><div><h2 className="text-xl font-bold text-slate-900">{editingDebt ? "Editar débito" : "Cadastrar débito"}</h2><p className="text-sm text-slate-500">Registre IPVA, multa e demais custos por veículo.</p></div><button onClick={closeModal} className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100">Fechar</button></div>
-        <form onSubmit={handleSubmit} className="space-y-5 p-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div><label className="block text-sm font-medium text-slate-700">Categoria</label><select value={form.category} onChange={(e) => handleChange("category", e.target.value as DebtCategory)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">{debtCategoryOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
-            <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={form.status} onChange={(e) => handleChange("status", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="PENDING">Pendente</option><option value="PAID">Paga</option><option value="APPEALED">Recorrida</option></select></div>
-            <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Descrição</label><input type="text" value={form.description} onChange={(e) => handleChange("description", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: IPVA 2026 cota unica" /></div>
-            <div><label className="block text-sm font-medium text-slate-700">Valor</label><input type="text" value={form.amount} onChange={(e) => handleChange("amount", formatMoney(e.target.value))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="0,00" /></div>
-            <div><label className="block text-sm font-medium text-slate-700">Pontos CNH</label><input type="number" min="0" value={form.points} onChange={(e) => handleChange("points", e.target.value)} disabled={form.category !== "FINE"} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="0" /></div>
-            <div><label className="block text-sm font-medium text-slate-700">Data de lancamento</label><input type="date" value={form.debtDate} onChange={(e) => handleChange("debtDate", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
-            <div><label className="block text-sm font-medium text-slate-700">Data de vencimento</label><input type="date" value={form.dueDate} onChange={(e) => handleChange("dueDate", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
-            <div><label className="block text-sm font-medium text-slate-700">Credor/órgão</label><input type="text" value={form.creditor} onChange={(e) => handleChange("creditor", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Detran, SEFAZ..." /></div>
-            <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select></div>
-            <label className="md:col-span-2 inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={form.isRecurring} onChange={(e) => handleChange("isRecurring", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200" />Débito recorrente</label>
+      {isModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-4xl rounded-2xl bg-white shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">
+                  {editingDebt ? "Editar débito" : "Cadastrar débito"}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Registre IPVA, multa e demais custos por veículo.
+                </p>
+              </div>
+              <button
+                onClick={closeModal}
+                className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100"
+              >
+                Fechar
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto p-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Categoria
+                  </label>
+                  <select
+                    value={form.category}
+                    onChange={(e) =>
+                      handleChange("category", e.target.value as DebtCategory)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  >
+                    {debtCategoryOptions.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Status
+                  </label>
+                  <select
+                    value={form.status}
+                    onChange={(e) => handleChange("status", e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  >
+                    <option value="PENDING">Pendente</option>
+                    <option value="PAID">Paga</option>
+                    <option value="APPEALED">Recorrida</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Descrição
+                  </label>
+                  <input
+                    type="text"
+                    value={form.description}
+                    onChange={(e) =>
+                      handleChange("description", e.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    placeholder="Ex: IPVA 2026 cota unica"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Valor
+                  </label>
+                  <input
+                    type="text"
+                    value={form.amount}
+                    onChange={(e) =>
+                      handleChange("amount", formatMoney(e.target.value))
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    placeholder="0,00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Pontos CNH
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.points}
+                    onChange={(e) => handleChange("points", e.target.value)}
+                    disabled={form.category !== "FINE"}
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Data de lancamento
+                  </label>
+                  <input
+                    type="date"
+                    value={form.debtDate}
+                    onChange={(e) => handleChange("debtDate", e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Data de vencimento
+                  </label>
+                  <input
+                    type="date"
+                    value={form.dueDate}
+                    onChange={(e) => handleChange("dueDate", e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Credor/órgão
+                  </label>
+                  <input
+                    type="text"
+                    value={form.creditor}
+                    onChange={(e) => handleChange("creditor", e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    placeholder="Detran, SEFAZ..."
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Veículo
+                  </label>
+                  <select
+                    value={form.vehicleId}
+                    onChange={(e) => handleChange("vehicleId", e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  >
+                    <option value="">Selecione um veículo</option>
+                    {availableVehicles.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {vehicle.brand} {vehicle.model} ({vehicle.plate})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="md:col-span-2 inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={form.isRecurring}
+                    onChange={(e) =>
+                      handleChange("isRecurring", e.target.checked)
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+                  />
+                  Débito recorrente
+                </label>
+              </div>
+              {formErrorMessage ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {formErrorMessage}
+                </div>
+              ) : null}
+              <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {saving
+                    ? "Salvando..."
+                    : editingDebt
+                      ? "Salvar alterações"
+                      : "Cadastrar débito"}
+                </button>
+              </div>
+            </form>
           </div>
-          {formErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formErrorMessage}</div> : null}
-          <div className="flex justify-end gap-3 border-t border-slate-200 pt-4"><button type="button" onClick={closeModal} className="cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancelar</button><button type="submit" disabled={saving} className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{saving ? "Salvando..." : editingDebt ? "Salvar alterações" : "Cadastrar débito"}</button></div>
-        </form></div></div> : null}
+        </div>
+      ) : null}
       <ConfirmDeleteModal
         isOpen={Boolean(debtToDelete)}
         title="Excluir débito"
         description={
-          debtToDelete ? `Deseja excluir o débito "${debtToDelete.description}"?` : ""
+          debtToDelete
+            ? `Deseja excluir o débito "${debtToDelete.description}"?`
+            : ""
         }
         loading={deletingDebt}
         onCancel={() => setDebtToDelete(null)}

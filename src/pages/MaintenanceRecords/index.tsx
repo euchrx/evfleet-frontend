@@ -1021,7 +1021,7 @@ export function MaintenanceRecordsPage() {
       ) : null}
 
       {recordModalOpen ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
           <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
@@ -1098,7 +1098,7 @@ export function MaintenanceRecordsPage() {
       ) : null}
 
       {planModalOpen ? (
-        <div className="fixed inset-0 z-[61] flex items-center justify-center bg-slate-900/60 p-4">
+        <div className="fixed inset-0 z-[61] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
           <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
@@ -1132,7 +1132,7 @@ export function MaintenanceRecordsPage() {
       ) : null}
 
       {tireModalOpen ? (
-        <div className="fixed inset-0 z-[62] flex items-center justify-center bg-slate-900/60 p-4">
+        <div className="fixed inset-0 z-[62] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
           <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div><h2 className="text-xl font-bold text-slate-900">{editingTire ? "Editar pneu" : "Cadastrar pneu"}</h2><p className="text-sm text-slate-500">Gestão técnica e operacional dos pneus da frota.</p></div>
@@ -1169,7 +1169,7 @@ export function MaintenanceRecordsPage() {
       ) : null}
 
       {readingModalOpen && selectedTire ? (
-        <div className="fixed inset-0 z-[63] flex items-center justify-center bg-slate-900/60 p-4">
+        <div className="fixed inset-0 z-[63] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
           <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div><h2 className="text-xl font-bold text-slate-900">Leituras técnicas</h2><p className="text-sm text-slate-500">{selectedTire.serialNumber} - {selectedTire.brand} {selectedTire.model}</p></div>

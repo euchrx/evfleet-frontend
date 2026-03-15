@@ -31,6 +31,10 @@ function toCurrency(value: number) {
   });
 }
 
+function formatDatePtBr(date: Date) {
+  return date.toLocaleDateString("pt-BR");
+}
+
 function maintenanceTypePtBr(value?: string) {
   if (value === "PREVENTIVE") return "Preventiva";
   if (value === "PERIODIC") return "Periódica";
@@ -41,6 +45,7 @@ function maintenanceTypePtBr(value?: string) {
 type CostPeriod = "CURRENT_MONTH" | "LAST_30_DAYS" | "CURRENT_YEAR" | "ALL";
 type CostModalType = "FUEL" | "MAINTENANCE" | "DEBTS";
 type DriverCategory = "LIGHT" | "HEAVY";
+const MAX_RANKING_ITEMS = 10;
 
 function parseDateSafe(dateValue: string) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
@@ -324,12 +329,12 @@ export function DashboardPage() {
       LIGHT: ranked
         .filter((item) => item.vehicleType === "LIGHT")
         .sort((a, b) => b.value - a.value)
-        .slice(0, 10)
+        .slice(0, MAX_RANKING_ITEMS)
         .map(({ label, value, vehicleId }) => ({ label, value, vehicleId })),
       HEAVY: ranked
         .filter((item) => item.vehicleType === "HEAVY")
         .sort((a, b) => b.value - a.value)
-        .slice(0, 10)
+        .slice(0, MAX_RANKING_ITEMS)
         .map(({ label, value, vehicleId }) => ({ label, value, vehicleId })),
     };
   }, [filteredData, costPeriod, selectedVehicleId]);
@@ -518,7 +523,7 @@ export function DashboardPage() {
           totalValue: entry.totalValue,
         }))
         .sort((a, b) => b.averageKmPerLiter - a.averageKmPerLiter)
-        .slice(0, 10);
+        .slice(0, MAX_RANKING_ITEMS);
 
     return {
       LIGHT: normalize([...byDriver.LIGHT.values()]),
@@ -632,9 +637,9 @@ export function DashboardPage() {
     costPeriod === "CURRENT_YEAR"
       ? "Ano atual"
       : costPeriod === "CURRENT_MONTH"
-        ? "Mes atual"
+        ? "Mês atual"
         : costPeriod === "LAST_30_DAYS"
-          ? "Ultimos 30 dias"
+          ? "Últimos 30 dias"
           : "Todo o período";
 
   const selectedVehicleLabel =
@@ -645,10 +650,53 @@ export function DashboardPage() {
           return vehicle ? `${vehicle.brand} ${vehicle.model}` : "Veículo selecionado";
         })() ||
         "Veículo selecionado";
-  const currentMonthLabel = new Date().toLocaleDateString("pt-BR", {
-    month: "long",
-    year: "numeric",
-  });
+  const periodReferenceLabel = useMemo(() => {
+    const now = new Date();
+
+    if (costPeriod === "CURRENT_YEAR") {
+      return `Ano referente: ${now.getFullYear()}`;
+    }
+
+    if (costPeriod === "CURRENT_MONTH") {
+      const monthYear = now.toLocaleDateString("pt-BR", {
+        month: "long",
+        year: "numeric",
+      });
+      return `Mês referente: ${monthYear}`;
+    }
+
+    if (costPeriod === "LAST_30_DAYS") {
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      start.setDate(start.getDate() - 29);
+      return `Data referente entre ${formatDatePtBr(start)} e ${formatDatePtBr(now)}`;
+    }
+
+    const isVehicleMatch = (vehicleId: string) =>
+      selectedVehicleId === "ALL" || vehicleId === selectedVehicleId;
+
+    const allDates = [
+      ...filteredData.fuel
+        .filter((record) => isVehicleMatch(record.vehicleId))
+        .map((record) => parseDateSafe(record.fuelDate)),
+      ...filteredData.maintenance
+        .filter((record) => isVehicleMatch(record.vehicleId))
+        .map((record) => parseDateSafe(record.maintenanceDate)),
+      ...filteredData.debts
+        .filter((record) => isVehicleMatch(record.vehicleId))
+        .map((record) => parseDateSafe(record.debtDate)),
+    ].filter((date) => !Number.isNaN(date.getTime()));
+
+    if (allDates.length === 0) {
+      return "Todo o período: sem registros";
+    }
+
+    const timestamps = allDates.map((date) => date.getTime());
+    const minDate = new Date(Math.min(...timestamps));
+    const maxDate = new Date(Math.max(...timestamps));
+
+    return `Todo o período: desde ${formatDatePtBr(minDate)} até ${formatDatePtBr(maxDate)}`;
+  }, [costPeriod, selectedVehicleId, filteredData.fuel, filteredData.maintenance, filteredData.debts]);
 
   return (
     <div className="space-y-6">
@@ -674,8 +722,8 @@ export function DashboardPage() {
           className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
         >
           <option value="CURRENT_YEAR">Ano atual</option>
-          <option value="CURRENT_MONTH">Mes atual</option>
-          <option value="LAST_30_DAYS">Ultimos 30 dias</option>
+          <option value="CURRENT_MONTH">Mês atual</option>
+          <option value="LAST_30_DAYS">Últimos 30 dias</option>
           <option value="ALL">Todo o período</option>
         </select>
 
@@ -693,7 +741,7 @@ export function DashboardPage() {
         </select>
       </div>
       <p className="text-xs text-slate-500">
-        Mes referente: {currentMonthLabel}
+        {periodReferenceLabel}
       </p>
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -1081,7 +1129,7 @@ export function DashboardPage() {
       </div>
 
       {vehicleCostModal && vehicleCostModalData ? (
-        <div className="fixed inset-0 z-[74] flex items-center justify-center bg-slate-900/60 p-4">
+        <div className="fixed inset-0 z-[74] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
           <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
@@ -1166,8 +1214,8 @@ export function DashboardPage() {
       ) : null}
 
       {bestDriverModal ? (
-        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-900/60 p-4">
-          <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[75] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-xl font-bold text-slate-900">
@@ -1247,7 +1295,7 @@ export function DashboardPage() {
       ) : null}
 
       {costModal ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
+        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
           <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>

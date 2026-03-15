@@ -344,8 +344,8 @@ export function TripsPage() {
       </div>
 
       {isModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-4xl rounded-2xl bg-white shadow-2xl flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{editingTrip ? "Editar viagem" : "Registrar viagem"}</h2>
@@ -353,7 +353,7 @@ export function TripsPage() {
               </div>
               <button onClick={closeModal} className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100">Fechar</button>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-5 p-6">
+            <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto p-6">
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Planejamento</p>
                 <div className="grid gap-4 md:grid-cols-2">
@@ -377,7 +377,7 @@ export function TripsPage() {
                 </div>
               </div>
               {formErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formErrorMessage}</div> : null}
-              <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
+              <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button type="button" onClick={closeModal} className="btn-ui btn-ui-neutral">Cancelar</button>
                 <button type="submit" disabled={saving} className="btn-ui btn-ui-primary disabled:cursor-not-allowed disabled:opacity-70">{saving ? "Salvando..." : editingTrip ? "Salvar alterações" : "Registrar viagem"}</button>
               </div>

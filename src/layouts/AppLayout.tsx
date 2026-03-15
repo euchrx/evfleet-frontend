@@ -439,7 +439,7 @@ export function AppLayout() {
       </div>
 
       {isSystemLogsModalOpen ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
+        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
           <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -486,7 +486,7 @@ export function AppLayout() {
       ) : null}
 
       {isNotificationsModalOpen ? (
-        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-900/60 p-4">
+        <div className="fixed inset-0 z-[75] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
           <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between gap-3">
               <div>

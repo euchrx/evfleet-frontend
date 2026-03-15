@@ -388,17 +388,17 @@ export function DriversPage() {
       </div>
 
       {isModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-3xl rounded-2xl bg-white shadow-2xl flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{editingDriver ? "Editar motorista" : "Cadastrar motorista"}</h2>
                 <p className="text-sm text-slate-500">Preencha as informações do motorista</p>
               </div>
-              <button onClick={closeModal} className="rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100">Fechar</button>
+              <button onClick={closeModal} className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100">Fechar</button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5 p-6">
+            <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto p-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Nome</label><input type="text" value={form.name} onChange={(e) => handleChange("name", e.target.value)} className={inputClass("name")} placeholder="Nome completo" />{fieldErrors.name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">CPF</label><input type="text" value={form.cpf} onChange={(e) => handleChange("cpf", formatCpf(e.target.value))} className={inputClass("cpf")} placeholder="000.000.000-00" />{fieldErrors.cpf ? <p className="mt-1 text-xs text-red-600">{fieldErrors.cpf}</p> : null}</div>
@@ -412,8 +412,8 @@ export function DriversPage() {
 
               {formErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formErrorMessage}</div> : null}
 
-              <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
-                <button type="button" onClick={closeModal} className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancelar</button>
+              <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
+                <button type="button" onClick={closeModal} className="cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancelar</button>
                 <button type="submit" disabled={saving} className="rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{saving ? "Salvando..." : editingDriver ? "Salvar alterações" : "Cadastrar motorista"}</button>
               </div>
             </form>
