@@ -68,7 +68,9 @@ export function BranchProvider({ children }: BranchProviderProps) {
     const settings = readSoftwareSettings();
     const fixedBranchId = settings.defaultBranchId;
     const fixedBranchExists =
-      fixedBranchId && branches.some((branch) => branch.id === fixedBranchId);
+      settings.lockDefaultBranch &&
+      fixedBranchId &&
+      branches.some((branch) => branch.id === fixedBranchId);
 
     if (fixedBranchExists) {
       setSelectedBranchIdState(fixedBranchId);
@@ -95,7 +97,9 @@ export function BranchProvider({ children }: BranchProviderProps) {
       const settings = readSoftwareSettings();
       const fixedBranchId = settings.defaultBranchId;
       const fixedBranchExists =
-        fixedBranchId && branches.some((branch) => branch.id === fixedBranchId);
+        settings.lockDefaultBranch &&
+        fixedBranchId &&
+        branches.some((branch) => branch.id === fixedBranchId);
 
       if (fixedBranchExists) {
         setSelectedBranchIdState(fixedBranchId);
@@ -116,7 +120,9 @@ export function BranchProvider({ children }: BranchProviderProps) {
     const settings = readSoftwareSettings();
     const fixedBranchId = settings.defaultBranchId;
     const fixedBranchExists =
-      fixedBranchId && branches.some((branch) => branch.id === fixedBranchId);
+      settings.lockDefaultBranch &&
+      fixedBranchId &&
+      branches.some((branch) => branch.id === fixedBranchId);
 
     if (fixedBranchExists) {
       setSelectedBranchIdState(fixedBranchId);

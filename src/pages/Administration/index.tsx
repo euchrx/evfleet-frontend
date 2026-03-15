@@ -172,9 +172,19 @@ export function AdministrationPage() {
             <span className="text-sm font-medium text-slate-700">
               Estabelecimento padrão do sistema
             </span>
+            <label className="mb-2 inline-flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={settings.lockDefaultBranch}
+                onChange={(e) => handleChange("lockDefaultBranch", e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+              Ativar e bloquear estabelecimento em todo o sistema
+            </label>
             <select
               value={settings.defaultBranchId}
               onChange={(e) => handleChange("defaultBranchId", e.target.value)}
+              disabled={!settings.lockDefaultBranch}
               className="w-full cursor-pointer rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             >
               <option value="">Nenhum (rede inteira)</option>
@@ -185,7 +195,7 @@ export function AdministrationPage() {
               ))}
             </select>
             <span className="text-xs text-slate-500">
-              Quando definido, formulários com campo de filial serão preenchidos automaticamente.
+              Quando ativado e definido, os campos de estabelecimento serão preenchidos automaticamente e desabilitados.
             </span>
           </label>
         </div>

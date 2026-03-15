@@ -10,6 +10,7 @@ import {
   updateVehicle,
 } from "../../services/vehicles";
 import { getBranches } from "../../services/branches";
+import { readSoftwareSettings } from "../../services/adminSettings";
 import { useBranch } from "../../contexts/BranchContext";
 import { useLocation } from "react-router-dom";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
@@ -158,6 +159,10 @@ export function VehiclesPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
   const [deletingVehicle, setDeletingVehicle] = useState(false);
+  const [isBranchLocked, setIsBranchLocked] = useState(() => {
+    const settings = readSoftwareSettings();
+    return Boolean(settings.lockDefaultBranch && settings.defaultBranchId);
+  });
 
   async function loadData() {
     try {
@@ -185,6 +190,16 @@ export function VehiclesPage() {
       document.body.style.overflow = previousOverflow;
     };
   }, [isModalOpen]);
+
+  useEffect(() => {
+    function refreshBranchLock() {
+      const settings = readSoftwareSettings();
+      setIsBranchLocked(Boolean(settings.lockDefaultBranch && settings.defaultBranchId));
+    }
+    window.addEventListener("evfleet-default-branch-updated", refreshBranchLock);
+    return () =>
+      window.removeEventListener("evfleet-default-branch-updated", refreshBranchLock);
+  }, []);
 
   function clearFieldError(field: keyof VehicleFormData) {
     setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -658,7 +673,7 @@ export function VehiclesPage() {
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Filial</span>
-                    <select value={form.branchId} onChange={(e) => { setForm({ ...form, branchId: e.target.value }); clearFieldError("branchId"); }} className={getFieldClass("branchId")}><option value="">Selecione uma filial</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+                    <select value={form.branchId} disabled={isBranchLocked} onChange={(e) => { setForm({ ...form, branchId: e.target.value }); clearFieldError("branchId"); }} className={getFieldClass("branchId")}><option value="">Selecione uma filial</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
                     {fieldErrors.branchId ? <p className="text-xs text-red-600">{fieldErrors.branchId}</p> : null}
                   </label>
                   <label className="space-y-1">

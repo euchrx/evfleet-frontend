@@ -7,6 +7,7 @@ import { getDrivers } from "../../services/drivers";
 import { getFuelRecords, type FuelRecord } from "../../services/fuelRecords";
 import { getMaintenanceRecords } from "../../services/maintenanceRecords";
 import { getVehicles } from "../../services/vehicles";
+import { readSoftwareSettings } from "../../services/adminSettings";
 import type { Branch } from "../../types/branch";
 import type { Debt } from "../../types/debt";
 import type { Driver } from "../../types/driver";
@@ -76,6 +77,7 @@ function MultiSelectField({
   onChange,
   placeholder,
   error,
+  disabled = false,
 }: {
   label: string;
   options: SelectOption[];
@@ -83,6 +85,7 @@ function MultiSelectField({
   onChange: (value: string[]) => void;
   placeholder: string;
   error?: string;
+  disabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -103,6 +106,7 @@ function MultiSelectField({
   }, [options, selectedIds, query]);
 
   function addItem(id: string) {
+    if (disabled) return;
     if (selectedIds.includes(id)) return;
     onChange([...selectedIds, id]);
     setQuery("");
@@ -151,9 +155,9 @@ function MultiSelectField({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    onChange(selectedIds.filter((id) => id !== item.id));
+                    if (!disabled) onChange(selectedIds.filter((id) => id !== item.id));
                   }}
-                  className="cursor-pointer text-slate-500 hover:text-red-600"
+                  className={`text-slate-500 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:text-red-600"}`}
                 >
                   ×
                 </button>
@@ -162,18 +166,22 @@ function MultiSelectField({
             <input
               value={query}
               onChange={(event) => {
+                if (disabled) return;
                 setQuery(event.target.value);
                 setOpen(true);
               }}
-              onFocus={() => setOpen(true)}
+              onFocus={() => {
+                if (!disabled) setOpen(true);
+              }}
               onBlur={() => setTimeout(() => setOpen(false), 120)}
               placeholder={selectedOptions.length === 0 ? placeholder : "Digite para buscar..."}
-              className="min-w-[180px] flex-1 bg-transparent px-1 py-1 text-sm outline-none"
+              disabled={disabled}
+              className="min-w-[180px] flex-1 bg-transparent px-1 py-1 text-sm outline-none disabled:cursor-not-allowed"
             />
           </div>
         </div>
 
-        {open && filteredOptions.length > 0 ? (
+        {open && !disabled && filteredOptions.length > 0 ? (
           <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
             {filteredOptions.map((option) => (
               <button
@@ -199,6 +207,10 @@ function MultiSelectField({
 export function ReportsPage() {
   const { selectedBranchId } = useBranch();
   const [errorMessage, setErrorMessage] = useState("");
+  const [isBranchLocked, setIsBranchLocked] = useState(() => {
+    const settings = readSoftwareSettings();
+    return Boolean(settings.lockDefaultBranch && settings.defaultBranchId);
+  });
 
   const [branches, setBranches] = useState<Branch[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -262,6 +274,16 @@ export function ReportsPage() {
       current.includes(selectedBranchId) ? current : [...current, selectedBranchId]
     );
   }, [selectedBranchId]);
+
+  useEffect(() => {
+    function refreshBranchLock() {
+      const settings = readSoftwareSettings();
+      setIsBranchLocked(Boolean(settings.lockDefaultBranch && settings.defaultBranchId));
+    }
+    window.addEventListener("evfleet-default-branch-updated", refreshBranchLock);
+    return () =>
+      window.removeEventListener("evfleet-default-branch-updated", refreshBranchLock);
+  }, []);
 
   const availableVehicles = useMemo(() => {
     const scoped = selectedBranchId
@@ -461,7 +483,7 @@ export function ReportsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Relatórios</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Confronte dados da frota por período, filial, veículo e motorista.
+          Confronte dados da frota por período, veículo e motorista.
         </p>
       </div>
 
@@ -480,6 +502,7 @@ export function ReportsPage() {
               selectedIds={selectedBranchIds}
               onChange={setSelectedBranchIds}
               placeholder="Digite para buscar estabelecimento"
+              disabled={isBranchLocked}
             />
           </div>
 

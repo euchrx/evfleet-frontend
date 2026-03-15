@@ -14,6 +14,7 @@ export type SoftwareSettings = {
   sessionTimeoutMinutes: number;
   defaultReportFormat: "PDF";
   defaultDashboardPeriod: "CURRENT_MONTH" | "CURRENT_YEAR" | "LAST_30_DAYS" | "ALL";
+  lockDefaultBranch: boolean;
   defaultBranchId: string;
 };
 
@@ -35,6 +36,7 @@ export const defaultSoftwareSettings: SoftwareSettings = {
   sessionTimeoutMinutes: 60,
   defaultReportFormat: "PDF",
   defaultDashboardPeriod: "CURRENT_YEAR",
+  lockDefaultBranch: false,
   defaultBranchId: "",
 };
 
@@ -52,4 +54,3 @@ export function readSoftwareSettings() {
 export function saveSoftwareSettings(settings: SoftwareSettings) {
   localStorage.setItem(ADMIN_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
 }
-
