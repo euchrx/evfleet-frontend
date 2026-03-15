@@ -167,8 +167,8 @@ export function DebtsPage() {
         setDebts(Array.isArray(debtsData) ? debtsData : []);
         setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
       } catch (error) {
-        console.error("Erro ao carregar dÃ©bitos:", error);
-        setPageErrorMessage("NÃ£o foi possÃ­vel carregar os dÃ©bitos.");
+        console.error("Erro ao carregar débitos:", error);
+        setPageErrorMessage("Não foi possível carregar os débitos.");
       } finally {
         setLoading(false);
       }
@@ -333,8 +333,8 @@ export function DebtsPage() {
   }
 
   function getSortArrow(column: DebtSortBy) {
-    if (sortBy !== column) return "â†•";
-    return sortDirection === "asc" ? "â†‘" : "â†“";
+    if (sortBy !== column) return "↕";
+    return sortDirection === "asc" ? "↑" : "↓";
   }
 
   function openCreateModal() {
@@ -394,12 +394,12 @@ export function DebtsPage() {
         vehicleId: form.vehicleId,
       };
       const nextErrors: Record<string, string> = {};
-      if (!payload.description) nextErrors.description = "Informe a descriÃ§Ã£o.";
-      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veÃ­culo.";
+      if (!payload.description) nextErrors.description = "Informe a descrição.";
+      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veículo.";
       if (!payload.debtDate)
         nextErrors.debtDate = "Informe a data de lancamento.";
       if (Number.isNaN(payload.amount) || payload.amount <= 0)
-        nextErrors.amount = "Informe um valor vÃ¡lido.";
+        nextErrors.amount = "Informe um valor válido.";
       if (Object.keys(nextErrors).length > 0) {
         return;
       }
@@ -412,7 +412,7 @@ export function DebtsPage() {
       const [debtsData] = await Promise.all([getDebts()]);
       setDebts(Array.isArray(debtsData) ? debtsData : []);
     } catch (error: any) {
-      console.error("Erro ao salvar dÃ©bito:", error);
+      console.error("Erro ao salvar débito:", error);
       const apiMessage =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
@@ -421,7 +421,7 @@ export function DebtsPage() {
       setFormErrorMessage(
         Array.isArray(apiMessage)
           ? apiMessage.join(", ")
-          : String(apiMessage || "NÃ£o foi possÃ­vel salvar o dÃ©bito."),
+          : String(apiMessage || "Não foi possível salvar o débito."),
       );
     } finally {
       setSaving(false);
@@ -441,8 +441,8 @@ export function DebtsPage() {
       notifyHeaderNotifications();
       setDebts((prev) => prev.filter((item) => item.id !== debtToDelete.id));
     } catch (error) {
-      console.error("Erro ao excluir dÃ©bito:", error);
-      setPageErrorMessage("NÃ£o foi possÃ­vel excluir o dÃ©bito.");
+      console.error("Erro ao excluir débito:", error);
+      setPageErrorMessage("Não foi possível excluir o débito.");
     } finally {
       setDeletingDebt(false);
     }
@@ -453,17 +453,17 @@ export function DebtsPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">
-            DÃ©bitos e Multas
+            Débitos e Multas
           </h1>
           <p className="text-sm text-slate-500">
-            GestÃ£o completa de IPVA, multas e demais custos do veÃ­culo.
+            Gestão completa de IPVA, multas e demais custos do veículo.
           </p>
         </div>
         <button
           onClick={openCreateModal}
           className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
         >
-          + Cadastrar dÃ©bito
+          + Cadastrar débito
         </button>
       </div>
 
@@ -525,7 +525,7 @@ export function DebtsPage() {
         <div className="flex flex-col gap-3 md:flex-row">
           <input
             type="text"
-            placeholder="Buscar por descriÃ§Ã£o, categoria, status ou placa"
+            placeholder="Buscar por descrição, categoria, status ou placa"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
@@ -584,7 +584,7 @@ export function DebtsPage() {
                     onClick={() => handleSort("description")}
                     className="cursor-pointer"
                   >
-                    DescriÃ§Ã£o {getSortArrow("description")}
+                    Descrição {getSortArrow("description")}
                   </button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
@@ -593,7 +593,7 @@ export function DebtsPage() {
                     onClick={() => handleSort("vehicle")}
                     className="cursor-pointer"
                   >
-                    VeÃ­culo {getSortArrow("vehicle")}
+                    Veículo {getSortArrow("vehicle")}
                   </button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
@@ -633,7 +633,7 @@ export function DebtsPage() {
                   </button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  AÃ§Ãµes
+                  Ações
                 </th>
               </tr>
             </thead>
@@ -644,7 +644,7 @@ export function DebtsPage() {
                     colSpan={8}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
-                    Carregando dÃ©bitos...
+                    Carregando débitos...
                   </td>
                 </tr>
               ) : filteredDebts.length === 0 ? (
@@ -653,7 +653,7 @@ export function DebtsPage() {
                     colSpan={8}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
-                    Nenhum dÃ©bito encontrado.
+                    Nenhum débito encontrado.
                   </td>
                 </tr>
               ) : (
@@ -727,10 +727,10 @@ export function DebtsPage() {
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">
-                  {editingDebt ? "Editar dÃ©bito" : "Cadastrar dÃ©bito"}
+                  {editingDebt ? "Editar débito" : "Cadastrar débito"}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Registre IPVA, multa e demais custos por veÃ­culo.
+                  Registre IPVA, multa e demais custos por veículo.
                 </p>
               </div>
               <button
@@ -776,7 +776,7 @@ export function DebtsPage() {
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">
-                    DescriÃ§Ã£o
+                    Descrição
                   </label>
                   <input
                     type="text"
@@ -840,7 +840,7 @@ export function DebtsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">
-                    Credor/Ã³rgÃ£o
+                    Credor/órgão
                   </label>
                   <input
                     type="text"
@@ -852,14 +852,14 @@ export function DebtsPage() {
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">
-                    VeÃ­culo
+                    Veículo
                   </label>
                   <select
                     value={form.vehicleId}
                     onChange={(e) => handleChange("vehicleId", e.target.value)}
                     className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                   >
-                    <option value="">Selecione um veÃ­culo</option>
+                    <option value="">Selecione um veículo</option>
                     {availableVehicles.map((vehicle) => (
                       <option key={vehicle.id} value={vehicle.id}>
                         {vehicle.brand} {vehicle.model} ({vehicle.plate})
@@ -876,7 +876,7 @@ export function DebtsPage() {
                     }
                     className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
                   />
-                  DÃ©bito recorrente
+                  Débito recorrente
                 </label>
               </div>
               {formErrorMessage ? (
@@ -900,8 +900,8 @@ export function DebtsPage() {
                   {saving
                     ? "Salvando..."
                     : editingDebt
-                      ? "Salvar alteraÃ§Ãµes"
-                      : "Cadastrar dÃ©bito"}
+                      ? "Salvar alterações"
+                      : "Cadastrar débito"}
                 </button>
               </div>
             </form>
@@ -910,10 +910,10 @@ export function DebtsPage() {
       ) : null}
       <ConfirmDeleteModal
         isOpen={Boolean(debtToDelete)}
-        title="Excluir dÃ©bito"
+        title="Excluir débito"
         description={
           debtToDelete
-            ? `Deseja excluir o dÃ©bito "${debtToDelete.description}"?`
+            ? `Deseja excluir o débito "${debtToDelete.description}"?`
             : ""
         }
         loading={deletingDebt}
