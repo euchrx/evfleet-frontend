@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import type { Vehicle } from "../../types/vehicle";
 import type { Driver } from "../../types/driver";
 import {
@@ -18,6 +18,7 @@ import { getVehicles } from "../../services/vehicles";
 import { getDrivers } from "../../services/drivers";
 import { useBranch } from "../../contexts/BranchContext";
 import { useLocation } from "react-router-dom";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
 type FuelFormData = {
   liters: string;
@@ -96,6 +97,8 @@ export function FuelRecordsPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<FuelRecord | null>(null);
+  const [recordToDelete, setRecordToDelete] = useState<FuelRecord | null>(null);
+  const [deletingRecord, setDeletingRecord] = useState(false);
   const [form, setForm] = useState<FuelFormData>(initialForm);
   const [anomalyRefreshSeed, setAnomalyRefreshSeed] = useState(0);
 
@@ -121,7 +124,7 @@ export function FuelRecordsPage() {
       setInsights(insightsData || null);
     } catch (error) {
       console.error("Erro ao carregar abastecimentos:", error);
-      setPageErrorMessage("Não foi possível carregar os abastecimentos.");
+      setPageErrorMessage("NÃ£o foi possÃ­vel carregar os abastecimentos.");
     } finally {
       setLoading(false);
     }
@@ -238,7 +241,7 @@ export function FuelRecordsPage() {
       };
 
       const nextErrors: FuelFieldErrors = {};
-      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veículo.";
+      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veÃ­culo.";
       if (!payload.fuelDate) nextErrors.fuelDate = "Informe a data.";
       if (Number.isNaN(payload.liters) || payload.liters <= 0) {
         nextErrors.liters = "Informe os litros corretamente.";
@@ -286,13 +289,13 @@ export function FuelRecordsPage() {
 
       const apiText = typeof apiMessage === "string" ? apiMessage : "";
       if (/litro/i.test(apiText)) {
-        setFieldErrors((prev) => ({ ...prev, liters: "Litros inválidos." }));
+        setFieldErrors((prev) => ({ ...prev, liters: "Litros invÃ¡lidos." }));
       }
       if (/valor|total/i.test(apiText)) {
-        setFieldErrors((prev) => ({ ...prev, totalValue: "Valor total inválido." }));
+        setFieldErrors((prev) => ({ ...prev, totalValue: "Valor total invÃ¡lido." }));
       }
       if (/km|odometro/i.test(apiText)) {
-        setFieldErrors((prev) => ({ ...prev, km: "KM inválido." }));
+        setFieldErrors((prev) => ({ ...prev, km: "KM invÃ¡lido." }));
       }
       if (/data|date/i.test(apiText)) {
         setFieldErrors((prev) => ({ ...prev, fuelDate: "Data invalida." }));
@@ -301,28 +304,27 @@ export function FuelRecordsPage() {
       setFormErrorMessage(
         typeof apiMessage === "string" && apiMessage.trim()
           ? apiMessage
-          : "Não foi possível salvar o abastecimento."
+          : "NÃ£o foi possÃ­vel salvar o abastecimento."
       );
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleDelete(record: FuelRecord) {
-    const confirmed = window.confirm(
-      `Deseja excluir o abastecimento da filial ${getRecordBranchName(record)}?`
-    );
-
-    if (!confirmed) return;
-
+  async function handleDelete(record: FuelRecord) {`r`n    setRecordToDelete(record);`r`n  }`r`n`r`n  async function confirmDeleteRecord() {
+    if (!recordToDelete) return;
     try {
+      setDeletingRecord(true);
       setPageErrorMessage("");
-      await deleteFuelRecord(record.id);
+      await deleteFuelRecord(recordToDelete.id);
+      setRecordToDelete(null);
       await loadData();
       notifyHeaderNotifications();
     } catch (error) {
       console.error("Erro ao excluir abastecimento:", error);
-      setPageErrorMessage("Não foi possível excluir o abastecimento.");
+      setPageErrorMessage("NÃƒÂ£o foi possÃƒÂ­vel excluir o abastecimento.");
+    } finally {
+      setDeletingRecord(false);
     }
   }
 
@@ -486,7 +488,7 @@ export function FuelRecordsPage() {
       window.dispatchEvent(new CustomEvent("evfleet-fuel-anomalies-updated"));
       notifyHeaderNotifications();
     } catch {
-      setPageErrorMessage("Não foi possível marcar a anomalia como conferida.");
+      setPageErrorMessage("NÃ£o foi possÃ­vel marcar a anomalia como conferida.");
     }
   }
 
@@ -553,7 +555,7 @@ export function FuelRecordsPage() {
                   <button type="button" onClick={() => handleSort("branch")} className="cursor-pointer">Filial {getSortArrow("branch")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <button type="button" onClick={() => handleSort("vehicle")} className="cursor-pointer">Veículo {getSortArrow("vehicle")}</button>
+                  <button type="button" onClick={() => handleSort("vehicle")} className="cursor-pointer">VeÃ­culo {getSortArrow("vehicle")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button type="button" onClick={() => handleSort("driver")} className="cursor-pointer">Motorista {getSortArrow("driver")}</button>
@@ -562,7 +564,7 @@ export function FuelRecordsPage() {
                   <button type="button" onClick={() => handleSort("fuelDate")} className="cursor-pointer">Data {getSortArrow("fuelDate")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <button type="button" onClick={() => handleSort("fuelType")} className="cursor-pointer">Combustível {getSortArrow("fuelType")}</button>
+                  <button type="button" onClick={() => handleSort("fuelType")} className="cursor-pointer">CombustÃ­vel {getSortArrow("fuelType")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button type="button" onClick={() => handleSort("liters")} className="cursor-pointer">Litros {getSortArrow("liters")}</button>
@@ -577,7 +579,7 @@ export function FuelRecordsPage() {
                   <button type="button" onClick={() => handleSort("avgConsumption")} className="cursor-pointer">Consumo medio {getSortArrow("avgConsumption")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Ações
+                  AÃ§Ãµes
                 </th>
               </tr>
             </thead>
@@ -656,7 +658,7 @@ export function FuelRecordsPage() {
                           Editar
                         </button>
                         <button
-                          onClick={() => handleDelete(record)}
+                          onClick={() => setRecordToDelete(record)}
                           className="btn-ui btn-ui-danger"
                         >
                           Excluir
@@ -680,7 +682,7 @@ export function FuelRecordsPage() {
                   {editingRecord ? "Editar abastecimento" : "Cadastrar abastecimento"}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Preencha as informações do abastecimento
+                  Preencha as informaÃ§Ãµes do abastecimento
                 </p>
               </div>
 
@@ -696,14 +698,14 @@ export function FuelRecordsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">
-                    Veículo
+                    VeÃ­culo
                   </label>
                   <select
                     value={form.vehicleId}
                     onChange={(e) => handleChange("vehicleId", e.target.value)}
                     className={inputClass("vehicleId")}
                   >
-                    <option value="">Selecione um veículo</option>
+                    <option value="">Selecione um veÃ­culo</option>
                     {availableVehicles.map((vehicle) => (
                       <option key={vehicle.id} value={vehicle.id}>
                         {vehicle.brand} {vehicle.model}
@@ -738,7 +740,7 @@ export function FuelRecordsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700">
-                    Tipo de combustível
+                    Tipo de combustÃ­vel
                   </label>
                   <select
                     value={form.fuelType}
@@ -754,8 +756,8 @@ export function FuelRecordsPage() {
                     <option value="GASOLINE">Gasolina</option>
                     <option value="ETHANOL">Etanol</option>
                     <option value="FLEX">Flex</option>
-                    <option value="ELECTRIC">Elétrico</option>
-                    <option value="HYBRID">Híbrido</option>
+                    <option value="ELECTRIC">ElÃ©trico</option>
+                    <option value="HYBRID">HÃ­brido</option>
                     <option value="CNG">GNV</option>
                   </select>
                   {fieldErrors.fuelType ? (
@@ -772,7 +774,7 @@ export function FuelRecordsPage() {
                     value={form.vehicleId ? getBranchNameByVehicleId(form.vehicleId) : ""}
                     readOnly
                     className="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-700 outline-none"
-                    placeholder="Selecione um veículo para identificar a filial"
+                    placeholder="Selecione um veÃ­culo para identificar a filial"
                   />
                 </div>
 
@@ -871,7 +873,7 @@ export function FuelRecordsPage() {
                   {saving
                     ? "Salvando..."
                     : editingRecord
-                    ? "Salvar alterações"
+                    ? "Salvar alteraÃ§Ãµes"
                     : "Cadastrar abastecimento"}
                 </button>
               </div>
@@ -884,10 +886,10 @@ export function FuelRecordsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <h3 className="text-base font-semibold text-slate-900">
-              Comparacao entre veículos
+              Comparacao entre veÃ­culos
             </h3>
             <p className="mt-1 text-xs text-slate-500">
-              Custos e consumo medio por veículo.
+              Custos e consumo medio por veÃ­culo.
             </p>
             <div className="mt-3 space-y-2">
               {insights.comparison.slice(0, 5).map((item) => (
@@ -903,7 +905,7 @@ export function FuelRecordsPage() {
                           maximumFractionDigits: 2,
                         })} km/L`
                       : "Sem consumo medio"}{" "}
-                    •{" "}
+                    â€¢{" "}
                     {item.totalValue.toLocaleString("pt-BR", {
                       style: "currency",
                       currency: "BRL",
@@ -952,6 +954,18 @@ export function FuelRecordsPage() {
           </div>
         </div>
       )}
+      <ConfirmDeleteModal
+        isOpen={Boolean(recordToDelete)}
+        title="Excluir abastecimento"
+        description={
+          recordToDelete
+            ? `Deseja excluir o abastecimento da filial ${getRecordBranchName(recordToDelete)}?`
+            : ""
+        }
+        loading={deletingRecord}
+        onCancel={() => setRecordToDelete(null)}
+        onConfirm={confirmDeleteRecord}
+      />
     </div>
   );
   function handleSort(column: FuelSortBy) {
@@ -964,7 +978,8 @@ export function FuelRecordsPage() {
   }
 
   function getSortArrow(column: FuelSortBy) {
-    if (sortBy !== column) return "↕";
-    return sortDirection === "asc" ? "↑" : "↓";
+    if (sortBy !== column) return "â†•";
+    return sortDirection === "asc" ? "â†‘" : "â†“";
   }
 }
+

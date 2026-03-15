@@ -12,6 +12,7 @@ import {
 import { getBranches } from "../../services/branches";
 import { useBranch } from "../../contexts/BranchContext";
 import { useLocation } from "react-router-dom";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
 type VehicleFormData = {
   plate: string;
@@ -155,6 +156,8 @@ export function VehiclesPage() {
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [sortBy, setSortBy] = useState<"plate" | "vehicle" | "type" | "status">("plate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
+  const [deletingVehicle, setDeletingVehicle] = useState(false);
 
   async function loadData() {
     try {
@@ -398,9 +401,19 @@ export function VehiclesPage() {
   }
 
   async function onDelete(vehicle: Vehicle) {
-    if (!window.confirm(`Deseja excluir o veículo ${vehicle.brand} ${vehicle.model}?`)) return;
-    await deleteVehicle(vehicle.id);
-    await loadData();
+    setVehicleToDelete(vehicle);
+  }
+
+  async function confirmDeleteVehicle() {
+    if (!vehicleToDelete) return;
+    try {
+      setDeletingVehicle(true);
+      await deleteVehicle(vehicleToDelete.id);
+      setVehicleToDelete(null);
+      await loadData();
+    } finally {
+      setDeletingVehicle(false);
+    }
   }
 
   function toggleSort(column: "plate" | "vehicle" | "type" | "status") {
@@ -813,6 +826,18 @@ export function VehiclesPage() {
           </div>
         </div>
       )}
+      <ConfirmDeleteModal
+        isOpen={Boolean(vehicleToDelete)}
+        title="Excluir veículo"
+        description={
+          vehicleToDelete
+            ? `Deseja excluir o veículo ${vehicleToDelete.brand} ${vehicleToDelete.model}?`
+            : ""
+        }
+        loading={deletingVehicle}
+        onCancel={() => setVehicleToDelete(null)}
+        onConfirm={confirmDeleteVehicle}
+      />
     </div>
   );
 }

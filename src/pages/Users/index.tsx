@@ -6,6 +6,7 @@ import {
   getUsers,
   updateUser,
 } from "../../services/users";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
 type UserFormData = {
   name: string;
@@ -34,6 +35,8 @@ export function UsersPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
   const [form, setForm] = useState<UserFormData>(initialForm);
 
   async function loadUsersData() {
@@ -143,18 +146,21 @@ export function UsersPage() {
   }
 
   async function handleDelete(user: User) {
-    const confirmed = window.confirm(
-      `Deseja excluir o usuário ${user.name}?`
-    );
+    setUserToDelete(user);
+  }
 
-    if (!confirmed) return;
-
+  async function confirmDeleteUser() {
+    if (!userToDelete) return;
     try {
-      await deleteUser(user.id);
+      setDeletingUser(true);
+      await deleteUser(userToDelete.id);
+      setUserToDelete(null);
       await loadUsersData();
     } catch (error) {
       console.error("Erro ao excluir usuário:", error);
       setPageErrorMessage("Não foi possível excluir o usuário.");
+    } finally {
+      setDeletingUser(false);
     }
   }
 
@@ -451,6 +457,16 @@ export function UsersPage() {
           </div>
         </div>
       )}
+      <ConfirmDeleteModal
+        isOpen={Boolean(userToDelete)}
+        title="Excluir usuário"
+        description={
+          userToDelete ? `Deseja excluir o usuário ${userToDelete.name}?` : ""
+        }
+        loading={deletingUser}
+        onCancel={() => setUserToDelete(null)}
+        onConfirm={confirmDeleteUser}
+      />
     </div>
   );
   function handleSort(column: UserSortBy) {

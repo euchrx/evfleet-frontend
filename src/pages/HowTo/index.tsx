@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { BookOpenCheck, CirclePlay, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import {
   addHowToVideo,
   deleteHowToVideo,
@@ -85,6 +86,7 @@ export function HowToPage() {
   const [form, setForm] = useState<VideoForm>(initialForm);
   const [search, setSearch] = useState("");
   const [formError, setFormError] = useState("");
+  const [videoToDelete, setVideoToDelete] = useState<HowToVideo | null>(null);
 
   const filteredVideos = useMemo(() => {
     if (!search.trim()) return videos;
@@ -131,9 +133,14 @@ export function HowToPage() {
 
   function handleDeleteVideo(video: HowToVideo) {
     if (!canManageVideos) return;
-    if (!window.confirm(`Deseja remover o vídeo "${video.title}"?`)) return;
-    deleteHowToVideo(video.id);
-    setVideos((prev) => prev.filter((item) => item.id !== video.id));
+    setVideoToDelete(video);
+  }
+
+  function confirmDeleteVideo() {
+    if (!videoToDelete) return;
+    deleteHowToVideo(videoToDelete.id);
+    setVideos((prev) => prev.filter((item) => item.id !== videoToDelete.id));
+    setVideoToDelete(null);
   }
 
   return (
@@ -264,6 +271,16 @@ export function HowToPage() {
           </div>
         )}
       </section>
+      <ConfirmDeleteModal
+        isOpen={Boolean(videoToDelete)}
+        title="Remover vídeo"
+        description={
+          videoToDelete ? `Deseja remover o vídeo "${videoToDelete.title}"?` : ""
+        }
+        confirmText="Remover"
+        onCancel={() => setVideoToDelete(null)}
+        onConfirm={confirmDeleteVideo}
+      />
     </div>
   );
 }

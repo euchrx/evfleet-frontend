@@ -5,6 +5,7 @@ import { useBranch } from "../../contexts/BranchContext";
 import type { Vehicle } from "../../types/vehicle";
 import type { VehicleDocument, VehicleDocumentStatus, VehicleDocumentType } from "../../types/vehicle-document";
 import { api } from "../../services/api";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
 type DocumentFormData = {
   type: VehicleDocumentType;
@@ -103,6 +104,8 @@ export function VehicleDocumentsPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<VehicleDocument | null>(null);
+  const [documentToDelete, setDocumentToDelete] = useState<VehicleDocument | null>(null);
+  const [deletingDocument, setDeletingDocument] = useState(false);
   const [form, setForm] = useState<DocumentFormData>(initialForm);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -279,13 +282,28 @@ export function VehicleDocumentsPage() {
   }
 
   async function handleDelete(item: VehicleDocument) {
-    if (!window.confirm(`Deseja excluir o documento "${item.name}"?`)) return;
+    setDocumentToDelete(item);
     try {
-      await deleteVehicleDocument(item.id);
+      return;
       await loadData();
     } catch (error) {
       console.error("Erro ao excluir documento:", error);
       setPageErrorMessage("Não foi possível excluir o documento.");
+    }
+  }
+
+  async function confirmDeleteDocument() {
+    if (!documentToDelete) return;
+    try {
+      setDeletingDocument(true);
+      await deleteVehicleDocument(documentToDelete.id);
+      setDocumentToDelete(null);
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao excluir documento:", error);
+      setPageErrorMessage("NÃ£o foi possÃ­vel excluir o documento.");
+    } finally {
+      setDeletingDocument(false);
     }
   }
 
@@ -421,6 +439,18 @@ export function VehicleDocumentsPage() {
           </div>
         </div>
       ) : null}
+      <ConfirmDeleteModal
+        isOpen={Boolean(documentToDelete)}
+        title="Excluir documento"
+        description={
+          documentToDelete
+            ? `Deseja excluir o documento "${documentToDelete.name}"?`
+            : ""
+        }
+        loading={deletingDocument}
+        onCancel={() => setDocumentToDelete(null)}
+        onConfirm={confirmDeleteDocument}
+      />
     </div>
   );
 }

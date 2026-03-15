@@ -6,6 +6,7 @@ import { useBranch } from "../../contexts/BranchContext";
 import type { Trip, TripStatus } from "../../types/trip";
 import type { Vehicle } from "../../types/vehicle";
 import type { Driver } from "../../types/driver";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
 type TripFormData = {
   vehicleId: string;
@@ -79,6 +80,8 @@ export function TripsPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
+  const [deletingTrip, setDeletingTrip] = useState(false);
   const [form, setForm] = useState<TripFormData>(initialForm);
 
   async function loadData() {
@@ -267,13 +270,21 @@ export function TripsPage() {
   }
 
   async function handleDelete(trip: Trip) {
-    if (!window.confirm(`Deseja excluir a viagem ${trip.origin} > ${trip.destination}?`)) return;
+    setTripToDelete(trip);
+  }
+
+  async function confirmDeleteTrip() {
+    if (!tripToDelete) return;
     try {
-      await deleteTrip(trip.id);
+      setDeletingTrip(true);
+      await deleteTrip(tripToDelete.id);
+      setTripToDelete(null);
       await loadData();
     } catch (error) {
       console.error("Erro ao excluir viagem:", error);
       setPageErrorMessage("Não foi possível excluir a viagem.");
+    } finally {
+      setDeletingTrip(false);
     }
   }
 
@@ -374,6 +385,18 @@ export function TripsPage() {
           </div>
         </div>
       ) : null}
+      <ConfirmDeleteModal
+        isOpen={Boolean(tripToDelete)}
+        title="Excluir viagem"
+        description={
+          tripToDelete
+            ? `Deseja excluir a viagem ${tripToDelete.origin} > ${tripToDelete.destination}?`
+            : ""
+        }
+        loading={deletingTrip}
+        onCancel={() => setTripToDelete(null)}
+        onConfirm={confirmDeleteTrip}
+      />
     </div>
   );
 }

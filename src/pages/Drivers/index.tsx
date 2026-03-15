@@ -4,6 +4,7 @@ import type { Vehicle } from "../../types/vehicle";
 import { createDriver, deleteDriver, getDrivers, updateDriver } from "../../services/drivers";
 import { getVehicles } from "../../services/vehicles";
 import { useBranch } from "../../contexts/BranchContext";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
 type DriverFormData = {
   name: string;
@@ -76,6 +77,8 @@ export function DriversPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+  const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
+  const [deletingDriver, setDeletingDriver] = useState(false);
   const [form, setForm] = useState<DriverFormData>(initialForm);
 
   async function loadData() {
@@ -208,14 +211,22 @@ export function DriversPage() {
   }
 
   async function handleDelete(driver: Driver) {
-    if (!window.confirm(`Deseja excluir o motorista ${driver.name}?`)) return;
+    setDriverToDelete(driver);
+  }
+
+  async function confirmDeleteDriver() {
+    if (!driverToDelete) return;
     try {
+      setDeletingDriver(true);
       setPageErrorMessage("");
-      await deleteDriver(driver.id);
+      await deleteDriver(driverToDelete.id);
+      setDriverToDelete(null);
       await loadData();
     } catch (error) {
       console.error("Erro ao excluir motorista:", error);
       setPageErrorMessage("Não foi possível excluir o motorista.");
+    } finally {
+      setDeletingDriver(false);
     }
   }
 
@@ -409,6 +420,19 @@ export function DriversPage() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(driverToDelete)}
+        title="Excluir motorista"
+        description={
+          driverToDelete
+            ? `Deseja excluir o motorista ${driverToDelete.name}?`
+            : ""
+        }
+        loading={deletingDriver}
+        onCancel={() => setDriverToDelete(null)}
+        onConfirm={confirmDeleteDriver}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import {
   getSystemLogs,
   type SystemLogEntry,
 } from "../../services/systemLogs";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
 function formatDateTime(iso: string) {
   const date = new Date(iso);
@@ -18,6 +19,7 @@ export function SystemLogsPage() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | "SUCCESS" | "ERROR" | "INFO">(
     "ALL"
   );
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
   function loadLogs() {
     setLogs(getSystemLogs());

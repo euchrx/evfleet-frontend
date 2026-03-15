@@ -6,6 +6,7 @@ import {
   getBranches,
   updateBranch,
 } from "../../services/branches";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
 type BranchFormData = {
   name: string;
@@ -31,6 +32,8 @@ export function BranchesPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+  const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
+  const [deletingBranch, setDeletingBranch] = useState(false);
   const [form, setForm] = useState<BranchFormData>(initialForm);
 
   async function loadBranchesData() {
@@ -131,15 +134,16 @@ export function BranchesPage() {
   }
 
   async function handleDelete(branch: Branch) {
-    const confirmed = window.confirm(
-      `Deseja excluir a filial ${branch.name}?`
-    );
+    setBranchToDelete(branch);
+  }
 
-    if (!confirmed) return;
-
+  async function confirmDeleteBranch() {
+    if (!branchToDelete) return;
     try {
+      setDeletingBranch(true);
       setPageErrorMessage("");
-      await deleteBranch(branch.id);
+      await deleteBranch(branchToDelete.id);
+      setBranchToDelete(null);
       await loadBranchesData();
     } catch (error: any) {
       console.error("Erro ao excluir filial:", error);
@@ -157,6 +161,8 @@ export function BranchesPage() {
           ? apiMessage
           : "Não foi possível excluir a filial."
       );
+    } finally {
+      setDeletingBranch(false);
     }
   }
 
@@ -435,6 +441,18 @@ export function BranchesPage() {
           </div>
         </div>
       )}
+      <ConfirmDeleteModal
+        isOpen={Boolean(branchToDelete)}
+        title="Excluir filial"
+        description={
+          branchToDelete
+            ? `Deseja excluir a filial ${branchToDelete.name}?`
+            : ""
+        }
+        loading={deletingBranch}
+        onCancel={() => setBranchToDelete(null)}
+        onConfirm={confirmDeleteBranch}
+      />
     </div>
   );
   function handleSort(column: BranchSortBy) {

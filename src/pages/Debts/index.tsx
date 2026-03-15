@@ -14,6 +14,7 @@ import { getVehicles } from "../../services/vehicles";
 import { getFuelRecords } from "../../services/fuelRecords";
 import { getMaintenanceRecords } from "../../services/maintenanceRecords";
 import { useBranch } from "../../contexts/BranchContext";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
 type DebtCategory = Debt["category"];
 type DebtSortBy =
@@ -137,6 +138,8 @@ export function DebtsPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
+  const [debtToDelete, setDebtToDelete] = useState<Debt | null>(null);
+  const [deletingDebt, setDeletingDebt] = useState(false);
   const [form, setForm] = useState<DebtFormData>(initialForm);
   const [highlightedDebtId, setHighlightedDebtId] = useState<string | null>(null);
 
@@ -371,14 +374,22 @@ export function DebtsPage() {
   }
 
   async function handleDelete(debt: Debt) {
-    if (!window.confirm(`Deseja excluir o débito "${debt.description}"?`)) return;
+    setDebtToDelete(debt);
+  }
+
+  async function confirmDeleteDebt() {
+    if (!debtToDelete) return;
     try {
-      await deleteDebt(debt.id);
+      setDeletingDebt(true);
+      await deleteDebt(debtToDelete.id);
+      setDebtToDelete(null);
       notifyHeaderNotifications();
-      setDebts((prev) => prev.filter((item) => item.id !== debt.id));
+      setDebts((prev) => prev.filter((item) => item.id !== debtToDelete.id));
     } catch (error) {
       console.error("Erro ao excluir débito:", error);
       setPageErrorMessage("Não foi possível excluir o débito.");
+    } finally {
+      setDeletingDebt(false);
     }
   }
 
@@ -462,6 +473,16 @@ export function DebtsPage() {
           {formErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formErrorMessage}</div> : null}
           <div className="flex justify-end gap-3 border-t border-slate-200 pt-4"><button type="button" onClick={closeModal} className="cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancelar</button><button type="submit" disabled={saving} className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{saving ? "Salvando..." : editingDebt ? "Salvar alterações" : "Cadastrar débito"}</button></div>
         </form></div></div> : null}
+      <ConfirmDeleteModal
+        isOpen={Boolean(debtToDelete)}
+        title="Excluir débito"
+        description={
+          debtToDelete ? `Deseja excluir o débito "${debtToDelete.description}"?` : ""
+        }
+        loading={deletingDebt}
+        onCancel={() => setDebtToDelete(null)}
+        onConfirm={confirmDeleteDebt}
+      />
     </div>
   );
 }
