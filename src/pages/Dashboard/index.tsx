@@ -31,6 +31,13 @@ function toCurrency(value: number) {
   });
 }
 
+function maintenanceTypePtBr(value?: string) {
+  if (value === "PREVENTIVE") return "Preventiva";
+  if (value === "PERIODIC") return "Periódica";
+  if (value === "CORRECTIVE") return "Corretiva";
+  return value || "Serviço";
+}
+
 type CostPeriod = "CURRENT_MONTH" | "LAST_30_DAYS" | "CURRENT_YEAR" | "ALL";
 type CostModalType = "FUEL" | "MAINTENANCE" | "DEBTS";
 type DriverCategory = "LIGHT" | "HEAVY";
@@ -378,7 +385,7 @@ export function DashboardPage() {
         date: item.maintenanceDate,
         type: "Manutenção",
         value: item.cost || 0,
-        description: `${item.type || "Servico"} • KM ${item.km}`,
+        description: `${maintenanceTypePtBr(item.type)} • KM ${item.km}`,
       })),
       ...debts.map((item) => ({
         id: `debt-${item.id}`,
