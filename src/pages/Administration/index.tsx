@@ -129,8 +129,8 @@ export function AdministrationPage() {
           <h2 className="text-lg font-semibold text-slate-900">Parâmetros gerais</h2>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <label className="space-y-1 md:col-span-2 lg:col-span-2">
+        <div className="grid gap-4 lg:grid-cols-12">
+          <label className="space-y-1 lg:col-span-6">
             <span className="text-sm font-medium text-slate-700">Nome da empresa</span>
             <input
               value={settings.companyName}
@@ -138,7 +138,7 @@ export function AdministrationPage() {
               className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
           </label>
-          <label className="space-y-1">
+          <label className="space-y-1 lg:col-span-3">
             <span className="text-sm font-medium text-slate-700">Fuso horário</span>
             <select
               value={settings.timezone}
@@ -148,7 +148,7 @@ export function AdministrationPage() {
               <option value="America/Sao_Paulo">America/Sao_Paulo</option>
             </select>
           </label>
-          <label className="space-y-1">
+          <label className="space-y-1 lg:col-span-3">
             <span className="text-sm font-medium text-slate-700">Idioma</span>
             <select
               value={settings.language}
@@ -158,7 +158,7 @@ export function AdministrationPage() {
               <option value="pt-BR">Português (Brasil)</option>
             </select>
           </label>
-          <label className="space-y-1 lg:col-span-1">
+          <label className="space-y-1 lg:col-span-3">
             <span className="text-sm font-medium text-slate-700">Moeda</span>
             <select
               value={settings.currency}
@@ -168,16 +168,16 @@ export function AdministrationPage() {
               <option value="BRL">Real (BRL)</option>
             </select>
           </label>
-          <label className="space-y-1 md:col-span-2 lg:col-span-2">
+          <div className="space-y-1 lg:col-span-9 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <span className="text-sm font-medium text-slate-700">
               Estabelecimento padrão do sistema
             </span>
-            <label className="mb-2 inline-flex items-center gap-2 text-sm text-slate-700">
+            <label className="mb-2 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
               <input
                 type="checkbox"
                 checked={settings.lockDefaultBranch}
                 onChange={(e) => handleChange("lockDefaultBranch", e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300"
+                className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
               />
               Ativar e bloquear estabelecimento em todo o sistema
             </label>
@@ -185,7 +185,7 @@ export function AdministrationPage() {
               value={settings.defaultBranchId}
               onChange={(e) => handleChange("defaultBranchId", e.target.value)}
               disabled={!settings.lockDefaultBranch}
-              className="w-full cursor-pointer rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              className="w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 disabled:cursor-not-allowed disabled:bg-slate-100"
             >
               <option value="">Nenhum (rede inteira)</option>
               {branches.map((branch) => (
@@ -194,10 +194,10 @@ export function AdministrationPage() {
                 </option>
               ))}
             </select>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs font-medium text-slate-500">
               Quando ativado e definido, os campos de estabelecimento serão preenchidos automaticamente e desabilitados.
             </span>
-          </label>
+          </div>
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
