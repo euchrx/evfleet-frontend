@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FileDown } from "lucide-react";
 import { useBranch } from "../../contexts/BranchContext";
 import { getBranches } from "../../services/branches";
@@ -84,6 +84,7 @@ function MultiSelectField({
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const selectedOptions = useMemo(
     () => options.filter((item) => selectedIds.includes(item.id)),
@@ -103,13 +104,34 @@ function MultiSelectField({
     if (selectedIds.includes(id)) return;
     onChange([...selectedIds, id]);
     setQuery("");
-    setOpen(true);
+    setOpen(false);
   }
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (!containerRef.current) return;
+      const target = event.target as Node;
+      if (!containerRef.current.contains(target)) {
+        setOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    window.addEventListener("mousedown", handleOutsideClick);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("mousedown", handleOutsideClick);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
 
   return (
     <div className="space-y-1">
       <label className="block text-sm font-semibold text-slate-700">{label}</label>
-      <div className="relative">
+      <div ref={containerRef} className="relative">
         <div
           className="min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-sm focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-200"
           onClick={() => setOpen(true)}
