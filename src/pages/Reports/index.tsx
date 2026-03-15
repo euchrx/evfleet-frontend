@@ -75,12 +75,14 @@ function MultiSelectField({
   selectedIds,
   onChange,
   placeholder,
+  error,
 }: {
   label: string;
   options: SelectOption[];
   selectedIds: string[];
   onChange: (value: string[]) => void;
   placeholder: string;
+  error?: string;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -133,7 +135,11 @@ function MultiSelectField({
       <label className="block text-sm font-semibold text-slate-700">{label}</label>
       <div ref={containerRef} className="relative">
         <div
-          className="min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-sm focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-200"
+          className={`min-h-[44px] w-full rounded-xl border bg-white px-2.5 py-2 text-sm focus-within:ring-2 ${
+            error
+              ? "border-red-300 focus-within:border-red-500 focus-within:ring-red-200"
+              : "border-slate-300 focus-within:border-orange-500 focus-within:ring-orange-200"
+          }`}
           onClick={() => setOpen(true)}
         >
           <div className="flex flex-wrap items-center gap-2">
@@ -187,13 +193,13 @@ function MultiSelectField({
           </div>
         ) : null}
       </div>
+      {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </div>
   );
 }
 
 export function ReportsPage() {
   const { selectedBranchId } = useBranch();
-  const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -212,6 +218,7 @@ export function ReportsPage() {
     "MAINTENANCE",
     "DEBTS",
   ]);
+  const [fieldErrors, setFieldErrors] = useState<{ modules?: string; vehicleTypes?: string }>({});
   const [format, setFormat] = useState("PDF");
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
@@ -221,7 +228,6 @@ export function ReportsPage() {
 
   async function loadData() {
     try {
-      setLoading(true);
       setErrorMessage("");
       const [branchesData, vehiclesData, driversData, fuelData, maintenanceData, debtsData] =
         await Promise.all([
@@ -243,7 +249,6 @@ export function ReportsPage() {
       console.error("Erro ao carregar relatórios:", error);
       setErrorMessage("Não foi possível carregar os dados para geração dos relatórios.");
     } finally {
-      setLoading(false);
     }
   }
 
@@ -372,6 +377,16 @@ export function ReportsPage() {
   }, [filteredData]);
 
   function exportReport() {
+    const nextErrors: { modules?: string; vehicleTypes?: string } = {};
+    if (selectedModules.length === 0) {
+      nextErrors.modules = "Selecione ao menos um módulo.";
+    }
+    if (selectedVehicleTypes.length === 0) {
+      nextErrors.vehicleTypes = "Selecione ao menos uma categoria de veículo.";
+    }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     const showFuel = selectedModules.length === 0 || selectedModules.includes("FUEL");
     const showMaintenance =
       selectedModules.length === 0 || selectedModules.includes("MAINTENANCE");
@@ -534,8 +549,12 @@ export function ReportsPage() {
               label="Categoria de veículo"
               options={vehicleTypeOptions}
               selectedIds={selectedVehicleTypes}
-              onChange={(value) => setSelectedVehicleTypes(value as VehicleTypeFilter[])}
+              onChange={(value) => {
+                setSelectedVehicleTypes(value as VehicleTypeFilter[]);
+                setFieldErrors((prev) => ({ ...prev, vehicleTypes: undefined }));
+              }}
               placeholder="Selecione Leve/Pesado"
+              error={fieldErrors.vehicleTypes}
             />
           </div>
 
@@ -544,8 +563,12 @@ export function ReportsPage() {
               label="Módulos"
               options={moduleOptions}
               selectedIds={selectedModules}
-              onChange={(value) => setSelectedModules(value as ReportModule[])}
+              onChange={(value) => {
+                setSelectedModules(value as ReportModule[]);
+                setFieldErrors((prev) => ({ ...prev, modules: undefined }));
+              }}
               placeholder="Selecione os módulos"
+              error={fieldErrors.modules}
             />
           </div>
 
@@ -570,12 +593,6 @@ export function ReportsPage() {
             Exportar {format}
           </button>
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        {loading
-          ? "Sincronizando dados para geração dos relatórios..."
-          : "Use os campos multi-select para cruzar 1, 2 ou mais veículos, motoristas, tipos e módulos."}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
