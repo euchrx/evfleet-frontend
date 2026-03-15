@@ -103,6 +103,7 @@ export function AppLayout() {
   const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(() => getCachedMenuVisibilityMap());
+  const [isLoadingMenuVisibility, setIsLoadingMenuVisibility] = useState(true);
 
   const menu = [
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN", "FLEET_MANAGER"] },
@@ -250,8 +251,10 @@ export function AppLayout() {
 
   useEffect(() => {
     async function refreshMenuVisibility() {
+      setIsLoadingMenuVisibility(true);
       const visibility = await fetchMenuVisibilityMap();
       setMenuVisibility(visibility);
+      setIsLoadingMenuVisibility(false);
     }
     refreshMenuVisibility();
     window.addEventListener("evfleet-menu-visibility-updated", refreshMenuVisibility);
@@ -261,6 +264,7 @@ export function AppLayout() {
   }, []);
 
   useEffect(() => {
+    if (isLoadingMenuVisibility) return;
     if (!user) return;
     if (location.pathname === "/login") return;
     if (isMenuPathVisible(location.pathname, menuVisibility)) return;
@@ -269,7 +273,15 @@ export function AppLayout() {
     if (location.pathname !== fallbackPath) {
       navigate(fallbackPath, { replace: true });
     }
-  }, [filteredMenu, location.pathname, menuVisibility, navigate, user]);
+  }, [filteredMenu, isLoadingMenuVisibility, location.pathname, menuVisibility, navigate, user]);
+
+  if (isLoadingMenuVisibility) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <p className="text-sm text-slate-500">Carregando permissões do sistema...</p>
+      </div>
+    );
+  }
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
