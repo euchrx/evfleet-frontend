@@ -23,7 +23,14 @@ type TripFormData = {
   notes: string;
 };
 
-type TripSortBy = "vehicle" | "driver" | "origin" | "departureAt" | "status" | "km";
+type TripSortBy =
+  | "vehicle"
+  | "driver"
+  | "origin"
+  | "departureAt"
+  | "returnAt"
+  | "kmDriven"
+  | "status";
 
 const initialForm: TripFormData = {
   vehicleId: "",
@@ -160,12 +167,29 @@ export function TripsPage() {
       if (sortBy === "driver") {
         return (a.driver?.name || "").localeCompare(b.driver?.name || "", "pt-BR", { sensitivity: "base" }) * direction;
       }
-      if (sortBy === "origin") return a.origin.localeCompare(b.origin, "pt-BR", { sensitivity: "base" }) * direction;
-      if (sortBy === "departureAt") return ((parseLocalDate(a.departureAt)?.getTime() || 0) - (parseLocalDate(b.departureAt)?.getTime() || 0)) * direction;
-      if (sortBy === "status") return statusLabel(a.status).localeCompare(statusLabel(b.status), "pt-BR", { sensitivity: "base" }) * direction;
-      const aKm = Math.max(a.returnKm || 0, a.departureKm || 0);
-      const bKm = Math.max(b.returnKm || 0, b.departureKm || 0);
-      return (aKm - bKm) * direction;
+      if (sortBy === "origin")
+        return a.origin.localeCompare(b.origin, "pt-BR", {
+          sensitivity: "base",
+        }) * direction;
+      if (sortBy === "departureAt")
+        return (
+          (parseLocalDate(a.departureAt)?.getTime() || 0) -
+          (parseLocalDate(b.departureAt)?.getTime() || 0)
+        ) * direction;
+      if (sortBy === "returnAt")
+        return (
+          (parseLocalDate(a.returnAt)?.getTime() || 0) -
+          (parseLocalDate(b.returnAt)?.getTime() || 0)
+        ) * direction;
+      if (sortBy === "status")
+        return (
+          statusLabel(a.status).localeCompare(statusLabel(b.status), "pt-BR", {
+            sensitivity: "base",
+          }) * direction
+        );
+      const aKmDriven = Math.max((a.returnKm || 0) - (a.departureKm || 0), 0);
+      const bKmDriven = Math.max((b.returnKm || 0) - (b.departureKm || 0), 0);
+      return (aKmDriven - bKmDriven) * direction;
     });
   }, [trips, selectedBranchId, search, sortBy, sortDirection]);
 
@@ -340,20 +364,22 @@ export function TripsPage() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("vehicle")} className="cursor-pointer">Veículo {getSortArrow("vehicle")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("driver")} className="cursor-pointer">Motorista {getSortArrow("driver")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("origin")} className="cursor-pointer">Rota {getSortArrow("origin")}</button></th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("departureAt")} className="cursor-pointer">Data {getSortArrow("departureAt")}</button></th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("km")} className="cursor-pointer">KM {getSortArrow("km")}</button></th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("departureAt")} className="cursor-pointer">Data de saída {getSortArrow("departureAt")}</button></th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("returnAt")} className="cursor-pointer">Data de retorno {getSortArrow("returnAt")}</button></th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("kmDriven")} className="cursor-pointer">KM rodados {getSortArrow("kmDriven")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("status")} className="cursor-pointer">Status {getSortArrow("status")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Carregando viagens...</td></tr> : filteredTrips.length === 0 ? <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma viagem encontrada.</td></tr> : filteredTrips.map((trip) => (
+              {loading ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Carregando viagens...</td></tr> : filteredTrips.length === 0 ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma viagem encontrada.</td></tr> : filteredTrips.map((trip) => (
                 <tr key={trip.id} className="border-t border-slate-200">
                   <td className="px-6 py-4 text-sm text-slate-700">{trip.vehicle ? `${trip.vehicle.brand} ${trip.vehicle.model} (${trip.vehicle.plate})` : trip.vehicleId}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{trip.driver?.name || "Sem motorista"}</td>
                   <td className="px-6 py-4 text-sm text-slate-700"><span className="font-medium">{trip.origin}</span><span className="mx-2 text-slate-400">→</span>{trip.destination}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{toDateText(trip.departureAt)}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700">{trip.departureKm.toLocaleString("pt-BR")} / {trip.returnKm ? trip.returnKm.toLocaleString("pt-BR") : "-"} km</td>
+                  <td className="px-6 py-4 text-sm text-slate-700">{toDateText(trip.returnAt)}</td>
+                  <td className="px-6 py-4 text-sm text-slate-700">{trip.returnKm ? Math.max(trip.returnKm - trip.departureKm, 0).toLocaleString("pt-BR") : "-"} km</td>
                   <td className="px-6 py-4 text-sm"><span className={`status-pill ${statusClass(trip.status)}`}>{statusLabel(trip.status)}</span></td>
                   <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openEditModal(trip)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => handleDelete(trip)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
                 </tr>
