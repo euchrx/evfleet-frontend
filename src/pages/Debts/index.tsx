@@ -347,7 +347,7 @@ export function DebtsPage() {
         vehicleId: form.vehicleId,
       };
       const nextErrors: Record<string, string> = {};
-      if (!payload.description) nextErrors.description = "Informe a descri??o.";
+      if (!payload.description) nextErrors.description = "Informe a descrição.";
       if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veículo.";
       if (!payload.debtDate) nextErrors.debtDate = "Informe a data de lancamento.";
       if (Number.isNaN(payload.amount) || payload.amount <= 0) nextErrors.amount = "Informe um valor válido.";
@@ -414,7 +414,7 @@ export function DebtsPage() {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row">
-          <input type="text" placeholder="Buscar por descri??o, categoria, status ou placa" value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
+          <input type="text" placeholder="Buscar por descrição, categoria, status ou placa" value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
           <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as "ALL" | DebtCategory)} className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="ALL">Todas as categorias</option>{debtCategoryOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="ALL">Todos os status</option><option value="PENDING">Pendente</option><option value="OVERDUE">Vencida</option><option value="PAID">Paga</option><option value="APPEALED">Recorrida</option></select>
         </div>
@@ -450,7 +450,7 @@ export function DebtsPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold text-slate-900">Custos totais por veículo</h2><span className="text-xs text-slate-500">Combustível + manutenção + débitos</span></div>
         <div className="overflow-x-auto">
-          <table className="min-w-full"><thead className="bg-slate-50"><tr><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Veículo</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Combustível</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Manuten??o</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Débitos</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Total</th></tr></thead>
+          <table className="min-w-full"><thead className="bg-slate-50"><tr><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Veículo</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Combustível</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Manutenção</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Débitos</th><th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Total</th></tr></thead>
             <tbody>{vehicleCosts.length === 0 ? <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">Sem custos consolidados no escopo atual.</td></tr> : vehicleCosts.map((row) => <tr key={row.id} className="border-t border-slate-200"><td className="px-4 py-3 text-sm text-slate-700">{row.label} ({row.plate})</td><td className="px-4 py-3 text-sm text-slate-700">{row.fuel.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td><td className="px-4 py-3 text-sm text-slate-700">{row.maintenance.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td><td className="px-4 py-3 text-sm text-slate-700">{row.debts.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td><td className="px-4 py-3 text-sm font-semibold text-slate-900">{row.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td></tr>)}</tbody>
           </table>
         </div>

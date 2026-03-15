@@ -162,7 +162,7 @@ export function MaintenanceRegisterPage() {
       return;
     }
     if (!payload.description) {
-      setErrorMessage("Informe a descri??o da manutenção.");
+      setErrorMessage("Informe a descrição da manutenção.");
       return;
     }
     if (!payload.maintenanceDate) {

@@ -40,7 +40,7 @@ const documentTypeOptions: Array<{ value: VehicleDocumentType; label: string }> 
   { value: "INSURANCE", label: "Seguro" },
   { value: "IPVA", label: "IPVA" },
   { value: "LEASING_CONTRACT", label: "Contrato de leasing" },
-  { value: "INSPECTION", label: "Inspe??o" },
+  { value: "INSPECTION", label: "Inspeção" },
   { value: "OTHER", label: "Outro" },
 ];
 
@@ -301,7 +301,7 @@ export function VehicleDocumentsPage() {
       await loadData();
     } catch (error) {
       console.error("Erro ao excluir documento:", error);
-      setPageErrorMessage("NÃ£o foi possÃ­vel excluir o documento.");
+      setPageErrorMessage("Não foi possível excluir o documento.");
     } finally {
       setDeletingDocument(false);
     }

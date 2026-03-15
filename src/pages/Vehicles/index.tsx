@@ -85,14 +85,14 @@ const getCategoryLabel = (value?: "CAR" | "TRUCK" | "UTILITY") => {
 const getVehicleTypeLabel = (value?: "LIGHT" | "HEAVY") =>
   value === "HEAVY" ? "Pesado" : "Leve";
 const getStatusLabel = (value?: "ACTIVE" | "MAINTENANCE" | "SOLD") => {
-  if (value === "MAINTENANCE") return "Manuten??o";
+  if (value === "MAINTENANCE") return "Manutenção";
   if (value === "SOLD") return "Vendido";
   return "Ativo";
 };
 const getHistoryTypeLabel = (value?: string) => {
   if (value === "VEHICLE_CREATED") return "Cadastro";
   if (value === "VEHICLE_EDIT") return "Edicao";
-  if (value === "MAINTENANCE") return "Manuten??o";
+  if (value === "MAINTENANCE") return "Manutenção";
   if (value === "FUEL") return "Abastecimento";
   if (value === "FINE") return "Multa";
   if (value === "MAINTENANCE_PLAN") return "Plano de manutenção";
@@ -106,7 +106,7 @@ const translateHistoryText = (value: string) => {
     OPEN: "Aberta",
     DONE: "Concluída",
     ACTIVE: "Ativo",
-    MAINTENANCE: "Manuten??o",
+    MAINTENANCE: "Manutenção",
     SOLD: "Vendido",
     LIGHT: "Leve",
     HEAVY: "Pesado",
@@ -516,7 +516,7 @@ export function VehiclesPage() {
           <p className="mt-1 text-2xl font-bold text-emerald-800">{summary.active}</p>
         </div>
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Manuten??o</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Manutenção</p>
           <p className="mt-1 text-2xl font-bold text-amber-800">{summary.maintenance}</p>
         </div>
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
@@ -710,7 +710,7 @@ export function VehiclesPage() {
 
               <div className="rounded-xl border border-slate-200 p-4">
                 <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  Opera??o
+                  Operação
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-1">
@@ -732,7 +732,7 @@ export function VehiclesPage() {
                   </label>
                   <label className="space-y-1 md:col-span-2">
                     <span className="text-sm font-medium text-slate-700">Status</span>
-                    <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as VehicleFormData["status"] })} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="ACTIVE">Ativo</option><option value="MAINTENANCE">Manuten??o</option><option value="SOLD">Vendido</option></select>
+                    <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as VehicleFormData["status"] })} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="ACTIVE">Ativo</option><option value="MAINTENANCE">Manutenção</option><option value="SOLD">Vendido</option></select>
                   </label>
                   {(form.vehicleType === "LIGHT" || form.category === "UTILITY") ? (
                     <>

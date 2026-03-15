@@ -236,7 +236,7 @@ export function ReportsPage() {
               <tr><td>Custo débitos e multas</td><td>${toCurrency(metrics.debtsCost)}</td></tr>
               <tr><td>Abastecimentos</td><td>${metrics.fuelCount}</td></tr>
               <tr><td>Total de litros</td><td>${metrics.totalLiters.toFixed(1)} L</td></tr>
-              <tr><td>Manuten??es pendentes</td><td>${metrics.pendingMaintenance}</td></tr>
+              <tr><td>Manutenções pendentes</td><td>${metrics.pendingMaintenance}</td></tr>
               <tr><td>Débitos e multas pendentes</td><td>${metrics.pendingDebts}</td></tr>
             </table>
           </section>
