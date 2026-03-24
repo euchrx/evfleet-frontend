@@ -390,7 +390,12 @@ export function VehicleDocumentsPage() {
           <h1 className="text-3xl font-bold text-slate-900">Gestão de Documentos</h1>
           <p className="text-sm text-slate-500">Controle de validade, vencimentos e rastreabilidade documental da frota.</p>
         </div>
-        <button onClick={openCreateModal} className="btn-ui btn-ui-primary">+ Cadastrar documento</button>
+        <button
+          onClick={openCreateModal}
+          className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+        >
+          + Cadastrar documento
+        </button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

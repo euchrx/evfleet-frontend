@@ -624,7 +624,6 @@ export function VehiclesPage() {
         </div>
         <button
           onClick={openCreate}
-          disabled={isVehicleLimitReached}
           className={`rounded-xl px-4 py-3 text-sm font-semibold text-white transition ${
             isVehicleLimitReached
               ? "cursor-not-allowed bg-slate-400"
