@@ -174,6 +174,8 @@ export function VehiclesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<"ALL" | "LIGHT" | "HEAVY">("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "MAINTENANCE" | "SOLD">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [form, setForm] = useState<VehicleFormData>(initialForm);
@@ -493,6 +495,8 @@ export function VehiclesPage() {
   const filtered = useMemo(() => {
     let list = vehicles;
     if (selectedBranchId) list = list.filter((v) => v.branchId === selectedBranchId);
+    if (categoryFilter !== "ALL") list = list.filter((v) => v.vehicleType === categoryFilter);
+    if (statusFilter !== "ALL") list = list.filter((v) => (v.status || "ACTIVE") === statusFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((v) => {
@@ -539,7 +543,7 @@ export function VehiclesPage() {
       const weightOrder: Record<string, number> = { LIGHT: 0, HEAVY: 1 };
       return ((weightOrder[a.vehicleType] ?? 0) - (weightOrder[b.vehicleType] ?? 0)) * direction;
     });
-  }, [vehicles, selectedBranchId, search, sortBy, sortDirection]);
+  }, [vehicles, selectedBranchId, categoryFilter, statusFilter, search, sortBy, sortDirection]);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filtered.length / TABLE_PAGE_SIZE)),
@@ -553,7 +557,7 @@ export function VehiclesPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, selectedBranchId, sortBy, sortDirection]);
+  }, [search, selectedBranchId, categoryFilter, statusFilter, sortBy, sortDirection]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -570,7 +574,7 @@ export function VehiclesPage() {
       total: scoped.length,
       active: scoped.filter((vehicle) => vehicle.status === "ACTIVE").length,
       maintenance: scoped.filter((vehicle) => vehicle.status === "MAINTENANCE").length,
-      sold: scoped.filter((vehicle) => vehicle.status === "SOLD").length,
+      light: scoped.filter((vehicle) => vehicle.vehicleType === "LIGHT").length,
       heavy: scoped.filter((vehicle) => vehicle.vehicleType === "HEAVY").length,
     };
   }, [vehicles, selectedBranchId]);
@@ -599,8 +603,8 @@ export function VehiclesPage() {
           <p className="mt-1 text-2xl font-bold text-amber-800">{summary.maintenance}</p>
         </div>
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Vendidos</p>
-          <p className="mt-1 text-2xl font-bold text-red-800">{summary.sold}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Leves</p>
+          <p className="mt-1 text-2xl font-bold text-red-800">{summary.light}</p>
         </div>
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Pesados</p>
@@ -609,7 +613,20 @@ export function VehiclesPage() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por placa, modelo ou marca" className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
+        <div className="flex flex-col gap-3 md:flex-row">
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por placa, modelo ou marca" className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
+          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as "ALL" | "LIGHT" | "HEAVY")} className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+            <option value="ALL">Todas as categorias</option>
+            <option value="LIGHT">Leves</option>
+            <option value="HEAVY">Pesados</option>
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "ALL" | "ACTIVE" | "MAINTENANCE" | "SOLD")} className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+            <option value="ALL">Todos os status</option>
+            <option value="ACTIVE">Ativo</option>
+            <option value="MAINTENANCE">Manutenção</option>
+            <option value="SOLD">Vendido</option>
+          </select>
+        </div>
       </div>
 
       {pageErrorMessage && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{pageErrorMessage}</div>}

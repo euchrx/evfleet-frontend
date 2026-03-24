@@ -322,8 +322,6 @@ export function DriversPage() {
       total: scoped.length,
       active: scoped.filter((driver) => driver.status === "ACTIVE").length,
       inactive: scoped.filter((driver) => driver.status !== "ACTIVE").length,
-      linked: scoped.filter((driver) => Boolean(driver.vehicleId)).length,
-      unlinked: scoped.filter((driver) => !driver.vehicleId).length,
     };
   }, [drivers, selectedBranchId]);
 
@@ -337,7 +335,7 @@ export function DriversPage() {
         <button onClick={openCreateModal} className="rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600">+ Cadastrar motorista</button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Totais</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">{summary.total}</p>
@@ -350,13 +348,11 @@ export function DriversPage() {
           <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Inativos</p>
           <p className="mt-1 text-2xl font-bold text-red-800">{summary.inactive}</p>
         </div>
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
+        <div className="hidden rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Com veículo</p>
-          <p className="mt-1 text-2xl font-bold text-blue-800">{summary.linked}</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
+        <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">Sem vinculo</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{summary.unlinked}</p>
         </div>
       </div>
 

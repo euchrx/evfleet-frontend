@@ -25,7 +25,7 @@ type DebtSortBy =
 
 type DebtFormData = {
   description: string;
-  category: DebtCategory;
+  category: DebtCategory | "";
   amount: string;
   points: string;
   debtDate: string;
@@ -38,14 +38,14 @@ type DebtFormData = {
 
 const initialForm: DebtFormData = {
   description: "",
-  category: "FINE",
+  category: "",
   amount: "",
   points: "",
   debtDate: "",
   dueDate: "",
   creditor: "",
   isRecurring: false,
-  status: "PENDING",
+  status: "",
   vehicleId: "",
 };
 const TABLE_PAGE_SIZE = 10;
@@ -406,7 +406,7 @@ export function DebtsPage() {
       setFormErrorMessage("");
       const payload = {
         description: form.description.trim(),
-        category: form.category,
+        category: form.category as DebtCategory,
         amount: Number(form.amount.replace(/\./g, "").replace(",", ".")),
         points: form.category === "FINE" ? Number(form.points || 0) : 0,
         debtDate: form.debtDate,
@@ -417,13 +417,18 @@ export function DebtsPage() {
         vehicleId: form.vehicleId,
       };
       const nextErrors: Record<string, string> = {};
+      if (!form.category) nextErrors.category = "Selecione uma categoria.";
+      if (!form.status) nextErrors.status = "Selecione um status.";
       if (!payload.description) nextErrors.description = "Informe a descrição.";
       if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veículo.";
       if (!payload.debtDate)
         nextErrors.debtDate = "Informe a data de lancamento.";
+      if (!payload.dueDate)
+        nextErrors.dueDate = "Informe a data de vencimento.";
       if (Number.isNaN(payload.amount) || payload.amount <= 0)
         nextErrors.amount = "Informe um valor válido.";
       if (Object.keys(nextErrors).length > 0) {
+        setFormErrorMessage(Object.values(nextErrors)[0]);
         return;
       }
 
@@ -785,8 +790,10 @@ export function DebtsPage() {
                     onChange={(e) =>
                       handleChange("category", e.target.value as DebtCategory)
                     }
+                    required
                     className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                   >
+                    <option value="">Selecione uma categoria</option>
                     {debtCategoryOptions.map((item) => (
                       <option key={item.value} value={item.value}>
                         {item.label}
@@ -801,8 +808,10 @@ export function DebtsPage() {
                   <select
                     value={form.status}
                     onChange={(e) => handleChange("status", e.target.value)}
+                    required
                     className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                   >
+                    <option value="">Selecione um status</option>
                     <option value="PENDING">Pendente</option>
                     <option value="PAID">Paga</option>
                     <option value="APPEALED">Recorrida</option>
@@ -818,6 +827,7 @@ export function DebtsPage() {
                     onChange={(e) =>
                       handleChange("description", e.target.value)
                     }
+                    required
                     className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                     placeholder="Ex: IPVA 2026 cota unica"
                   />
@@ -832,6 +842,7 @@ export function DebtsPage() {
                     onChange={(e) =>
                       handleChange("amount", formatMoney(e.target.value))
                     }
+                    required
                     className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                     placeholder="0,00"
                   />
@@ -858,6 +869,7 @@ export function DebtsPage() {
                     type="date"
                     value={form.debtDate}
                     onChange={(e) => handleChange("debtDate", e.target.value)}
+                    required
                     className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                   />
                 </div>
@@ -869,6 +881,7 @@ export function DebtsPage() {
                     type="date"
                     value={form.dueDate}
                     onChange={(e) => handleChange("dueDate", e.target.value)}
+                    required
                     className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                   />
                 </div>
@@ -891,6 +904,7 @@ export function DebtsPage() {
                   <select
                     value={form.vehicleId}
                     onChange={(e) => handleChange("vehicleId", e.target.value)}
+                    required
                     className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                   >
                     <option value="">Selecione um veículo</option>

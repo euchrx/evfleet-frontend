@@ -226,6 +226,8 @@ export function MaintenanceRecordsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
+  const [recordTypeFilter, setRecordTypeFilter] = useState<"ALL" | "PREVENTIVE" | "CORRECTIVE" | "PERIODIC">("ALL");
+  const [recordStatusFilter, setRecordStatusFilter] = useState<"ALL" | "OPEN" | "DONE">("ALL");
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
   const [recordSortBy, setRecordSortBy] = useState<RecordSortBy>("date");
@@ -366,6 +368,14 @@ export function MaintenanceRecordsPage() {
         })
       : records;
 
+    if (recordTypeFilter !== "ALL") {
+      filtered = filtered.filter((record) => record.type === recordTypeFilter);
+    }
+
+    if (recordStatusFilter !== "ALL") {
+      filtered = filtered.filter((record) => record.status === recordStatusFilter);
+    }
+
     if (search.trim()) {
       const term = search.toLowerCase();
       filtered = filtered.filter((record) => {
@@ -404,7 +414,7 @@ export function MaintenanceRecordsPage() {
       if (recordSortBy === "cost") return ((a.cost || 0) - (b.cost || 0)) * direction;
       return maintenanceStatusLabel(a.status).localeCompare(maintenanceStatusLabel(b.status), "pt-BR") * direction;
     });
-  }, [records, selectedBranchId, vehicleMap, search, recordSortBy, recordSortDirection]);
+  }, [records, selectedBranchId, vehicleMap, recordTypeFilter, recordStatusFilter, search, recordSortBy, recordSortDirection]);
 
   const scopedPlans = useMemo(() => {
     let filtered = selectedBranchId
@@ -526,7 +536,7 @@ export function MaintenanceRecordsPage() {
 
   useEffect(() => {
     setRecordPage(1);
-  }, [search, selectedBranchId, recordSortBy, recordSortDirection]);
+  }, [search, selectedBranchId, recordTypeFilter, recordStatusFilter, recordSortBy, recordSortDirection]);
   useEffect(() => {
     setPlanPage(1);
   }, [search, selectedBranchId, planSortBy, planSortDirection]);
@@ -943,6 +953,29 @@ export function MaintenanceRecordsPage() {
           <button type="button" onClick={() => setTab("plans")} className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "plans" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>Planos de manutenção</button>
           <button type="button" onClick={() => setTab("tires")} className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "tires" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>Gestão de pneus</button>
         </div>
+        {tab === "records" ? (
+          <div className="mt-3 flex flex-col gap-3 md:flex-row">
+            <select
+              value={recordTypeFilter}
+              onChange={(event) => setRecordTypeFilter(event.target.value as "ALL" | "PREVENTIVE" | "CORRECTIVE" | "PERIODIC")}
+              className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            >
+              <option value="ALL">Todas as categorias</option>
+              <option value="PREVENTIVE">Preventiva</option>
+              <option value="CORRECTIVE">Corretiva</option>
+              <option value="PERIODIC">Periódica</option>
+            </select>
+            <select
+              value={recordStatusFilter}
+              onChange={(event) => setRecordStatusFilter(event.target.value as "ALL" | "OPEN" | "DONE")}
+              className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            >
+              <option value="ALL">Todos os status</option>
+              <option value="OPEN">Pendente</option>
+              <option value="DONE">Concluída</option>
+            </select>
+          </div>
+        ) : null}
       </section>
 
       {errorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div> : null}
