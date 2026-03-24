@@ -261,7 +261,7 @@ export function VehiclesPage() {
     const settings = readSoftwareSettings();
     const maxVehiclesAllowed = Number(settings.maxVehiclesAllowed || 0);
     if (maxVehiclesAllowed >= 0 && vehicles.length >= maxVehiclesAllowed) {
-      setPageErrorMessage(`Limite de veículos atingido (${maxVehiclesAllowed}). Ajuste em Administração para cadastrar novos veículos.`);
+      setPageErrorMessage("Limite máximo atingido para cadastro de veículos. Entre em contato com o suporte.");
       return;
     }
     setPageErrorMessage("");
@@ -346,7 +346,7 @@ export function VehiclesPage() {
         const settings = readSoftwareSettings();
         const maxVehiclesAllowed = Number(settings.maxVehiclesAllowed || 0);
         if (maxVehiclesAllowed >= 0 && vehicles.length >= maxVehiclesAllowed) {
-          setFormErrorMessage(`Limite de veículos atingido (${maxVehiclesAllowed}). Ajuste em Administração para cadastrar novos veículos.`);
+          setFormErrorMessage("Limite máximo atingido para cadastro de veículos. Entre em contato com o suporte.");
           return;
         }
       }
