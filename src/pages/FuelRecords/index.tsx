@@ -181,7 +181,7 @@ export function FuelRecordsPage() {
 
   function openCreateModal() {
     setEditingRecord(null);
-    setForm(initialForm);
+    setForm({ ...initialForm, driverId: latestDriverId });
     setFormErrorMessage("");
     setFieldErrors({});
     setIsModalOpen(true);
@@ -381,6 +381,34 @@ export function FuelRecordsPage() {
     () => resolveLatestVehicleKmMap({ vehicles, fuelRecords: records }),
     [vehicles, records],
   );
+
+  const latestDriverId = useMemo(() => {
+    const sortedByNewest = [...records].sort((a, b) => {
+      const aTime = new Date(a.createdAt || a.fuelDate).getTime();
+      const bTime = new Date(b.createdAt || b.fuelDate).getTime();
+      return bTime - aTime;
+    });
+
+    for (const record of sortedByNewest) {
+      if (!record.driverId) continue;
+      const driver = drivers.find((item) => item.id === record.driverId);
+      if (!driver || driver.status !== "ACTIVE") continue;
+
+      if (selectedBranchId) {
+        const driverBranchId =
+          driver.vehicle?.branchId ||
+          (driver.vehicleId
+            ? vehicles.find((vehicle) => vehicle.id === driver.vehicleId)?.branchId
+            : undefined);
+
+        if (driverBranchId !== selectedBranchId) continue;
+      }
+
+      return record.driverId;
+    }
+
+    return "";
+  }, [records, drivers, vehicles, selectedBranchId]);
 
   function handleVehicleChange(vehicleId: string) {
     if (editingRecord) {
