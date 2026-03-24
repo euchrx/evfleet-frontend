@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BellRing, Building2, FileCog, Lock, Settings2, ShieldCheck } from "lucide-react";
+import { Building2, Settings2, ShieldCheck } from "lucide-react";
 import { addSystemLog } from "../../services/systemLogs";
 import { getBranches } from "../../services/branches";
 import type { Branch } from "../../types/branch";
@@ -170,7 +170,7 @@ export function AdministrationPage() {
               <option value="BRL">Real (BRL)</option>
             </select>
           </label>
-          <div className="space-y-3 lg:col-span-9 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="space-y-3 lg:col-span-12 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <span className="block text-sm font-medium text-slate-700">
               Estabelecimento padrão do sistema
             </span>
@@ -199,145 +199,6 @@ export function AdministrationPage() {
             <span className="text-xs font-medium text-slate-500">
               Quando ativado e definido, os campos de estabelecimento serão preenchidos automaticamente e desabilitados.
             </span>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <BellRing size={18} className="text-slate-600" />
-              <h3 className="text-base font-semibold text-slate-900">Automação e alertas</h3>
-            </div>
-            <div className="grid gap-3">
-              <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">Alerta CNH (dias)</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={settings.alertDaysBeforeCnh}
-                  onChange={(e) => handleChange("alertDaysBeforeCnh", Number(e.target.value))}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">Alerta documento (dias)</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={settings.alertDaysBeforeDocument}
-                  onChange={(e) => handleChange("alertDaysBeforeDocument", Number(e.target.value))}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">Alerta manutenção (KM)</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={settings.alertKmBeforeMaintenance}
-                  onChange={(e) => handleChange("alertKmBeforeMaintenance", Number(e.target.value))}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                />
-              </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={settings.enableSystemNotifications}
-                  onChange={(e) => handleChange("enableSystemNotifications", e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                Notificação no sistema
-              </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={settings.enableEmailNotifications}
-                  onChange={(e) => handleChange("enableEmailNotifications", e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                Notificação por e-mail
-              </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={settings.enableWhatsappNotifications}
-                  onChange={(e) => handleChange("enableWhatsappNotifications", e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                Notificação por WhatsApp
-              </label>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Lock size={18} className="text-slate-600" />
-              <h3 className="text-base font-semibold text-slate-900">Segurança e acesso</h3>
-            </div>
-            <div className="grid gap-3">
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={settings.enforceStrongPassword}
-                  onChange={(e) => handleChange("enforceStrongPassword", e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                Exigir senha forte para todos os usuários
-              </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={settings.allowFleetManagerDeleteRecords}
-                  onChange={(e) => handleChange("allowFleetManagerDeleteRecords", e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                Permitir que gestor exclua registros
-              </label>
-              <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">Tempo de sessão (minutos)</span>
-                <input
-                  type="number"
-                  min="5"
-                  value={settings.sessionTimeoutMinutes}
-                  onChange={(e) => handleChange("sessionTimeoutMinutes", Number(e.target.value))}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                />
-              </label>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <FileCog size={18} className="text-slate-600" />
-              <h3 className="text-base font-semibold text-slate-900">Padrões de relatório</h3>
-            </div>
-            <div className="grid gap-3">
-              <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">Formato padrão</span>
-                <select
-                  value={settings.defaultReportFormat}
-                  onChange={(e) => handleChange("defaultReportFormat", e.target.value as "PDF")}
-                  className="w-full cursor-pointer rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                >
-                  <option value="PDF">PDF</option>
-                </select>
-              </label>
-              <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">Período padrão do dashboard</span>
-                <select
-                  value={settings.defaultDashboardPeriod}
-                  onChange={(e) =>
-                    handleChange("defaultDashboardPeriod", e.target.value as SoftwareSettings["defaultDashboardPeriod"])
-                  }
-                  className="w-full cursor-pointer rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                >
-                  <option value="CURRENT_YEAR">Ano atual</option>
-                  <option value="CURRENT_MONTH">Mês atual</option>
-                  <option value="LAST_30_DAYS">Últimos 30 dias</option>
-                  <option value="ALL">Todo o período</option>
-                </select>
-              </label>
-            </div>
           </div>
         </div>
 

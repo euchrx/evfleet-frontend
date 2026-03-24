@@ -28,7 +28,7 @@ type FuelFormData = {
   totalValue: string;
   km: string;
   fuelDate: string;
-  fuelType: "GASOLINE" | "ETHANOL" | "DIESEL" | "FLEX" | "ELECTRIC" | "HYBRID" | "CNG";
+  fuelType: "" | "GASOLINE" | "ETHANOL" | "DIESEL" | "FLEX" | "ELECTRIC" | "HYBRID" | "CNG";
   vehicleId: string;
   driverId: string;
 };
@@ -40,7 +40,7 @@ const initialForm: FuelFormData = {
   totalValue: "",
   km: "",
   fuelDate: "",
-  fuelType: "DIESEL",
+  fuelType: "",
   vehicleId: "",
   driverId: "",
 };
@@ -242,6 +242,7 @@ export function FuelRecordsPage() {
 
       const nextErrors: FuelFieldErrors = {};
       if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veículo.";
+      if (!payload.fuelType) nextErrors.fuelType = "Selecione o combustível.";
       if (!payload.fuelDate) nextErrors.fuelDate = "Informe a data.";
       if (Number.isNaN(payload.liters) || payload.liters <= 0) {
         nextErrors.liters = "Informe os litros corretamente.";
@@ -261,6 +262,7 @@ export function FuelRecordsPage() {
 
       const payloadWithBranch = {
         ...payload,
+        fuelType: payload.fuelType as Exclude<FuelFormData["fuelType"], "">,
         station: branchName,
       };
 
@@ -828,6 +830,7 @@ export function FuelRecordsPage() {
                     }
                     className={inputClass("fuelType")}
                   >
+                    <option value="">Selecione um combustível</option>
                     <option value="DIESEL">Diesel</option>
                     <option value="GASOLINE">Gasolina</option>
                     <option value="ETHANOL">Etanol</option>
