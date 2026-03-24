@@ -387,11 +387,13 @@ export function FuelRecordsPage() {
       handleChange("vehicleId", vehicleId);
       return;
     }
+    const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
     const latestKm = latestKmByVehicle.get(vehicleId);
     setForm((prev) => ({
       ...prev,
       vehicleId,
       km: typeof latestKm === "number" ? String(latestKm) : "",
+      fuelType: selectedVehicle?.fuelType || prev.fuelType,
     }));
     setFieldErrors((prev) => ({ ...prev, vehicleId: undefined, km: undefined }));
   }
