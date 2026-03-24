@@ -614,6 +614,7 @@ export function VehiclesPage() {
     () => maxVehiclesAllowed >= 0 && vehicles.length >= maxVehiclesAllowed,
     [maxVehiclesAllowed, vehicles.length]
   );
+  const isCreateButtonBlockedVisual = loading || isVehicleLimitReached;
 
   return (
     <div className="space-y-6">
@@ -623,9 +624,12 @@ export function VehiclesPage() {
           <p className="text-sm text-slate-500">Cadastro completo da frota.</p>
         </div>
         <button
-          onClick={openCreate}
+          onClick={() => {
+            if (loading) return;
+            openCreate();
+          }}
           className={`rounded-xl px-4 py-3 text-sm font-semibold text-white transition ${
-            isVehicleLimitReached
+            isCreateButtonBlockedVisual
               ? "cursor-not-allowed bg-slate-400"
               : "cursor-pointer bg-orange-500 hover:bg-orange-600"
           }`}
