@@ -41,6 +41,10 @@ type SortDirection = "asc" | "desc";
 type RecordSortBy = "date" | "vehicle" | "type" | "km" | "cost" | "status";
 type PlanSortBy = "name" | "vehicle" | "interval" | "due" | "status";
 type TireSortBy = "serial" | "tire" | "vehicle" | "km" | "status";
+type RecordFieldKey = "vehicleId" | "type" | "status" | "description" | "maintenanceDate" | "km" | "cost";
+type PlanFieldKey = "vehicleId" | "name" | "intervalValue";
+type TireFieldKey = "serialNumber" | "brand" | "model" | "size";
+type ReadingFieldKey = "readingDate" | "km" | "treadDepthMm" | "pressurePsi";
 
 type RecordFormState = {
   vehicleId: string;
@@ -246,26 +250,26 @@ export function MaintenanceRecordsPage() {
 
   const [recordModalOpen, setRecordModalOpen] = useState(false);
   const [recordSaving, setRecordSaving] = useState(false);
-  const [recordError, setRecordError] = useState("");
+  const [recordFieldErrors, setRecordFieldErrors] = useState<Partial<Record<RecordFieldKey, string>>>({});
   const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
   const [recordForm, setRecordForm] = useState<RecordFormState>(initialRecordForm);
   const [partsInput, setPartsInput] = useState("");
 
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [planSaving, setPlanSaving] = useState(false);
-  const [planError, setPlanError] = useState("");
+  const [planFieldErrors, setPlanFieldErrors] = useState<Partial<Record<PlanFieldKey, string>>>({});
   const [editingPlan, setEditingPlan] = useState<MaintenancePlan | null>(null);
   const [planForm, setPlanForm] = useState<PlanFormState>(initialPlanForm);
 
   const [tireModalOpen, setTireModalOpen] = useState(false);
   const [tireSaving, setTireSaving] = useState(false);
-  const [tireError, setTireError] = useState("");
+  const [tireFieldErrors, setTireFieldErrors] = useState<Partial<Record<TireFieldKey, string>>>({});
   const [editingTire, setEditingTire] = useState<Tire | null>(null);
   const [tireForm, setTireForm] = useState<TireFormState>(initialTireForm);
 
   const [readingModalOpen, setReadingModalOpen] = useState(false);
   const [readingSaving, setReadingSaving] = useState(false);
-  const [readingError, setReadingError] = useState("");
+  const [readingFieldErrors, setReadingFieldErrors] = useState<Partial<Record<ReadingFieldKey, string>>>({});
   const [selectedTire, setSelectedTire] = useState<Tire | null>(null);
   const [readingForm, setReadingForm] = useState<TireReadingFormState>(initialReadingForm);
   const [tireReadings, setTireReadings] = useState<TireReading[]>([]);
@@ -592,6 +596,13 @@ export function MaintenanceRecordsPage() {
     return value.replace(/[.,;]+$/g, "").trim();
   }
 
+  function getFieldClass(hasError: boolean) {
+    if (hasError) {
+      return "mt-1 w-full rounded-xl border border-red-400 bg-red-50 px-4 py-3 text-slate-900 outline-none transition placeholder:text-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100";
+    }
+    return "mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200";
+  }
+
   function addParts(parts: string[]) {
     const normalized = parts.map(normalizePartLabel).filter(Boolean);
     if (!normalized.length) return;
@@ -615,7 +626,7 @@ export function MaintenanceRecordsPage() {
 
   function openCreateRecord() {
     setEditingRecord(null);
-    setRecordError("");
+    setRecordFieldErrors({});
     const defaultVehicleId = "";
     const latestKm = undefined;
     setRecordForm({
@@ -629,7 +640,7 @@ export function MaintenanceRecordsPage() {
 
   function openEditRecord(record: MaintenanceRecord) {
     setEditingRecord(record);
-    setRecordError("");
+    setRecordFieldErrors({});
     setRecordForm({
       vehicleId: record.vehicleId,
       type: (record.type as RecordFormState["type"]) || "",
@@ -653,8 +664,16 @@ export function MaintenanceRecordsPage() {
       ? Array.from(new Set([...recordForm.partsReplaced, pendingPart]))
       : recordForm.partsReplaced;
 
-    if (!recordForm.vehicleId || !recordForm.type || !recordForm.status || !recordForm.description.trim() || !recordForm.maintenanceDate || !recordForm.km || !recordForm.cost) {
-      setRecordError("Preencha veículo, tipo, status, descrição, data, KM e custo.");
+    const nextErrors: Partial<Record<RecordFieldKey, string>> = {};
+    if (!recordForm.vehicleId) nextErrors.vehicleId = "Selecione o veículo.";
+    if (!recordForm.type) nextErrors.type = "Selecione o tipo.";
+    if (!recordForm.status) nextErrors.status = "Selecione o status.";
+    if (!recordForm.description.trim()) nextErrors.description = "Informe a descrição.";
+    if (!recordForm.maintenanceDate) nextErrors.maintenanceDate = "Informe a data.";
+    if (!recordForm.km) nextErrors.km = "Informe o KM.";
+    if (!recordForm.cost) nextErrors.cost = "Informe o custo.";
+    setRecordFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
       return;
     }
 
@@ -673,16 +692,18 @@ export function MaintenanceRecordsPage() {
 
     try {
       setRecordSaving(true);
-      setRecordError("");
+      setRecordFieldErrors({});
       if (editingRecord) await updateMaintenanceRecord(editingRecord.id, payload);
       else await createMaintenanceRecord(payload);
       setPartsInput("");
       setRecordModalOpen(false);
       await loadData();
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
-    } catch (error: any) {
-      const apiMessage = error?.response?.data?.message;
-      setRecordError(Array.isArray(apiMessage) ? apiMessage.join(", ") : apiMessage || "Erro ao salvar manutenção.");
+    } catch {
+      setRecordFieldErrors((prev) => ({
+        ...prev,
+        description: prev.description || "Não foi possível salvar. Revise os dados.",
+      }));
     } finally {
       setRecordSaving(false);
     }
@@ -694,14 +715,14 @@ export function MaintenanceRecordsPage() {
 
   function openCreatePlan() {
     setEditingPlan(null);
-    setPlanError("");
+    setPlanFieldErrors({});
     setPlanForm({ ...initialPlanForm, vehicleId: activeVehicles[0]?.id || "" });
     setPlanModalOpen(true);
   }
 
   function openEditPlan(plan: MaintenancePlan) {
     setEditingPlan(plan);
-    setPlanError("");
+    setPlanFieldErrors({});
     setPlanForm({
       vehicleId: plan.vehicleId,
       name: plan.name || "",
@@ -720,8 +741,12 @@ export function MaintenanceRecordsPage() {
 
   async function savePlan(event: React.FormEvent) {
     event.preventDefault();
-    if (!planForm.vehicleId || !planForm.name.trim() || !planForm.intervalValue.trim()) {
-      setPlanError("Preencha veículo, nome e intervalo.");
+    const nextErrors: Partial<Record<PlanFieldKey, string>> = {};
+    if (!planForm.vehicleId) nextErrors.vehicleId = "Selecione o veículo.";
+    if (!planForm.name.trim()) nextErrors.name = "Informe o nome do plano.";
+    if (!planForm.intervalValue.trim()) nextErrors.intervalValue = "Informe o intervalo.";
+    setPlanFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
       return;
     }
 
@@ -741,15 +766,17 @@ export function MaintenanceRecordsPage() {
 
     try {
       setPlanSaving(true);
-      setPlanError("");
+      setPlanFieldErrors({});
       if (editingPlan) await updateMaintenancePlan(editingPlan.id, payload);
       else await createMaintenancePlan(payload);
       setPlanModalOpen(false);
       await loadData();
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
-    } catch (error: any) {
-      const apiMessage = error?.response?.data?.message;
-      setPlanError(Array.isArray(apiMessage) ? apiMessage.join(", ") : apiMessage || "Erro ao salvar plano.");
+    } catch {
+      setPlanFieldErrors((prev) => ({
+        ...prev,
+        name: prev.name || "Não foi possível salvar. Revise os dados.",
+      }));
     } finally {
       setPlanSaving(false);
     }
@@ -761,7 +788,7 @@ export function MaintenanceRecordsPage() {
 
   function openCreateTire() {
     setEditingTire(null);
-    setTireError("");
+    setTireFieldErrors({});
     const defaultVehicleId = activeVehicles[0]?.id || "";
     const latestKm = defaultVehicleId
       ? latestKmByVehicle.get(defaultVehicleId)
@@ -776,7 +803,7 @@ export function MaintenanceRecordsPage() {
 
   function openEditTire(tire: Tire) {
     setEditingTire(tire);
-    setTireError("");
+    setTireFieldErrors({});
     setTireForm({
       serialNumber: tire.serialNumber || "",
       brand: tire.brand || "",
@@ -801,8 +828,13 @@ export function MaintenanceRecordsPage() {
 
   async function saveTire(event: React.FormEvent) {
     event.preventDefault();
-    if (!tireForm.serialNumber.trim() || !tireForm.brand.trim() || !tireForm.model.trim() || !tireForm.size.trim()) {
-      setTireError("Preencha DOT/TIN, marca, modelo e medida.");
+    const nextErrors: Partial<Record<TireFieldKey, string>> = {};
+    if (!tireForm.serialNumber.trim()) nextErrors.serialNumber = "Informe o DOT/TIN.";
+    if (!tireForm.brand.trim()) nextErrors.brand = "Informe a marca.";
+    if (!tireForm.model.trim()) nextErrors.model = "Informe o modelo.";
+    if (!tireForm.size.trim()) nextErrors.size = "Informe a medida.";
+    setTireFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
       return;
     }
 
@@ -828,15 +860,17 @@ export function MaintenanceRecordsPage() {
 
     try {
       setTireSaving(true);
-      setTireError("");
+      setTireFieldErrors({});
       if (editingTire) await updateTire(editingTire.id, payload);
       else await createTire(payload);
       setTireModalOpen(false);
       await loadData();
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
-    } catch (error: any) {
-      const apiMessage = error?.response?.data?.message;
-      setTireError(Array.isArray(apiMessage) ? apiMessage.join(", ") : apiMessage || "Erro ao salvar pneu.");
+    } catch {
+      setTireFieldErrors((prev) => ({
+        ...prev,
+        serialNumber: prev.serialNumber || "Não foi possível salvar. Revise os dados.",
+      }));
     } finally {
       setTireSaving(false);
     }
@@ -872,7 +906,7 @@ export function MaintenanceRecordsPage() {
 
   async function openReadingModal(tire: Tire) {
     setSelectedTire(tire);
-    setReadingError("");
+    setReadingFieldErrors({});
     setReadingForm({
       ...initialReadingForm,
       km: String(tire.currentKm || ""),
@@ -887,8 +921,13 @@ export function MaintenanceRecordsPage() {
   async function saveReading(event: React.FormEvent) {
     event.preventDefault();
     if (!selectedTire) return;
-    if (!readingForm.readingDate || !readingForm.km || !readingForm.treadDepthMm || !readingForm.pressurePsi) {
-      setReadingError("Preencha data, KM, sulco e pressão.");
+    const nextErrors: Partial<Record<ReadingFieldKey, string>> = {};
+    if (!readingForm.readingDate) nextErrors.readingDate = "Informe a data.";
+    if (!readingForm.km) nextErrors.km = "Informe o KM.";
+    if (!readingForm.treadDepthMm) nextErrors.treadDepthMm = "Informe o sulco.";
+    if (!readingForm.pressurePsi) nextErrors.pressurePsi = "Informe a pressão.";
+    setReadingFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
       return;
     }
 
@@ -904,16 +943,18 @@ export function MaintenanceRecordsPage() {
 
     try {
       setReadingSaving(true);
-      setReadingError("");
+      setReadingFieldErrors({});
       await createTireReading(selectedTire.id, payload);
       const readings = await getTireReadings(selectedTire.id);
       setTireReadings(Array.isArray(readings) ? readings : []);
       await loadData();
       setReadingForm(initialReadingForm);
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
-    } catch (error: any) {
-      const apiMessage = error?.response?.data?.message;
-      setReadingError(Array.isArray(apiMessage) ? apiMessage.join(", ") : apiMessage || "Erro ao registrar leitura.");
+    } catch {
+      setReadingFieldErrors((prev) => ({
+        ...prev,
+        readingDate: prev.readingDate || "Não foi possível salvar. Revise os dados.",
+      }));
     } finally {
       setReadingSaving(false);
     }
@@ -1044,7 +1085,7 @@ export function MaintenanceRecordsPage() {
       {loading ? <section className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Carregando...</section> : null}
 
       {!loading && tab === "records" ? (
-        <section className="overflow-hidden rounded-b-2xl rounded-t-none border border-slate-200 bg-white shadow-sm">
+        <section className="-mt-6 overflow-hidden rounded-b-2xl rounded-t-none border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-slate-50">
@@ -1195,47 +1236,54 @@ export function MaintenanceRecordsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">Veículo</label>
-                  <select value={recordForm.vehicleId} onChange={(event) => setRecordForm((prev) => { const vehicleId = event.target.value; if (editingRecord) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, km: typeof latestKm === "number" ? String(latestKm) : "" }; })} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                  <select value={recordForm.vehicleId} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, vehicleId: undefined })); setRecordForm((prev) => { const vehicleId = event.target.value; if (editingRecord) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, km: typeof latestKm === "number" ? String(latestKm) : "" }; }); }} className={getFieldClass(Boolean(recordFieldErrors.vehicleId))}>
                     <option value="">Selecione um veículo</option>
                     {(editingRecord ? scopedVehicles : activeVehicles).map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}
                   </select>
+                  {recordFieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.vehicleId}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Tipo</label>
-                  <select value={recordForm.type} onChange={(event) => setRecordForm((prev) => ({ ...prev, type: event.target.value as RecordFormState["type"] }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                  <select value={recordForm.type} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, type: undefined })); setRecordForm((prev) => ({ ...prev, type: event.target.value as RecordFormState["type"] })); }} className={getFieldClass(Boolean(recordFieldErrors.type))}>
                     <option value="">Selecione o tipo</option>
                     <option value="PREVENTIVE">Preventiva</option>
                     <option value="PERIODIC">Periódica</option>
                     <option value="CORRECTIVE">Corretiva</option>
                   </select>
+                  {recordFieldErrors.type ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.type}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Status</label>
-                  <select value={recordForm.status} onChange={(event) => setRecordForm((prev) => ({ ...prev, status: event.target.value as RecordFormState["status"] }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                  <select value={recordForm.status} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, status: undefined })); setRecordForm((prev) => ({ ...prev, status: event.target.value as RecordFormState["status"] })); }} className={getFieldClass(Boolean(recordFieldErrors.status))}>
                     <option value="">Selecione o status</option>
                     <option value="OPEN">Pendente</option>
                     <option value="DONE">Concluída</option>
                   </select>
+                  {recordFieldErrors.status ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.status}</p> : null}
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">Descrição</label>
-                  <input value={recordForm.description} onChange={(event) => setRecordForm((prev) => ({ ...prev, description: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: troca de embreagem, revisão 20.000 km..." />
+                  <input value={recordForm.description} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, description: undefined })); setRecordForm((prev) => ({ ...prev, description: event.target.value })); }} className={getFieldClass(Boolean(recordFieldErrors.description))} placeholder="Ex: troca de embreagem, revisão 20.000 km..." />
+                  {recordFieldErrors.description ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.description}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Data</label>
-                  <input type="date" value={recordForm.maintenanceDate} onChange={(event) => setRecordForm((prev) => ({ ...prev, maintenanceDate: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
+                  <input type="date" value={recordForm.maintenanceDate} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, maintenanceDate: undefined })); setRecordForm((prev) => ({ ...prev, maintenanceDate: event.target.value })); }} className={getFieldClass(Boolean(recordFieldErrors.maintenanceDate))} />
+                  {recordFieldErrors.maintenanceDate ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.maintenanceDate}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">KM</label>
-                  <input type="number" min={0} value={recordForm.km} onChange={(event) => setRecordForm((prev) => ({ ...prev, km: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="0" />
+                  <input type="number" min={0} value={recordForm.km} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, km: undefined })); setRecordForm((prev) => ({ ...prev, km: event.target.value })); }} className={getFieldClass(Boolean(recordFieldErrors.km))} placeholder="0" />
+                  {recordFieldErrors.km ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.km}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Custo (R$)</label>
-                  <input value={recordForm.cost} onChange={(event) => setRecordForm((prev) => ({ ...prev, cost: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="0,00" />
+                  <input value={recordForm.cost} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, cost: undefined })); setRecordForm((prev) => ({ ...prev, cost: event.target.value })); }} className={getFieldClass(Boolean(recordFieldErrors.cost))} placeholder="0,00" />
+                  {recordFieldErrors.cost ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.cost}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Oficina</label>
-                  <input value={recordForm.workshop} onChange={(event) => setRecordForm((prev) => ({ ...prev, workshop: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Nome da oficina" />
+                  <input value={recordForm.workshop} onChange={(event) => setRecordForm((prev) => ({ ...prev, workshop: event.target.value }))} className={getFieldClass(false)} placeholder="Nome da oficina" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">Peças trocadas</label>
@@ -1272,16 +1320,18 @@ export function MaintenanceRecordsPage() {
                         }
                       }}
                       className="w-full border-0 px-0 py-1 text-sm outline-none"
-                      placeholder="Digite uma peça e pressione Enter, vírgula ou ponto"
+                      placeholder="Ex: filtro de óleo, correia dentada, vela de ignição"
                     />
                   </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Obs.: digite o nome da peça e pressione Enter, vírgula ou ponto para adicionar cada item.
+                  </p>
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">Observações</label>
-                  <textarea rows={3} value={recordForm.notes} onChange={(event) => setRecordForm((prev) => ({ ...prev, notes: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Detalhes complementares" />
+                  <textarea rows={3} value={recordForm.notes} onChange={(event) => setRecordForm((prev) => ({ ...prev, notes: event.target.value }))} className={getFieldClass(false)} placeholder="Detalhes complementares" />
                 </div>
               </div>
-              {recordError ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{recordError}</div> : null}
               <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
                 <button type="button" onClick={() => setRecordModalOpen(false)} className="cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancelar</button>
                 <button type="submit" disabled={recordSaving} className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{recordSaving ? "Salvando..." : editingRecord ? "Salvar alterações" : "Registrar manutenção"}</button>
@@ -1303,19 +1353,18 @@ export function MaintenanceRecordsPage() {
             </div>
             <form onSubmit={savePlan} className="space-y-5 p-6">
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={planForm.vehicleId} onChange={(event) => setPlanForm((prev) => ({ ...prev, vehicleId: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select></div>
-                <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Nome do plano</label><input value={planForm.name} onChange={(event) => setPlanForm((prev) => ({ ...prev, name: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Revisão geral 10.000 km" /></div>
+                <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={planForm.vehicleId} onChange={(event) => { setPlanFieldErrors((prev) => ({ ...prev, vehicleId: undefined })); setPlanForm((prev) => ({ ...prev, vehicleId: event.target.value })); }} className={getFieldClass(Boolean(planFieldErrors.vehicleId))}><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select>{planFieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{planFieldErrors.vehicleId}</p> : null}</div>
+                <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Nome do plano</label><input value={planForm.name} onChange={(event) => { setPlanFieldErrors((prev) => ({ ...prev, name: undefined })); setPlanForm((prev) => ({ ...prev, name: event.target.value })); }} className={getFieldClass(Boolean(planFieldErrors.name))} placeholder="Ex: Revisão geral 10.000 km" />{planFieldErrors.name ? <p className="mt-1 text-xs text-red-600">{planFieldErrors.name}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Tipo</label><select value={planForm.planType} onChange={(event) => setPlanForm((prev) => ({ ...prev, planType: event.target.value as PlanFormState["planType"] }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="PREVENTIVE">Preventivo</option><option value="PERIODIC">Periódico</option></select></div>
                 <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={planForm.active ? "ACTIVE" : "INACTIVE"} onChange={(event) => setPlanForm((prev) => ({ ...prev, active: event.target.value === "ACTIVE" }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="ACTIVE">Ativo</option><option value="INACTIVE">Inativo</option></select></div>
                 <div><label className="block text-sm font-medium text-slate-700">Unidade do intervalo</label><select value={planForm.intervalUnit} onChange={(event) => setPlanForm((prev) => ({ ...prev, intervalUnit: event.target.value as PlanFormState["intervalUnit"] }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="KM">KM</option><option value="DAY">Dia(s)</option><option value="MONTH">Mês(es)</option></select></div>
-                <div><label className="block text-sm font-medium text-slate-700">Valor do intervalo</label><input type="number" min={1} value={planForm.intervalValue} onChange={(event) => setPlanForm((prev) => ({ ...prev, intervalValue: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 10000" /></div>
+                <div><label className="block text-sm font-medium text-slate-700">Valor do intervalo</label><input type="number" min={1} value={planForm.intervalValue} onChange={(event) => { setPlanFieldErrors((prev) => ({ ...prev, intervalValue: undefined })); setPlanForm((prev) => ({ ...prev, intervalValue: event.target.value })); }} className={getFieldClass(Boolean(planFieldErrors.intervalValue))} placeholder="Ex: 10000" />{planFieldErrors.intervalValue ? <p className="mt-1 text-xs text-red-600">{planFieldErrors.intervalValue}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Alerta antes (dias)</label><input type="number" min={0} value={planForm.alertBeforeDays} onChange={(event) => setPlanForm((prev) => ({ ...prev, alertBeforeDays: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 5" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Alerta antes (KM)</label><input type="number" min={0} value={planForm.alertBeforeKm} onChange={(event) => setPlanForm((prev) => ({ ...prev, alertBeforeKm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 500" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Próxima data</label><input type="date" value={planForm.nextDueDate} onChange={(event) => setPlanForm((prev) => ({ ...prev, nextDueDate: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Próximo KM</label><input type="number" min={0} value={planForm.nextDueKm} onChange={(event) => setPlanForm((prev) => ({ ...prev, nextDueKm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 120000" /></div>
                 <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Observações</label><textarea rows={3} value={planForm.notes} onChange={(event) => setPlanForm((prev) => ({ ...prev, notes: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Detalhes adicionais do plano" /></div>
               </div>
-              {planError ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{planError}</div> : null}
               <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
                 <button type="button" onClick={() => setPlanModalOpen(false)} className="cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancelar</button>
                 <button type="submit" disabled={planSaving} className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{planSaving ? "Salvando..." : editingPlan ? "Salvar alterações" : "Salvar plano"}</button>
@@ -1334,11 +1383,11 @@ export function MaintenanceRecordsPage() {
             </div>
             <form onSubmit={saveTire} className="space-y-5 p-6">
               <div className="grid gap-4 md:grid-cols-2">
-                <div><label className="block text-sm font-medium text-slate-700">DOT/TIN</label><input value={tireForm.serialNumber} onChange={(event) => setTireForm((prev) => ({ ...prev, serialNumber: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
+                <div><label className="block text-sm font-medium text-slate-700">DOT/TIN</label><input value={tireForm.serialNumber} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, serialNumber: undefined })); setTireForm((prev) => ({ ...prev, serialNumber: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.serialNumber))} />{tireFieldErrors.serialNumber ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.serialNumber}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={tireForm.status} onChange={(event) => setTireForm((prev) => ({ ...prev, status: event.target.value as TireStatus }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="IN_STOCK">Estoque</option><option value="INSTALLED">Instalado</option><option value="MAINTENANCE">Manutenção</option><option value="RETREADED">Recapado</option><option value="SCRAPPED">Descartado</option></select></div>
-                <div><label className="block text-sm font-medium text-slate-700">Marca</label><input value={tireForm.brand} onChange={(event) => setTireForm((prev) => ({ ...prev, brand: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
-                <div><label className="block text-sm font-medium text-slate-700">Modelo</label><input value={tireForm.model} onChange={(event) => setTireForm((prev) => ({ ...prev, model: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
-                <div><label className="block text-sm font-medium text-slate-700">Medida</label><input value={tireForm.size} onChange={(event) => setTireForm((prev) => ({ ...prev, size: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 295/80R22.5" /></div>
+                <div><label className="block text-sm font-medium text-slate-700">Marca</label><input value={tireForm.brand} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, brand: undefined })); setTireForm((prev) => ({ ...prev, brand: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.brand))} />{tireFieldErrors.brand ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.brand}</p> : null}</div>
+                <div><label className="block text-sm font-medium text-slate-700">Modelo</label><input value={tireForm.model} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, model: undefined })); setTireForm((prev) => ({ ...prev, model: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.model))} />{tireFieldErrors.model ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.model}</p> : null}</div>
+                <div><label className="block text-sm font-medium text-slate-700">Medida</label><input value={tireForm.size} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, size: undefined })); setTireForm((prev) => ({ ...prev, size: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.size))} placeholder="Ex: 295/80R22.5" />{tireFieldErrors.size ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.size}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => setTireForm((prev) => { const vehicleId = event.target.value; if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; })} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Sem vínculo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select></div>
                 <div><label className="block text-sm font-medium text-slate-700">Posição do eixo</label><input value={tireForm.axlePosition} onChange={(event) => setTireForm((prev) => ({ ...prev, axlePosition: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Traseiro" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Posição da roda</label><input value={tireForm.wheelPosition} onChange={(event) => setTireForm((prev) => ({ ...prev, wheelPosition: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Dianteira direita" /></div>
@@ -1352,7 +1401,6 @@ export function MaintenanceRecordsPage() {
                 <div><label className="block text-sm font-medium text-slate-700">Data de instalação</label><input type="date" value={tireForm.installedAt} onChange={(event) => setTireForm((prev) => ({ ...prev, installedAt: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
                 <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Observações</label><textarea rows={3} value={tireForm.notes} onChange={(event) => setTireForm((prev) => ({ ...prev, notes: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Detalhes técnicos do pneu" /></div>
               </div>
-              {tireError ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{tireError}</div> : null}
               <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
                 <button type="button" onClick={() => setTireModalOpen(false)} className="cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancelar</button>
                 <button type="submit" disabled={tireSaving} className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{tireSaving ? "Salvando..." : editingTire ? "Salvar alterações" : "Cadastrar pneu"}</button>
@@ -1373,14 +1421,13 @@ export function MaintenanceRecordsPage() {
               <form onSubmit={saveReading} className="space-y-4 rounded-2xl border border-slate-200 p-4">
                 <h3 className="text-sm font-semibold text-slate-800">Registrar nova leitura</h3>
                 <div className="grid gap-4 md:grid-cols-3">
-                  <div><label className="block text-sm font-medium text-slate-700">Data</label><input type="date" value={readingForm.readingDate} onChange={(event) => setReadingForm((prev) => ({ ...prev, readingDate: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">KM</label><input type="number" min={0} value={readingForm.km} onChange={(event) => setReadingForm((prev) => ({ ...prev, km: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Sulco (mm)</label><input value={readingForm.treadDepthMm} onChange={(event) => setReadingForm((prev) => ({ ...prev, treadDepthMm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Pressão (PSI)</label><input value={readingForm.pressurePsi} onChange={(event) => setReadingForm((prev) => ({ ...prev, pressurePsi: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
+                  <div><label className="block text-sm font-medium text-slate-700">Data</label><input type="date" value={readingForm.readingDate} onChange={(event) => { setReadingFieldErrors((prev) => ({ ...prev, readingDate: undefined })); setReadingForm((prev) => ({ ...prev, readingDate: event.target.value })); }} className={getFieldClass(Boolean(readingFieldErrors.readingDate))} />{readingFieldErrors.readingDate ? <p className="mt-1 text-xs text-red-600">{readingFieldErrors.readingDate}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">KM</label><input type="number" min={0} value={readingForm.km} onChange={(event) => { setReadingFieldErrors((prev) => ({ ...prev, km: undefined })); setReadingForm((prev) => ({ ...prev, km: event.target.value })); }} className={getFieldClass(Boolean(readingFieldErrors.km))} />{readingFieldErrors.km ? <p className="mt-1 text-xs text-red-600">{readingFieldErrors.km}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Sulco (mm)</label><input value={readingForm.treadDepthMm} onChange={(event) => { setReadingFieldErrors((prev) => ({ ...prev, treadDepthMm: undefined })); setReadingForm((prev) => ({ ...prev, treadDepthMm: event.target.value })); }} className={getFieldClass(Boolean(readingFieldErrors.treadDepthMm))} />{readingFieldErrors.treadDepthMm ? <p className="mt-1 text-xs text-red-600">{readingFieldErrors.treadDepthMm}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Pressão (PSI)</label><input value={readingForm.pressurePsi} onChange={(event) => { setReadingFieldErrors((prev) => ({ ...prev, pressurePsi: undefined })); setReadingForm((prev) => ({ ...prev, pressurePsi: event.target.value })); }} className={getFieldClass(Boolean(readingFieldErrors.pressurePsi))} />{readingFieldErrors.pressurePsi ? <p className="mt-1 text-xs text-red-600">{readingFieldErrors.pressurePsi}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Condição</label><input value={readingForm.condition} onChange={(event) => setReadingForm((prev) => ({ ...prev, condition: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: desgaste irregular" /></div>
                   <div className="md:col-span-3"><label className="block text-sm font-medium text-slate-700">Observações</label><textarea rows={2} value={readingForm.notes} onChange={(event) => setReadingForm((prev) => ({ ...prev, notes: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
                 </div>
-                {readingError ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{readingError}</div> : null}
                 <div className="flex justify-end"><button type="submit" disabled={readingSaving} className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{readingSaving ? "Salvando..." : "Registrar leitura"}</button></div>
               </form>
               <div className="overflow-hidden rounded-2xl border border-slate-200">
