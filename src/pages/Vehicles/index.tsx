@@ -628,6 +628,7 @@ export function VehiclesPage() {
             if (loading) return;
             openCreate();
           }}
+          style={{ cursor: isCreateButtonBlockedVisual ? "not-allowed" : "pointer" }}
           className={`rounded-xl px-4 py-3 text-sm font-semibold text-white transition ${
             isCreateButtonBlockedVisual
               ? "cursor-not-allowed bg-slate-400"
