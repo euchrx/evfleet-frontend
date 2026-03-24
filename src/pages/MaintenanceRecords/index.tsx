@@ -44,15 +44,14 @@ type TireSortBy = "serial" | "tire" | "vehicle" | "km" | "status";
 
 type RecordFormState = {
   vehicleId: string;
-  type: "PREVENTIVE" | "CORRECTIVE" | "PERIODIC";
+  type: "PREVENTIVE" | "CORRECTIVE" | "PERIODIC" | "";
   description: string;
-  partsReplaced: string;
+  partsReplaced: string[];
   workshop: string;
-  responsible: string;
   cost: string;
   km: string;
   maintenanceDate: string;
-  status: "OPEN" | "DONE";
+  status: "OPEN" | "DONE" | "";
   notes: string;
 };
 
@@ -101,15 +100,14 @@ type TireReadingFormState = {
 
 const initialRecordForm: RecordFormState = {
   vehicleId: "",
-  type: "PREVENTIVE",
+  type: "",
   description: "",
-  partsReplaced: "",
+  partsReplaced: [],
   workshop: "",
-  responsible: "",
   cost: "",
   km: "",
   maintenanceDate: new Date().toISOString().slice(0, 10),
-  status: "OPEN",
+  status: "",
   notes: "",
 };
 
@@ -251,6 +249,7 @@ export function MaintenanceRecordsPage() {
   const [recordError, setRecordError] = useState("");
   const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
   const [recordForm, setRecordForm] = useState<RecordFormState>(initialRecordForm);
+  const [partsInput, setPartsInput] = useState("");
 
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [planSaving, setPlanSaving] = useState(false);
@@ -589,18 +588,42 @@ export function MaintenanceRecordsPage() {
     [vehicles, records],
   );
 
+  function normalizePartLabel(value: string) {
+    return value.replace(/[.,;]+$/g, "").trim();
+  }
+
+  function addParts(parts: string[]) {
+    const normalized = parts.map(normalizePartLabel).filter(Boolean);
+    if (!normalized.length) return;
+    setRecordForm((prev) => {
+      const next = [...prev.partsReplaced];
+      for (const part of normalized) {
+        if (!next.some((item) => item.toLowerCase() === part.toLowerCase())) {
+          next.push(part);
+        }
+      }
+      return { ...prev, partsReplaced: next };
+    });
+  }
+
+  function removePart(partToRemove: string) {
+    setRecordForm((prev) => ({
+      ...prev,
+      partsReplaced: prev.partsReplaced.filter((part) => part !== partToRemove),
+    }));
+  }
+
   function openCreateRecord() {
     setEditingRecord(null);
     setRecordError("");
-    const defaultVehicleId = activeVehicles[0]?.id || "";
-    const latestKm = defaultVehicleId
-      ? latestKmByVehicle.get(defaultVehicleId)
-      : undefined;
+    const defaultVehicleId = "";
+    const latestKm = undefined;
     setRecordForm({
       ...initialRecordForm,
       vehicleId: defaultVehicleId,
       km: typeof latestKm === "number" ? String(latestKm) : "",
     });
+    setPartsInput("");
     setRecordModalOpen(true);
   }
 
@@ -609,43 +632,42 @@ export function MaintenanceRecordsPage() {
     setRecordError("");
     setRecordForm({
       vehicleId: record.vehicleId,
-      type: (record.type as RecordFormState["type"]) || "PREVENTIVE",
+      type: (record.type as RecordFormState["type"]) || "",
       description: record.description || "",
-      partsReplaced: Array.isArray(record.partsReplaced) ? record.partsReplaced.join(", ") : "",
+      partsReplaced: Array.isArray(record.partsReplaced) ? record.partsReplaced.filter(Boolean) : [],
       workshop: record.workshop || "",
-      responsible: record.responsible || "",
       cost: String(record.cost ?? ""),
       km: String(record.km ?? ""),
       maintenanceDate: String(record.maintenanceDate).slice(0, 10),
-      status: (record.status as RecordFormState["status"]) || "OPEN",
+      status: (record.status as RecordFormState["status"]) || "",
       notes: record.notes || "",
     });
+    setPartsInput("");
     setRecordModalOpen(true);
   }
 
   async function saveRecord(event: React.FormEvent) {
     event.preventDefault();
-    if (!recordForm.vehicleId || !recordForm.description.trim() || !recordForm.maintenanceDate || !recordForm.km || !recordForm.cost) {
-      setRecordError("Preencha veículo, descrição, data, KM e custo.");
+    const pendingPart = normalizePartLabel(partsInput);
+    const mergedParts = pendingPart
+      ? Array.from(new Set([...recordForm.partsReplaced, pendingPart]))
+      : recordForm.partsReplaced;
+
+    if (!recordForm.vehicleId || !recordForm.type || !recordForm.status || !recordForm.description.trim() || !recordForm.maintenanceDate || !recordForm.km || !recordForm.cost) {
+      setRecordError("Preencha veículo, tipo, status, descrição, data, KM e custo.");
       return;
     }
 
     const payload: CreateMaintenanceRecordInput = {
       vehicleId: recordForm.vehicleId,
-      type: recordForm.type,
+      type: recordForm.type as "PREVENTIVE" | "CORRECTIVE" | "PERIODIC",
       description: recordForm.description.trim(),
-      partsReplaced: recordForm.partsReplaced
-        ? recordForm.partsReplaced
-            .split(/[,;\n]/)
-            .map((part) => part.trim())
-            .filter(Boolean)
-        : undefined,
+      partsReplaced: mergedParts.length ? mergedParts : undefined,
       workshop: recordForm.workshop.trim() || undefined,
-      responsible: recordForm.responsible.trim() || undefined,
       cost: toNumber(recordForm.cost),
       km: Number(recordForm.km) || 0,
       maintenanceDate: recordForm.maintenanceDate,
-      status: recordForm.status,
+      status: recordForm.status as "OPEN" | "DONE",
       notes: recordForm.notes.trim() || undefined,
     };
 
@@ -654,6 +676,7 @@ export function MaintenanceRecordsPage() {
       setRecordError("");
       if (editingRecord) await updateMaintenanceRecord(editingRecord.id, payload);
       else await createMaintenanceRecord(payload);
+      setPartsInput("");
       setRecordModalOpen(false);
       await loadData();
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
@@ -933,7 +956,7 @@ export function MaintenanceRecordsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section className={`${tab === "records" ? "rounded-t-2xl rounded-b-none border-b-0" : "rounded-2xl"} border border-slate-200 bg-white p-4 shadow-sm`}>
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Manutenções</h1>
@@ -953,35 +976,6 @@ export function MaintenanceRecordsPage() {
           <button type="button" onClick={() => setTab("plans")} className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "plans" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>Planos de manutenção</button>
           <button type="button" onClick={() => setTab("tires")} className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "tires" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>Gestão de pneus</button>
         </div>
-        {tab === "records" ? (
-          <div className="mt-3 flex flex-col gap-3 md:flex-row">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por veículo, tipo, status, descrição..."
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            />
-            <select
-              value={recordTypeFilter}
-              onChange={(event) => setRecordTypeFilter(event.target.value as "ALL" | "PREVENTIVE" | "CORRECTIVE" | "PERIODIC")}
-              className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            >
-              <option value="ALL">Todas as categorias</option>
-              <option value="PREVENTIVE">Preventiva</option>
-              <option value="CORRECTIVE">Corretiva</option>
-              <option value="PERIODIC">Periódica</option>
-            </select>
-            <select
-              value={recordStatusFilter}
-              onChange={(event) => setRecordStatusFilter(event.target.value as "ALL" | "OPEN" | "DONE")}
-              className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            >
-              <option value="ALL">Todos os status</option>
-              <option value="OPEN">Pendente</option>
-              <option value="DONE">Concluída</option>
-            </select>
-          </div>
-        ) : null}
       </section>
 
       {errorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div> : null}
@@ -1013,19 +1007,44 @@ export function MaintenanceRecordsPage() {
         </div>
       ) : null}
 
-      <section className="hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder={tab === "records" ? "Buscar por veículo, tipo, status, descrição..." : tab === "plans" ? "Buscar por plano, veículo, intervalo..." : "Buscar por DOT/TIN, pneu, status, veículo..."}
-          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-        />
+      <section className={`${tab === "records" ? "rounded-t-2xl rounded-b-none border-b-0" : "rounded-2xl"} border border-slate-200 bg-white p-4 shadow-sm`}>
+        <div className="flex flex-col gap-3 md:flex-row">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={tab === "records" ? "Buscar por veículo, tipo, status, descrição..." : tab === "plans" ? "Buscar por plano, veículo, intervalo..." : "Buscar por DOT/TIN, pneu, status, veículo..."}
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+          />
+          {tab === "records" ? (
+            <>
+              <select
+                value={recordTypeFilter}
+                onChange={(event) => setRecordTypeFilter(event.target.value as "ALL" | "PREVENTIVE" | "CORRECTIVE" | "PERIODIC")}
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              >
+                <option value="ALL">Todas as categorias</option>
+                <option value="PREVENTIVE">Preventiva</option>
+                <option value="CORRECTIVE">Corretiva</option>
+                <option value="PERIODIC">Periódica</option>
+              </select>
+              <select
+                value={recordStatusFilter}
+                onChange={(event) => setRecordStatusFilter(event.target.value as "ALL" | "OPEN" | "DONE")}
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              >
+                <option value="ALL">Todos os status</option>
+                <option value="OPEN">Pendente</option>
+                <option value="DONE">Concluída</option>
+              </select>
+            </>
+          ) : null}
+        </div>
       </section>
 
       {loading ? <section className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Carregando...</section> : null}
 
       {!loading && tab === "records" ? (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <section className="overflow-hidden rounded-b-2xl rounded-t-none border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-slate-50">
@@ -1184,6 +1203,7 @@ export function MaintenanceRecordsPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Tipo</label>
                   <select value={recordForm.type} onChange={(event) => setRecordForm((prev) => ({ ...prev, type: event.target.value as RecordFormState["type"] }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                    <option value="">Selecione o tipo</option>
                     <option value="PREVENTIVE">Preventiva</option>
                     <option value="PERIODIC">Periódica</option>
                     <option value="CORRECTIVE">Corretiva</option>
@@ -1192,6 +1212,7 @@ export function MaintenanceRecordsPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Status</label>
                   <select value={recordForm.status} onChange={(event) => setRecordForm((prev) => ({ ...prev, status: event.target.value as RecordFormState["status"] }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                    <option value="">Selecione o status</option>
                     <option value="OPEN">Pendente</option>
                     <option value="DONE">Concluída</option>
                   </select>
@@ -1216,13 +1237,44 @@ export function MaintenanceRecordsPage() {
                   <label className="block text-sm font-medium text-slate-700">Oficina</label>
                   <input value={recordForm.workshop} onChange={(event) => setRecordForm((prev) => ({ ...prev, workshop: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Nome da oficina" />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Responsável</label>
-                  <input value={recordForm.responsible} onChange={(event) => setRecordForm((prev) => ({ ...prev, responsible: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Responsável técnico" />
-                </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">Peças trocadas</label>
-                  <input value={recordForm.partsReplaced} onChange={(event) => setRecordForm((prev) => ({ ...prev, partsReplaced: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: filtro óleo, correia, vela" />
+                  <div className="mt-1 rounded-xl border border-slate-300 px-3 py-2 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-200">
+                    {recordForm.partsReplaced.length ? (
+                      <div className="mb-2 flex flex-wrap gap-2">
+                        {recordForm.partsReplaced.map((part) => (
+                          <span key={part} className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                            {part}
+                            <button type="button" onClick={() => removePart(part)} className="cursor-pointer text-blue-500 transition hover:text-blue-700">
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <input
+                      value={partsInput}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        const chunks = value.split(/[,.]/);
+                        if (chunks.length > 1) {
+                          addParts(chunks.slice(0, -1));
+                          setPartsInput(chunks[chunks.length - 1] || "");
+                          return;
+                        }
+                        setPartsInput(value);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          addParts([partsInput]);
+                          setPartsInput("");
+                        }
+                      }}
+                      className="w-full border-0 px-0 py-1 text-sm outline-none"
+                      placeholder="Digite uma peça e pressione Enter, vírgula ou ponto"
+                    />
+                  </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">Observações</label>

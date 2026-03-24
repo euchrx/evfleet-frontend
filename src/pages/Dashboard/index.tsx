@@ -749,7 +749,7 @@ export function DashboardPage() {
           Dashboard Executivo
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Visao operacional e financeira da frota
+          Visão operacional e financeira da frota
         </p>
       </div>
 
