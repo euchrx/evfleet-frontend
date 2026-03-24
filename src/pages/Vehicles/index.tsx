@@ -151,9 +151,16 @@ function formatHistoryDate(value: string) {
     return new Date(year, month - 1, day).toLocaleDateString("pt-BR");
   }
 
+  const hasExplicitUtc = /z$/i.test(raw);
+  const hasOffset = /[+-]\d{2}:\d{2}$/.test(raw);
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return raw;
-  return parsed.toLocaleString("pt-BR");
+
+  if (hasExplicitUtc || hasOffset) {
+    return parsed.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+  }
+
+  return parsed.toLocaleDateString("pt-BR");
 }
 
 export function VehiclesPage() {
@@ -797,16 +804,58 @@ export function VehiclesPage() {
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-1">
-                    <span className="text-sm font-medium text-slate-700">Tipo de peso</span>
-                    <select value={form.vehicleType} onChange={(e) => { setForm({ ...form, vehicleType: e.target.value as VehicleFormData["vehicleType"] }); clearFieldError("vehicleType"); }} className={getFieldClass("vehicleType")}><option value="">Selecione o tipo de peso</option><option value="LIGHT">Leve</option><option value="HEAVY">Pesado</option></select>
+                    <span className="text-sm font-medium text-slate-700">Tipo de categoria</span>
+                    <select
+                      value={form.vehicleType}
+                      onChange={(e) => {
+                        setForm({ ...form, vehicleType: e.target.value as VehicleFormData["vehicleType"] });
+                        clearFieldError("vehicleType");
+                      }}
+                      className={getFieldClass("vehicleType")}
+                    >
+                      <option value="">Seleciona a categoria</option>
+                      <option value="LIGHT">Leve</option>
+                      <option value="HEAVY">Pesado</option>
+                    </select>
+                    {fieldErrors.vehicleType ? <p className="text-xs text-red-600">{fieldErrors.vehicleType}</p> : null}
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Tipo de veículo</span>
-                    <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as "CAR" | "TRUCK" | "UTILITY" })} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione o tipo de veículo</option><option value="CAR">Carro</option><option value="TRUCK">Caminháo</option><option value="UTILITY">Utilitário</option></select>
+                    <select
+                      value={form.category}
+                      onChange={(e) => {
+                        setForm({ ...form, category: e.target.value as "CAR" | "TRUCK" | "UTILITY" });
+                        clearFieldError("category");
+                      }}
+                      className={getFieldClass("category")}
+                    >
+                      <option value="">Selecione o tipo de veículo</option>
+                      <option value="CAR">Carro</option>
+                      <option value="TRUCK">Caminhão</option>
+                      <option value="UTILITY">Utilitário</option>
+                    </select>
+                    {fieldErrors.category ? <p className="text-xs text-red-600">{fieldErrors.category}</p> : null}
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Combustível</span>
-                    <select value={form.fuelType} onChange={(e) => setForm({ ...form, fuelType: e.target.value as VehicleFormData["fuelType"] })} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione o combustível</option><option value="GASOLINE">Gasolina</option><option value="ETHANOL">Etanol</option><option value="DIESEL">Diesel</option><option value="FLEX">Flex</option><option value="ELECTRIC">Elétrico</option><option value="HYBRID">Híbrido</option><option value="CNG">GNV</option></select>
+                    <select
+                      value={form.fuelType}
+                      onChange={(e) => {
+                        setForm({ ...form, fuelType: e.target.value as VehicleFormData["fuelType"] });
+                        clearFieldError("fuelType");
+                      }}
+                      className={getFieldClass("fuelType")}
+                    >
+                      <option value="">Selecione o combustível</option>
+                      <option value="GASOLINE">Gasolina</option>
+                      <option value="ETHANOL">Etanol</option>
+                      <option value="DIESEL">Diesel</option>
+                      <option value="FLEX">Flex</option>
+                      <option value="ELECTRIC">Elétrico</option>
+                      <option value="HYBRID">Híbrido</option>
+                      <option value="CNG">GNV</option>
+                    </select>
+                    {fieldErrors.fuelType ? <p className="text-xs text-red-600">{fieldErrors.fuelType}</p> : null}
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Capacidade do tanque (L)</span>
