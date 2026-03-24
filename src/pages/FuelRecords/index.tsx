@@ -181,7 +181,7 @@ export function FuelRecordsPage() {
 
   function openCreateModal() {
     setEditingRecord(null);
-    setForm({ ...initialForm, driverId: latestDriverId });
+    setForm(initialForm);
     setFormErrorMessage("");
     setFieldErrors({});
     setIsModalOpen(true);
@@ -382,33 +382,26 @@ export function FuelRecordsPage() {
     [vehicles, records],
   );
 
-  const latestDriverId = useMemo(() => {
+  const latestDriverIdByVehicle = useMemo(() => {
     const sortedByNewest = [...records].sort((a, b) => {
       const aTime = new Date(a.createdAt || a.fuelDate).getTime();
       const bTime = new Date(b.createdAt || b.fuelDate).getTime();
       return bTime - aTime;
     });
 
+    const map = new Map<string, string>();
     for (const record of sortedByNewest) {
-      if (!record.driverId) continue;
+      if (!record.driverId || !record.vehicleId) continue;
+      if (map.has(record.vehicleId)) continue;
+
       const driver = drivers.find((item) => item.id === record.driverId);
       if (!driver || driver.status !== "ACTIVE") continue;
 
-      if (selectedBranchId) {
-        const driverBranchId =
-          driver.vehicle?.branchId ||
-          (driver.vehicleId
-            ? vehicles.find((vehicle) => vehicle.id === driver.vehicleId)?.branchId
-            : undefined);
-
-        if (driverBranchId !== selectedBranchId) continue;
-      }
-
-      return record.driverId;
+      map.set(record.vehicleId, record.driverId);
     }
 
-    return "";
-  }, [records, drivers, vehicles, selectedBranchId]);
+    return map;
+  }, [records, drivers]);
 
   function handleVehicleChange(vehicleId: string) {
     if (editingRecord) {
@@ -417,13 +410,15 @@ export function FuelRecordsPage() {
     }
     const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
     const latestKm = latestKmByVehicle.get(vehicleId);
+    const latestDriverId = latestDriverIdByVehicle.get(vehicleId) || "";
     setForm((prev) => ({
       ...prev,
       vehicleId,
       km: typeof latestKm === "number" ? String(latestKm) : "",
       fuelType: selectedVehicle?.fuelType || prev.fuelType,
+      driverId: latestDriverId,
     }));
-    setFieldErrors((prev) => ({ ...prev, vehicleId: undefined, km: undefined }));
+    setFieldErrors((prev) => ({ ...prev, vehicleId: undefined, km: undefined, driverId: undefined }));
   }
 
   const filteredRecords = useMemo(() => {
