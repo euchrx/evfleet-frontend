@@ -996,7 +996,7 @@ export function MaintenanceRecordsPage() {
           <button
             type="button"
             onClick={() => (tab === "records" ? openCreateRecord() : tab === "plans" ? openCreatePlan() : openCreateTire())}
-            className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+            className="w-full cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 md:w-auto"
           >
             + {actionLabel}
           </button>

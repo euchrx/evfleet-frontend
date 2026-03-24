@@ -572,7 +572,7 @@ export function FuelRecordsPage() {
 
         <button
           onClick={openCreateModal}
-          className="rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+          className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
         >
           + Cadastrar abastecimento
         </button>

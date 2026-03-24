@@ -631,8 +631,8 @@ export function VehiclesPage() {
           style={{ cursor: isCreateButtonBlockedVisual ? "not-allowed" : "pointer" }}
           className={`rounded-xl px-4 py-3 text-sm font-semibold text-white transition ${
             isCreateButtonBlockedVisual
-              ? "cursor-not-allowed bg-slate-400"
-              : "cursor-pointer bg-orange-500 hover:bg-orange-600"
+              ? "w-full cursor-not-allowed bg-slate-400 sm:w-auto"
+              : "w-full cursor-pointer bg-orange-500 hover:bg-orange-600 sm:w-auto"
           }`}
         >
           + Cadastrar veículo

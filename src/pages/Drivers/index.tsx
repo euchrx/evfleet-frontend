@@ -329,7 +329,7 @@ export function DriversPage() {
           <h1 className="text-3xl font-bold text-slate-900">Motoristas</h1>
           <p className="text-sm text-slate-500">Gerencie os motoristas cadastrados no sistema</p>
         </div>
-        <button onClick={openCreateModal} className="rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600">+ Cadastrar motorista</button>
+        <button onClick={openCreateModal} className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto">+ Cadastrar motorista</button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

@@ -135,3 +135,27 @@ button:disabled {
 .notification-highlight td:last-child {
   border-right: 2px solid #fb923c;
 }
+
+@media (max-width: 768px) {
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .overflow-x-auto > table {
+    min-width: 760px;
+  }
+
+  .overflow-x-auto th,
+  .overflow-x-auto td {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  .overflow-x-auto td .flex.gap-2 {
+    flex-wrap: wrap;
+  }
+
+  .overflow-x-auto td .btn-ui {
+    white-space: nowrap;
+  }
+}
