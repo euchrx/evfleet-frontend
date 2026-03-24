@@ -7,6 +7,7 @@ import type { Trip, TripStatus } from "../../types/trip";
 import type { Vehicle } from "../../types/vehicle";
 import type { Driver } from "../../types/driver";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { TablePagination } from "../../components/TablePagination";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
 
 type TripFormData = {
@@ -45,6 +46,7 @@ const initialForm: TripFormData = {
   status: "OPEN",
   notes: "",
 };
+const TABLE_PAGE_SIZE = 10;
 
 function parseLocalDate(value?: string | null) {
   if (!value) return null;
@@ -84,6 +86,7 @@ export function TripsPage() {
   const [pageErrorMessage, setPageErrorMessage] = useState("");
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<TripSortBy>("departureAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -192,6 +195,26 @@ export function TripsPage() {
       return (aKmDriven - bKmDriven) * direction;
     });
   }, [trips, selectedBranchId, search, sortBy, sortDirection]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredTrips.length / TABLE_PAGE_SIZE)),
+    [filteredTrips.length]
+  );
+
+  const paginatedTrips = useMemo(() => {
+    const start = (currentPage - 1) * TABLE_PAGE_SIZE;
+    return filteredTrips.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredTrips, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, sortBy, sortDirection, selectedBranchId]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const summary = useMemo(() => {
     const scoped = selectedBranchId ? trips.filter((trip) => trip.vehicle?.branchId === selectedBranchId) : trips;
@@ -372,7 +395,7 @@ export function TripsPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Carregando viagens...</td></tr> : filteredTrips.length === 0 ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma viagem encontrada.</td></tr> : filteredTrips.map((trip) => (
+              {loading ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Carregando viagens...</td></tr> : filteredTrips.length === 0 ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma viagem encontrada.</td></tr> : paginatedTrips.map((trip) => (
                 <tr key={trip.id} className="border-t border-slate-200">
                   <td className="px-6 py-4 text-sm text-slate-700">{trip.vehicle ? `${trip.vehicle.brand} ${trip.vehicle.model} (${trip.vehicle.plate})` : trip.vehicleId}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{trip.driver?.name || "Sem motorista"}</td>
@@ -387,6 +410,17 @@ export function TripsPage() {
             </tbody>
           </table>
         </div>
+        {!loading && filteredTrips.length > 0 ? (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredTrips.length}
+            pageSize={TABLE_PAGE_SIZE}
+            itemLabel="viagens"
+            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          />
+        ) : null}
       </div>
 
       {isModalOpen ? (

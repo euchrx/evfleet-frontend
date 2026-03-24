@@ -7,6 +7,7 @@ import {
   updateUser,
 } from "../../services/users";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { TablePagination } from "../../components/TablePagination";
 
 type UserFormData = {
   name: string;
@@ -21,6 +22,7 @@ const initialForm: UserFormData = {
   password: "",
   role: "FLEET_MANAGER",
 };
+const TABLE_PAGE_SIZE = 10;
 
 export function UsersPage() {
   type UserSortBy = "name" | "email" | "role" | "createdAt";
@@ -30,6 +32,7 @@ export function UsersPage() {
   const [pageErrorMessage, setPageErrorMessage] = useState("");
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState<UserSortBy>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -205,17 +208,31 @@ export function UsersPage() {
     });
   }, [users, roleFilter, search, sortBy, sortDirection]);
 
-  const summary = useMemo(() => {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredUsers.length / TABLE_PAGE_SIZE)),
+    [filteredUsers.length]
+  );
 
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * TABLE_PAGE_SIZE;
+    return filteredUsers.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredUsers, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, roleFilter, sortBy, sortDirection]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const summary = useMemo(() => {
     return {
       total: users.length,
       admins: users.filter((user) => user.role === "ADMIN").length,
       managers: users.filter((user) => user.role === "FLEET_MANAGER").length,
-      createdMonth: users.filter((user) => new Date(user.createdAt) >= monthStart).length,
-      createdToday: users.filter((user) => new Date(user.createdAt) >= todayStart).length,
     };
   }, [users]);
 
@@ -237,7 +254,7 @@ export function UsersPage() {
         </button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Totais</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">{summary.total}</p>
@@ -249,14 +266,6 @@ export function UsersPage() {
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Gestores</p>
           <p className="mt-1 text-2xl font-bold text-blue-800">{summary.managers}</p>
-        </div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Novos no mes</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-800">{summary.createdMonth}</p>
-        </div>
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Novos hoje</p>
-          <p className="mt-1 text-2xl font-bold text-amber-800">{summary.createdToday}</p>
         </div>
       </div>
 
@@ -315,7 +324,7 @@ export function UsersPage() {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
+                paginatedUsers.map((user) => (
                   <tr key={user.id} className="border-t border-slate-200">
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">{user.name}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{user.email}</td>
@@ -348,6 +357,17 @@ export function UsersPage() {
             </tbody>
           </table>
         </div>
+        {!loading && filteredUsers.length > 0 ? (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredUsers.length}
+            pageSize={TABLE_PAGE_SIZE}
+            itemLabel="usuários"
+            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          />
+        ) : null}
       </div>
 
       {isModalOpen && (

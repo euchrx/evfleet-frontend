@@ -11,6 +11,7 @@ import {
 import { getVehicles } from "../../services/vehicles";
 import { useBranch } from "../../contexts/BranchContext";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { TablePagination } from "../../components/TablePagination";
 
 type DebtCategory = Debt["category"];
 type DebtSortBy =
@@ -47,6 +48,7 @@ const initialForm: DebtFormData = {
   status: "PENDING",
   vehicleId: "",
 };
+const TABLE_PAGE_SIZE = 10;
 
 const debtCategoryOptions: Array<{ value: DebtCategory; label: string }> = [
   { value: "FINE", label: "Multa" },
@@ -136,6 +138,7 @@ export function DebtsPage() {
   const [pageErrorMessage, setPageErrorMessage] = useState("");
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [categoryFilter, setCategoryFilter] = useState<"ALL" | DebtCategory>(
     "ALL",
@@ -299,6 +302,26 @@ export function DebtsPage() {
     sortBy,
     sortDirection,
   ]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredDebts.length / TABLE_PAGE_SIZE)),
+    [filteredDebts.length]
+  );
+
+  const paginatedDebts = useMemo(() => {
+    const start = (currentPage - 1) * TABLE_PAGE_SIZE;
+    return filteredDebts.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredDebts, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, categoryFilter, sortBy, sortDirection, selectedBranchId]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const summary = useMemo(() => {
     const scoped = selectedBranchId
@@ -657,7 +680,7 @@ export function DebtsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredDebts.map((debt) => {
+                paginatedDebts.map((debt) => {
                   const effectiveStatus = getEffectiveDebtStatus(debt);
                   return (
                     <tr
@@ -718,6 +741,17 @@ export function DebtsPage() {
             </tbody>
           </table>
         </div>
+        {!loading && filteredDebts.length > 0 ? (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredDebts.length}
+            pageSize={TABLE_PAGE_SIZE}
+            itemLabel="débitos"
+            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          />
+        ) : null}
       </div>
 
 

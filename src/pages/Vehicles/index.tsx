@@ -14,6 +14,7 @@ import { readSoftwareSettings } from "../../services/adminSettings";
 import { useBranch } from "../../contexts/BranchContext";
 import { useLocation } from "react-router-dom";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { TablePagination } from "../../components/TablePagination";
 
 type VehicleFormData = {
   plate: string;
@@ -59,6 +60,7 @@ const initialForm: VehicleFormData = {
   documentUrls: [],
   branchId: "",
 };
+const TABLE_PAGE_SIZE = 10;
 
 function readConsumptionRules() {
   try {
@@ -141,6 +143,7 @@ export function VehiclesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [form, setForm] = useState<VehicleFormData>(initialForm);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
@@ -497,6 +500,26 @@ export function VehiclesPage() {
     });
   }, [vehicles, selectedBranchId, search, sortBy, sortDirection]);
 
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filtered.length / TABLE_PAGE_SIZE)),
+    [filtered.length]
+  );
+
+  const paginatedVehicles = useMemo(() => {
+    const start = (currentPage - 1) * TABLE_PAGE_SIZE;
+    return filtered.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedBranchId, sortBy, sortDirection]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const summary = useMemo(() => {
     const scoped = selectedBranchId
       ? vehicles.filter((vehicle) => vehicle.branchId === selectedBranchId)
@@ -608,7 +631,7 @@ export function VehiclesPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((v) => (
+                paginatedVehicles.map((v) => (
                   <tr key={v.id} className="border-t border-slate-200">
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">{v.plate}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{v.brand} {v.model}</td>
@@ -635,6 +658,17 @@ export function VehiclesPage() {
             </tbody>
           </table>
         </div>
+        {!loading && filtered.length > 0 ? (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filtered.length}
+            pageSize={TABLE_PAGE_SIZE}
+            itemLabel="veículos"
+            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          />
+        ) : null}
       </div>
 
       {isModalOpen && (

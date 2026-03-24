@@ -6,6 +6,9 @@ import {
   type SystemLogEntry,
 } from "../../services/systemLogs";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { TablePagination } from "../../components/TablePagination";
+
+const TABLE_PAGE_SIZE = 10;
 
 function formatDateTime(iso: string) {
   const date = new Date(iso);
@@ -19,6 +22,7 @@ export function SystemLogsPage() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | "SUCCESS" | "ERROR" | "INFO">(
     "ALL"
   );
+  const [currentPage, setCurrentPage] = useState(1);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
   function loadLogs() {
@@ -44,6 +48,24 @@ export function SystemLogsPage() {
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
   }, [logs, search, statusFilter]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredLogs.length / TABLE_PAGE_SIZE)),
+    [filteredLogs.length]
+  );
+
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * TABLE_PAGE_SIZE;
+    return filteredLogs.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredLogs, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   function handleClearLogs() {
     setIsClearModalOpen(true);
@@ -128,7 +150,7 @@ export function SystemLogsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
+                paginatedLogs.map((log) => (
                   <tr key={log.id} className="border-t border-slate-200">
                     <td className="px-6 py-4 text-sm text-slate-700">{formatDateTime(log.timestamp)}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{log.actor}</td>
@@ -155,12 +177,31 @@ export function SystemLogsPage() {
             </tbody>
           </table>
         </div>
+        {filteredLogs.length > 0 ? (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredLogs.length}
+            pageSize={TABLE_PAGE_SIZE}
+            itemLabel="logs"
+            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          />
+        ) : null}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <Database size={16} className="text-orange-600" />
-          Produzido por EvTech | Soluções em Sistemas
+          Plataforma desenvolvida por{" "}
+          <a
+            href="https://evsistemas.com.br"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800"
+          >
+            EvSistemas
+          </a>
         </div>
       </div>
 

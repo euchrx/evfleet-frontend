@@ -5,6 +5,7 @@ import { createDriver, deleteDriver, getDrivers, updateDriver } from "../../serv
 import { getVehicles } from "../../services/vehicles";
 import { useBranch } from "../../contexts/BranchContext";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { TablePagination } from "../../components/TablePagination";
 
 type DriverFormData = {
   name: string;
@@ -30,6 +31,7 @@ const initialForm: DriverFormData = {
   status: "ACTIVE",
   vehicleId: "",
 };
+const TABLE_PAGE_SIZE = 10;
 
 function onlyDigits(value: string) {
   return value.replace(/\D/g, "");
@@ -72,6 +74,7 @@ export function DriversPage() {
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<DriverFieldErrors>({});
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState<DriverSortBy>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -290,6 +293,26 @@ export function DriversPage() {
     });
   }, [drivers, selectedBranchId, statusFilter, search, sortBy, sortDirection]);
 
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredDrivers.length / TABLE_PAGE_SIZE)),
+    [filteredDrivers.length]
+  );
+
+  const paginatedDrivers = useMemo(() => {
+    const start = (currentPage - 1) * TABLE_PAGE_SIZE;
+    return filteredDrivers.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredDrivers, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, sortBy, sortDirection, selectedBranchId]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const summary = useMemo(() => {
     const scoped = selectedBranchId
       ? drivers.filter((driver) => !driver.vehicle || driver.vehicle.branchId === selectedBranchId)
@@ -370,7 +393,7 @@ export function DriversPage() {
               ) : filteredDrivers.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum motorista encontrado.</td></tr>
               ) : (
-                filteredDrivers.map((driver) => (
+                paginatedDrivers.map((driver) => (
                   <tr key={driver.id} className="border-t border-slate-200">
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">{driver.name}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{formatCpf(driver.cpf)}</td>
@@ -385,6 +408,17 @@ export function DriversPage() {
             </tbody>
           </table>
         </div>
+        {!loading && filteredDrivers.length > 0 ? (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredDrivers.length}
+            pageSize={TABLE_PAGE_SIZE}
+            itemLabel="motoristas"
+            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          />
+        ) : null}
       </div>
 
       {isModalOpen ? (

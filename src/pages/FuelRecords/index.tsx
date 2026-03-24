@@ -19,6 +19,7 @@ import { getDrivers } from "../../services/drivers";
 import { useBranch } from "../../contexts/BranchContext";
 import { useLocation } from "react-router-dom";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { TablePagination } from "../../components/TablePagination";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
 
 type FuelFormData = {
@@ -42,6 +43,7 @@ const initialForm: FuelFormData = {
   vehicleId: "",
   driverId: "",
 };
+const TABLE_PAGE_SIZE = 10;
 
 function formatMoney(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -94,6 +96,7 @@ export function FuelRecordsPage() {
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FuelFieldErrors>({});
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<FuelSortBy>("vehicle");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -477,6 +480,26 @@ export function FuelRecordsPage() {
     });
   }, [records, search, selectedBranchId, vehicles, branches, sortBy, sortDirection]);
 
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredRecords.length / TABLE_PAGE_SIZE)),
+    [filteredRecords.length]
+  );
+
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * TABLE_PAGE_SIZE;
+    return filteredRecords.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredRecords, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedBranchId, sortBy, sortDirection]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const anomalyMapByRecordId = useMemo(() => {
     const list = detectFuelAnomalies(filteredRecords, vehicles);
     return list.reduce<Record<string, (typeof list)[number]>>((acc, item) => {
@@ -627,7 +650,7 @@ export function FuelRecordsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((record) => (
+                paginatedRecords.map((record) => (
                   <tr key={record.id} className="border-t border-slate-200">
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {getRecordBranchName(record)}
@@ -694,6 +717,17 @@ export function FuelRecordsPage() {
             </tbody>
           </table>
         </div>
+        {!loading && filteredRecords.length > 0 ? (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredRecords.length}
+            pageSize={TABLE_PAGE_SIZE}
+            itemLabel="abastecimentos"
+            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          />
+        ) : null}
       </div>
 
       {isModalOpen && (

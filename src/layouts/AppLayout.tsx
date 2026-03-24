@@ -557,7 +557,18 @@ export function AppLayout() {
             </div>
 
             <div className="mt-5 flex items-center justify-between gap-3">
-              <p className="text-xs text-slate-500">Produzido por EvTech | Soluções em Sistemas</p>
+              <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-slate-600">
+                Plataforma desenvolvida com foco corporativo por{" "}
+                <a
+                  href="https://evsistemas.com.br"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-blue-700 underline underline-offset-2 transition hover:text-blue-800"
+                >
+                  EvSistemas
+                </a>
+                .
+              </div>
               <button
                 type="button"
                 onClick={() => setIsSystemLogsModalOpen(false)}

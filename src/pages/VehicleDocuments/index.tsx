@@ -7,6 +7,7 @@ import type { VehicleDocument, VehicleDocumentStatus, VehicleDocumentType } from
 import { api } from "../../services/api";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { useLocation } from "react-router-dom";
+import { TablePagination } from "../../components/TablePagination";
 
 type DocumentFormData = {
   type: VehicleDocumentType;
@@ -35,6 +36,7 @@ const initialForm: DocumentFormData = {
   notes: "",
   vehicleId: "",
 };
+const TABLE_PAGE_SIZE = 10;
 
 const documentTypeOptions: Array<{ value: VehicleDocumentType; label: string }> = [
   { value: "LICENSING", label: "Licenciamento" },
@@ -102,6 +104,7 @@ export function VehicleDocumentsPage() {
   const [pageErrorMessage, setPageErrorMessage] = useState("");
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<DocumentSortBy>("expiryDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -202,6 +205,26 @@ export function VehicleDocumentsPage() {
       return statusLabel(getEffectiveStatus(a)).localeCompare(statusLabel(getEffectiveStatus(b)), "pt-BR", { sensitivity: "base" }) * direction;
     });
   }, [documents, selectedBranchId, search, sortBy, sortDirection]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredDocuments.length / TABLE_PAGE_SIZE)),
+    [filteredDocuments.length]
+  );
+
+  const paginatedDocuments = useMemo(() => {
+    const start = (currentPage - 1) * TABLE_PAGE_SIZE;
+    return filteredDocuments.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredDocuments, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, sortBy, sortDirection, selectedBranchId]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const summary = useMemo(() => {
     const scoped = selectedBranchId ? documents.filter((item) => item.vehicle?.branchId === selectedBranchId) : documents;
@@ -380,7 +403,7 @@ export function VehicleDocumentsPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Carregando documentos...</td></tr> : filteredDocuments.length === 0 ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum documento encontrado.</td></tr> : filteredDocuments.map((item) => {
+              {loading ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Carregando documentos...</td></tr> : filteredDocuments.length === 0 ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum documento encontrado.</td></tr> : paginatedDocuments.map((item) => {
                 const effectiveStatus = getEffectiveStatus(item);
                 const isHighlighted = highlightedDocumentId === item.id;
                 return (
@@ -397,6 +420,17 @@ export function VehicleDocumentsPage() {
             </tbody>
           </table>
         </div>
+        {!loading && filteredDocuments.length > 0 ? (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredDocuments.length}
+            pageSize={TABLE_PAGE_SIZE}
+            itemLabel="documentos"
+            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          />
+        ) : null}
       </div>
 
       {isModalOpen ? (

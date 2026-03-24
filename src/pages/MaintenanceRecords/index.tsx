@@ -28,6 +28,7 @@ import {
   type CreateTireReadingInput,
 } from "../../services/tires";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { TablePagination } from "../../components/TablePagination";
 import type { Vehicle } from "../../types/vehicle";
 import type { MaintenanceRecord } from "../../types/maintenance-record";
 import type { MaintenancePlan } from "../../types/maintenance-plan";
@@ -215,6 +216,8 @@ function planDueLabel(plan: MaintenancePlan) {
   return "-";
 }
 
+const TABLE_PAGE_SIZE = 10;
+
 export function MaintenanceRecordsPage() {
   const location = useLocation();
   const { selectedBranchId } = useBranch();
@@ -231,6 +234,9 @@ export function MaintenanceRecordsPage() {
   const [planSortDirection, setPlanSortDirection] = useState<SortDirection>("asc");
   const [tireSortBy, setTireSortBy] = useState<TireSortBy>("serial");
   const [tireSortDirection, setTireSortDirection] = useState<SortDirection>("asc");
+  const [recordPage, setRecordPage] = useState(1);
+  const [planPage, setPlanPage] = useState(1);
+  const [tirePage, setTirePage] = useState(1);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
@@ -491,6 +497,52 @@ export function MaintenanceRecordsPage() {
       return tireStatusLabel(a.status).localeCompare(tireStatusLabel(b.status), "pt-BR") * direction;
     });
   }, [tires, selectedBranchId, vehicleMap, search, tireSortBy, tireSortDirection]);
+
+  const recordTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(scopedRecords.length / TABLE_PAGE_SIZE)),
+    [scopedRecords.length]
+  );
+  const planTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(scopedPlans.length / TABLE_PAGE_SIZE)),
+    [scopedPlans.length]
+  );
+  const tireTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(scopedTires.length / TABLE_PAGE_SIZE)),
+    [scopedTires.length]
+  );
+
+  const paginatedRecords = useMemo(() => {
+    const start = (recordPage - 1) * TABLE_PAGE_SIZE;
+    return scopedRecords.slice(start, start + TABLE_PAGE_SIZE);
+  }, [scopedRecords, recordPage]);
+  const paginatedPlans = useMemo(() => {
+    const start = (planPage - 1) * TABLE_PAGE_SIZE;
+    return scopedPlans.slice(start, start + TABLE_PAGE_SIZE);
+  }, [scopedPlans, planPage]);
+  const paginatedTires = useMemo(() => {
+    const start = (tirePage - 1) * TABLE_PAGE_SIZE;
+    return scopedTires.slice(start, start + TABLE_PAGE_SIZE);
+  }, [scopedTires, tirePage]);
+
+  useEffect(() => {
+    setRecordPage(1);
+  }, [search, selectedBranchId, recordSortBy, recordSortDirection]);
+  useEffect(() => {
+    setPlanPage(1);
+  }, [search, selectedBranchId, planSortBy, planSortDirection]);
+  useEffect(() => {
+    setTirePage(1);
+  }, [search, selectedBranchId, tireSortBy, tireSortDirection]);
+
+  useEffect(() => {
+    if (recordPage > recordTotalPages) setRecordPage(recordTotalPages);
+  }, [recordPage, recordTotalPages]);
+  useEffect(() => {
+    if (planPage > planTotalPages) setPlanPage(planTotalPages);
+  }, [planPage, planTotalPages]);
+  useEffect(() => {
+    if (tirePage > tireTotalPages) setTirePage(tireTotalPages);
+  }, [tirePage, tireTotalPages]);
 
   const maintenanceMetrics = useMemo(() => {
     const pending = scopedRecords.filter((record) => record.status !== "DONE").length;
@@ -949,7 +1001,7 @@ export function MaintenanceRecordsPage() {
                 </tr>
               </thead>
               <tbody>
-                {scopedRecords.length === 0 ? <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma manutenção encontrada.</td></tr> : scopedRecords.map((record) => {
+                {scopedRecords.length === 0 ? <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma manutenção encontrada.</td></tr> : paginatedRecords.map((record) => {
                   const vehicle = record.vehicle || vehicleMap.get(record.vehicleId);
                   const isHighlighted = highlightId === record.id;
                   return (
@@ -967,6 +1019,17 @@ export function MaintenanceRecordsPage() {
               </tbody>
             </table>
           </div>
+          {scopedRecords.length > 0 ? (
+            <TablePagination
+              currentPage={recordPage}
+              totalPages={recordTotalPages}
+              totalItems={scopedRecords.length}
+              pageSize={TABLE_PAGE_SIZE}
+              itemLabel="manutenções"
+              onPrevious={() => setRecordPage((prev) => Math.max(prev - 1, 1))}
+              onNext={() => setRecordPage((prev) => Math.min(prev + 1, recordTotalPages))}
+            />
+          ) : null}
         </section>
       ) : null}
 
@@ -985,7 +1048,7 @@ export function MaintenanceRecordsPage() {
                 </tr>
               </thead>
               <tbody>
-                {scopedPlans.length === 0 ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum plano encontrado.</td></tr> : scopedPlans.map((plan) => {
+                {scopedPlans.length === 0 ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum plano encontrado.</td></tr> : paginatedPlans.map((plan) => {
                   const vehicle = plan.vehicle || vehicleMap.get(plan.vehicleId);
                   return (
                     <tr key={plan.id} className="border-t border-slate-200">
@@ -1001,6 +1064,17 @@ export function MaintenanceRecordsPage() {
               </tbody>
             </table>
           </div>
+          {scopedPlans.length > 0 ? (
+            <TablePagination
+              currentPage={planPage}
+              totalPages={planTotalPages}
+              totalItems={scopedPlans.length}
+              pageSize={TABLE_PAGE_SIZE}
+              itemLabel="planos"
+              onPrevious={() => setPlanPage((prev) => Math.max(prev - 1, 1))}
+              onNext={() => setPlanPage((prev) => Math.min(prev + 1, planTotalPages))}
+            />
+          ) : null}
         </section>
       ) : null}
 
@@ -1019,7 +1093,7 @@ export function MaintenanceRecordsPage() {
                 </tr>
               </thead>
               <tbody>
-                {scopedTires.length === 0 ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum pneu encontrado.</td></tr> : scopedTires.map((tire) => {
+                {scopedTires.length === 0 ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum pneu encontrado.</td></tr> : paginatedTires.map((tire) => {
                   const vehicle = tire.vehicle || (tire.vehicleId ? vehicleMap.get(tire.vehicleId) : undefined);
                   return (
                     <tr key={tire.id} className="border-t border-slate-200">
@@ -1035,6 +1109,17 @@ export function MaintenanceRecordsPage() {
               </tbody>
             </table>
           </div>
+          {scopedTires.length > 0 ? (
+            <TablePagination
+              currentPage={tirePage}
+              totalPages={tireTotalPages}
+              totalItems={scopedTires.length}
+              pageSize={TABLE_PAGE_SIZE}
+              itemLabel="pneus"
+              onPrevious={() => setTirePage((prev) => Math.max(prev - 1, 1))}
+              onNext={() => setTirePage((prev) => Math.min(prev + 1, tireTotalPages))}
+            />
+          ) : null}
         </section>
       ) : null}
 

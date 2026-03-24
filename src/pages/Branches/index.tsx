@@ -7,6 +7,7 @@ import {
   updateBranch,
 } from "../../services/branches";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { TablePagination } from "../../components/TablePagination";
 
 type BranchFormData = {
   name: string;
@@ -19,6 +20,7 @@ const initialForm: BranchFormData = {
   city: "",
   state: "",
 };
+const TABLE_PAGE_SIZE = 10;
 
 export function BranchesPage() {
   type BranchSortBy = "name" | "city" | "state" | "createdAt";
@@ -28,6 +30,7 @@ export function BranchesPage() {
   const [pageErrorMessage, setPageErrorMessage] = useState("");
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<BranchSortBy>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -191,6 +194,26 @@ export function BranchesPage() {
     });
   }, [branches, search, sortBy, sortDirection]);
 
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredBranches.length / TABLE_PAGE_SIZE)),
+    [filteredBranches.length]
+  );
+
+  const paginatedBranches = useMemo(() => {
+    const start = (currentPage - 1) * TABLE_PAGE_SIZE;
+    return filteredBranches.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredBranches, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, sortBy, sortDirection]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const summary = useMemo(() => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -305,7 +328,7 @@ export function BranchesPage() {
                   </td>
                 </tr>
               ) : (
-                filteredBranches.map((branch) => (
+                paginatedBranches.map((branch) => (
                   <tr key={branch.id} className="border-t border-slate-200">
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">
                       {branch.name}
@@ -342,6 +365,17 @@ export function BranchesPage() {
             </tbody>
           </table>
         </div>
+        {!loading && filteredBranches.length > 0 ? (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredBranches.length}
+            pageSize={TABLE_PAGE_SIZE}
+            itemLabel="filiais"
+            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          />
+        ) : null}
       </div>
 
       {isModalOpen && (
