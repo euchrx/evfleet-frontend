@@ -83,10 +83,7 @@ type TireFormState = {
   axlePosition: string;
   wheelPosition: string;
   currentKm: string;
-  currentTreadDepthMm: string;
-  currentPressurePsi: string;
   targetPressurePsi: string;
-  minTreadDepthMm: string;
   purchaseDate: string;
   purchaseCost: string;
   installedAt: string;
@@ -139,10 +136,7 @@ const initialTireForm: TireFormState = {
   axlePosition: "",
   wheelPosition: "",
   currentKm: "",
-  currentTreadDepthMm: "",
-  currentPressurePsi: "",
   targetPressurePsi: "",
-  minTreadDepthMm: "3",
   purchaseDate: "",
   purchaseCost: "",
   installedAt: "",
@@ -815,10 +809,7 @@ export function MaintenanceRecordsPage() {
       axlePosition: tire.axlePosition || "",
       wheelPosition: tire.wheelPosition || "",
       currentKm: String(tire.currentKm || ""),
-      currentTreadDepthMm: String(tire.currentTreadDepthMm || ""),
-      currentPressurePsi: String(tire.currentPressurePsi || ""),
       targetPressurePsi: String(tire.targetPressurePsi || ""),
-      minTreadDepthMm: String(tire.minTreadDepthMm || 3),
       purchaseDate: tire.purchaseDate ? String(tire.purchaseDate).slice(0, 10) : "",
       purchaseCost: String(tire.purchaseCost || ""),
       installedAt: tire.installedAt ? String(tire.installedAt).slice(0, 10) : "",
@@ -850,10 +841,7 @@ export function MaintenanceRecordsPage() {
       axlePosition: tireForm.axlePosition.trim() || undefined,
       wheelPosition: tireForm.wheelPosition.trim() || undefined,
       currentKm: Number(tireForm.currentKm) || 0,
-      currentTreadDepthMm: tireForm.currentTreadDepthMm ? toNumber(tireForm.currentTreadDepthMm) : undefined,
-      currentPressurePsi: tireForm.currentPressurePsi ? toNumber(tireForm.currentPressurePsi) : undefined,
       targetPressurePsi: tireForm.targetPressurePsi ? toNumber(tireForm.targetPressurePsi) : undefined,
-      minTreadDepthMm: tireForm.minTreadDepthMm ? toNumber(tireForm.minTreadDepthMm) : undefined,
       purchaseDate: tireForm.purchaseDate || undefined,
       purchaseCost: tireForm.purchaseCost ? toNumber(tireForm.purchaseCost) : undefined,
       installedAt: tireForm.installedAt || undefined,
@@ -1201,7 +1189,7 @@ export function MaintenanceRecordsPage() {
                       <td className="px-6 py-4 text-sm text-slate-700">{tire.serialNumber}</td>
                       <td className="px-6 py-4 text-sm text-slate-900"><p className="font-medium">{tire.brand} {tire.model}</p><p className="text-xs text-slate-500">{tire.size}</p></td>
                       <td className="px-6 py-4 text-sm text-slate-700"><p>{vehicle ? `${vehicle.brand} ${vehicle.model} (${vehicle.plate})` : "Sem veículo"}</p><p className="text-xs text-slate-500">{tire.axlePosition || "-"} / {tire.wheelPosition || "-"}</p></td>
-                      <td className="px-6 py-4 text-sm text-slate-700"><p>KM: {tire.currentKm || 0}</p><p className="text-xs text-slate-500">Sulco: {typeof tire.currentTreadDepthMm === "number" ? `${tire.currentTreadDepthMm} mm` : "-"}</p><p className="text-xs text-slate-500">Pressão: {typeof tire.currentPressurePsi === "number" ? `${tire.currentPressurePsi} PSI` : "-"}</p></td>
+                      <td className="px-6 py-4 text-sm text-slate-700"><p>KM: {tire.currentKm || 0}</p><p className="text-xs text-slate-500">Pressão recomendada: {typeof tire.targetPressurePsi === "number" ? `${tire.targetPressurePsi} PSI` : "-"}</p></td>
                       <td className="px-6 py-4 text-sm"><span className={`status-pill ${tireStatusClass(tire.status)}`}>{tireStatusLabel(tire.status)}</span></td>
                       <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button type="button" onClick={() => openReadingModal(tire)} className="btn-ui btn-ui-neutral">Leituras</button><button type="button" onClick={() => openEditTire(tire)} className="btn-ui btn-ui-neutral">Editar</button><button type="button" onClick={() => removeTire(tire)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
                     </tr>
@@ -1394,10 +1382,7 @@ export function MaintenanceRecordsPage() {
                 <div><label className="block text-sm font-medium text-slate-700">Posição do eixo</label><input value={tireForm.axlePosition} onChange={(event) => setTireForm((prev) => ({ ...prev, axlePosition: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Traseiro" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Posição da roda</label><input value={tireForm.wheelPosition} onChange={(event) => setTireForm((prev) => ({ ...prev, wheelPosition: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Dianteira direita" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">KM atual</label><input type="number" min={0} value={tireForm.currentKm} onChange={(event) => setTireForm((prev) => ({ ...prev, currentKm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 128500" /></div>
-                <div><label className="block text-sm font-medium text-slate-700">Sulco atual (mm)</label><input value={tireForm.currentTreadDepthMm} onChange={(event) => setTireForm((prev) => ({ ...prev, currentTreadDepthMm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 11,5" /></div>
-                <div><label className="block text-sm font-medium text-slate-700">Pressão atual (PSI)</label><input value={tireForm.currentPressurePsi} onChange={(event) => setTireForm((prev) => ({ ...prev, currentPressurePsi: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 95" /></div>
-                <div><label className="block text-sm font-medium text-slate-700">Pressão alvo (PSI)</label><input value={tireForm.targetPressurePsi} onChange={(event) => setTireForm((prev) => ({ ...prev, targetPressurePsi: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 100" /></div>
-                <div><label className="block text-sm font-medium text-slate-700">Sulco mínimo (mm)</label><input value={tireForm.minTreadDepthMm} onChange={(event) => setTireForm((prev) => ({ ...prev, minTreadDepthMm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 3,0" /></div>
+                <div><label className="block text-sm font-medium text-slate-700">Pressão recomendada (PSI)</label><input value={tireForm.targetPressurePsi} onChange={(event) => setTireForm((prev) => ({ ...prev, targetPressurePsi: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 100" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Data de compra</label><input type="date" value={tireForm.purchaseDate} onChange={(event) => setTireForm((prev) => ({ ...prev, purchaseDate: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Custo de compra (R$)</label><input value={tireForm.purchaseCost} onChange={(event) => setTireForm((prev) => ({ ...prev, purchaseCost: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 1850,00" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Data de instalação</label><input type="date" value={tireForm.installedAt} onChange={(event) => setTireForm((prev) => ({ ...prev, installedAt: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>

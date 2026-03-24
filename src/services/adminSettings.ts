@@ -3,6 +3,7 @@ export type SoftwareSettings = {
   timezone: string;
   language: string;
   currency: string;
+  maxVehiclesAllowed: number;
   alertDaysBeforeCnh: number;
   alertDaysBeforeDocument: number;
   alertKmBeforeMaintenance: number;
@@ -25,6 +26,7 @@ export const defaultSoftwareSettings: SoftwareSettings = {
   timezone: "America/Sao_Paulo",
   language: "pt-BR",
   currency: "BRL",
+  maxVehiclesAllowed: 500,
   alertDaysBeforeCnh: 30,
   alertDaysBeforeDocument: 15,
   alertKmBeforeMaintenance: 500,

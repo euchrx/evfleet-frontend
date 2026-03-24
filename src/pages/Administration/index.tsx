@@ -170,6 +170,21 @@ export function AdministrationPage() {
               <option value="BRL">Real (BRL)</option>
             </select>
           </label>
+          <label className="space-y-1 lg:col-span-3">
+            <span className="text-sm font-medium text-slate-700">Máximo de veículos permitidos</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={String(settings.maxVehiclesAllowed)}
+              onChange={(e) => {
+                const onlyDigits = e.target.value.replace(/\D/g, "");
+                handleChange("maxVehiclesAllowed", Number(onlyDigits || "0"));
+              }}
+              placeholder="Ex: 500"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            />
+          </label>
           <div className="space-y-3 lg:col-span-12 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <span className="block text-sm font-medium text-slate-700">
               Estabelecimento padrão do sistema
