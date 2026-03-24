@@ -752,7 +752,7 @@ export function DashboardPage() {
           }
           className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
         >
-          <option value="ALL">Categorias</option>
+          <option value="ALL">Todas as categorias</option>
           <option value="LIGHT">Categoria Leve</option>
           <option value="HEAVY">Categoria Pesado</option>
         </select>
