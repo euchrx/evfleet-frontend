@@ -21,13 +21,21 @@ type VehicleFormData = {
   model: string;
   brand: string;
   year: string;
-  vehicleType: "LIGHT" | "HEAVY";
-  category: "CAR" | "TRUCK" | "UTILITY";
+  vehicleType: "LIGHT" | "HEAVY" | "";
+  category: "CAR" | "TRUCK" | "UTILITY" | "";
   chassis: string;
   renavam: string;
   acquisitionDate: string;
   noAcquisitionDate: boolean;
-  fuelType: "GASOLINE" | "ETHANOL" | "DIESEL" | "FLEX" | "ELECTRIC" | "HYBRID" | "CNG";
+  fuelType:
+    | "GASOLINE"
+    | "ETHANOL"
+    | "DIESEL"
+    | "FLEX"
+    | "ELECTRIC"
+    | "HYBRID"
+    | "CNG"
+    | "";
   tankCapacity: string;
   status: "ACTIVE" | "MAINTENANCE" | "SOLD";
   consumptionMinKmPerLiter: string;
@@ -45,13 +53,13 @@ const initialForm: VehicleFormData = {
   model: "",
   brand: "",
   year: "",
-  vehicleType: "LIGHT",
-  category: "CAR",
+  vehicleType: "",
+  category: "",
   chassis: "",
   renavam: "",
   acquisitionDate: "",
   noAcquisitionDate: false,
-  fuelType: "DIESEL",
+  fuelType: "",
   tankCapacity: "",
   status: "ACTIVE",
   consumptionMinKmPerLiter: "",
@@ -131,6 +139,22 @@ const translateHistoryText = (value: string) => {
   }
   return translated;
 };
+
+function formatHistoryDate(value: string) {
+  const raw = String(value || "").trim();
+  const onlyDateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (onlyDateMatch) {
+    const year = Number(onlyDateMatch[1]);
+    const month = Number(onlyDateMatch[2]);
+    const day = Number(onlyDateMatch[3]);
+    return new Date(year, month - 1, day).toLocaleDateString("pt-BR");
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return parsed.toLocaleString("pt-BR");
+}
 
 export function VehiclesPage() {
   type VehicleFieldErrors = Partial<Record<keyof VehicleFormData, string>>;
@@ -309,12 +333,19 @@ export function VehiclesPage() {
         model: form.model.trim(),
         brand: form.brand.trim(),
         year: Number(form.year),
-        vehicleType: form.vehicleType,
-        category: form.category,
+        vehicleType: form.vehicleType as "LIGHT" | "HEAVY",
+        category: form.category as "CAR" | "TRUCK" | "UTILITY",
         chassis: normalizeChassis(form.chassis),
         renavam: normalizeRenavam(form.renavam),
         acquisitionDate: form.noAcquisitionDate ? undefined : form.acquisitionDate || undefined,
-        fuelType: form.fuelType,
+        fuelType: form.fuelType as
+          | "GASOLINE"
+          | "ETHANOL"
+          | "DIESEL"
+          | "FLEX"
+          | "ELECTRIC"
+          | "HYBRID"
+          | "CNG",
         tankCapacity: Number(form.tankCapacity),
         status: form.status,
         photoUrls: [...form.photoUrls, ...uploadedPhotoUrls],
@@ -327,6 +358,9 @@ export function VehiclesPage() {
       if (!payload.model) nextFieldErrors.model = "Informe o modelo.";
       if (!payload.brand) nextFieldErrors.brand = "Informe a marca.";
       if (!payload.branchId) nextFieldErrors.branchId = "Selecione a filial.";
+      if (!form.vehicleType) nextFieldErrors.vehicleType = "Selecione o tipo de peso.";
+      if (!form.category) nextFieldErrors.category = "Selecione o tipo de veículo.";
+      if (!form.fuelType) nextFieldErrors.fuelType = "Selecione o combustível.";
       if (!payload.chassis) nextFieldErrors.chassis = "Informe o chassi.";
       if (!payload.renavam) nextFieldErrors.renavam = "Informe o renavam.";
       if (Number.isNaN(payload.year) || payload.year < 1900) {
@@ -707,7 +741,7 @@ export function VehiclesPage() {
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Filial</span>
-                    <select value={form.branchId} disabled={isBranchLocked} onChange={(e) => { setForm({ ...form, branchId: e.target.value }); clearFieldError("branchId"); }} className={getFieldClass("branchId")}><option value="">Selecione uma filial</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+                    <select value={form.branchId} disabled={isBranchLocked} onChange={(e) => { setForm({ ...form, branchId: e.target.value }); clearFieldError("branchId"); }} className={`${getFieldClass("branchId")} disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500`}><option value="">Selecione uma filial</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
                     {fieldErrors.branchId ? <p className="text-xs text-red-600">{fieldErrors.branchId}</p> : null}
                   </label>
                   <label className="space-y-1">
@@ -764,15 +798,15 @@ export function VehiclesPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Tipo de peso</span>
-                    <select value={form.vehicleType} onChange={(e) => setForm({ ...form, vehicleType: e.target.value as "LIGHT" | "HEAVY" })} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="LIGHT">Leve</option><option value="HEAVY">Pesado</option></select>
+                    <select value={form.vehicleType} onChange={(e) => { setForm({ ...form, vehicleType: e.target.value as VehicleFormData["vehicleType"] }); clearFieldError("vehicleType"); }} className={getFieldClass("vehicleType")}><option value="">Selecione o tipo de peso</option><option value="LIGHT">Leve</option><option value="HEAVY">Pesado</option></select>
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Tipo de veículo</span>
-                    <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as "CAR" | "TRUCK" | "UTILITY" })} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="CAR">Carro</option><option value="TRUCK">Caminháo</option><option value="UTILITY">Utilitário</option></select>
+                    <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as "CAR" | "TRUCK" | "UTILITY" })} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione o tipo de veículo</option><option value="CAR">Carro</option><option value="TRUCK">Caminháo</option><option value="UTILITY">Utilitário</option></select>
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Combustível</span>
-                    <select value={form.fuelType} onChange={(e) => setForm({ ...form, fuelType: e.target.value as VehicleFormData["fuelType"] })} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="GASOLINE">Gasolina</option><option value="ETHANOL">Etanol</option><option value="DIESEL">Diesel</option><option value="FLEX">Flex</option><option value="ELECTRIC">Elétrico</option><option value="HYBRID">Híbrido</option><option value="CNG">GNV</option></select>
+                    <select value={form.fuelType} onChange={(e) => setForm({ ...form, fuelType: e.target.value as VehicleFormData["fuelType"] })} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione o combustível</option><option value="GASOLINE">Gasolina</option><option value="ETHANOL">Etanol</option><option value="DIESEL">Diesel</option><option value="FLEX">Flex</option><option value="ELECTRIC">Elétrico</option><option value="HYBRID">Híbrido</option><option value="CNG">GNV</option></select>
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Capacidade do tanque (L)</span>
@@ -846,7 +880,7 @@ export function VehiclesPage() {
               ) : historyItems.length === 0 ? (
                 <p className="text-sm text-slate-500">Sem eventos.</p>
               ) : (
-                historyItems.map((item, i) => <div key={`${item.type}-${i}`} className="rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between"><p className="font-semibold text-slate-900">{translateHistoryText(item.title)}</p><p className="text-xs text-slate-500">{new Date(item.date).toLocaleString("pt-BR")}</p></div><p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{getHistoryTypeLabel(item.type)}</p><p className="mt-1 text-sm text-slate-600">{translateHistoryText(item.description)}</p></div>)
+                historyItems.map((item, i) => <div key={`${item.type}-${i}`} className="rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between"><p className="font-semibold text-slate-900">{translateHistoryText(item.title)}</p><p className="text-xs text-slate-500">{formatHistoryDate(item.date)}</p></div><p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{getHistoryTypeLabel(item.type)}</p><p className="mt-1 text-sm text-slate-600">{translateHistoryText(item.description)}</p></div>)
               )}
             </div>
             <div className="sticky bottom-0 flex items-center justify-between border-t border-slate-200 bg-white px-6 py-4">

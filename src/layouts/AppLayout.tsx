@@ -404,7 +404,7 @@ export function AppLayout() {
       >
         <div className="border-b border-slate-800 px-6 py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold tracking-tight">{companyName}</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-orange-500">{companyName}</h1>
             <button
               type="button"
               aria-label="Fechar menu"
