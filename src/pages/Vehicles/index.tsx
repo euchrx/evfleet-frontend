@@ -258,6 +258,13 @@ export function VehiclesPage() {
   }, [pathname]);
 
   function openCreate() {
+    const settings = readSoftwareSettings();
+    const maxVehiclesAllowed = Number(settings.maxVehiclesAllowed || 0);
+    if (maxVehiclesAllowed >= 0 && vehicles.length >= maxVehiclesAllowed) {
+      setPageErrorMessage(`Limite de veículos atingido (${maxVehiclesAllowed}). Ajuste em Administração para cadastrar novos veículos.`);
+      return;
+    }
+    setPageErrorMessage("");
     setEditingVehicle(null);
     setForm({ ...initialForm, branchId: selectedBranchId });
     setPhotoFiles([]);
@@ -334,6 +341,16 @@ export function VehiclesPage() {
       setSaving(true);
       setFormErrorMessage("");
       setFieldErrors({});
+
+      if (!editingVehicle) {
+        const settings = readSoftwareSettings();
+        const maxVehiclesAllowed = Number(settings.maxVehiclesAllowed || 0);
+        if (maxVehiclesAllowed >= 0 && vehicles.length >= maxVehiclesAllowed) {
+          setFormErrorMessage(`Limite de veículos atingido (${maxVehiclesAllowed}). Ajuste em Administração para cadastrar novos veículos.`);
+          return;
+        }
+      }
+
       const uploadedPhotoUrls = await uploadVehicleFiles("photo", photoFiles);
       const uploadedDocumentUrls = await uploadVehicleFiles("document", documentFiles);
 

@@ -171,7 +171,7 @@ export function AdministrationPage() {
             </select>
           </label>
           <label className="space-y-1 lg:col-span-3">
-            <span className="text-sm font-medium text-slate-700">Máximo de veículos permitidos</span>
+            <span className="text-sm font-medium text-slate-700">Limite máximo de veículos permitidos no sistema</span>
             <input
               type="text"
               inputMode="numeric"
