@@ -39,6 +39,7 @@ export function AdministrationPage() {
 
   function saveSettings() {
     saveSoftwareSettings(settings);
+    window.dispatchEvent(new CustomEvent("evfleet-settings-updated"));
     window.dispatchEvent(new CustomEvent("evfleet-default-branch-updated"));
     const now = new Date().toLocaleString("pt-BR");
     setSavedAt(now);
@@ -49,6 +50,7 @@ export function AdministrationPage() {
   function restoreDefaults() {
     setSettings(defaultSoftwareSettings);
     saveSoftwareSettings(defaultSoftwareSettings);
+    window.dispatchEvent(new CustomEvent("evfleet-settings-updated"));
     window.dispatchEvent(new CustomEvent("evfleet-default-branch-updated"));
     const now = new Date().toLocaleString("pt-BR");
     setSavedAt(now);
@@ -168,11 +170,11 @@ export function AdministrationPage() {
               <option value="BRL">Real (BRL)</option>
             </select>
           </label>
-          <div className="space-y-1 lg:col-span-9 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <span className="text-sm font-medium text-slate-700">
+          <div className="space-y-3 lg:col-span-9 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <span className="block text-sm font-medium text-slate-700">
               Estabelecimento padrão do sistema
             </span>
-            <label className="mb-2 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+            <label className="mt-1 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
               <input
                 type="checkbox"
                 checked={settings.lockDefaultBranch}

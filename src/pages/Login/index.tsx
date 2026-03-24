@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../services/api";
+import { defaultSoftwareSettings, readSoftwareSettings } from "../../services/adminSettings";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const companyName = readSoftwareSettings().companyName?.trim() || defaultSoftwareSettings.companyName;
 
   function getErrorMessage(error: unknown) {
     if (axios.isAxiosError(error)) {
@@ -73,7 +75,7 @@ export function LoginPage() {
       <div className="w-full max-w-md rounded-2xl bg-white p-10 shadow-2xl">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-slate-900">
-            Fleet<span className="text-orange-500">System</span>
+            {companyName}
           </h1>
 
           <p className="mt-2 text-sm text-slate-500">

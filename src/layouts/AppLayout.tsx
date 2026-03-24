@@ -33,6 +33,7 @@ import {
   isMenuPathVisible,
   type MenuVisibilityMap,
 } from "../services/menuVisibility";
+import { defaultSoftwareSettings, readSoftwareSettings } from "../services/adminSettings";
 
 type AppNotification = {
   id: string;
@@ -105,6 +106,10 @@ export function AppLayout() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(() => getCachedMenuVisibilityMap());
   const [isLoadingMenuVisibility, setIsLoadingMenuVisibility] = useState(true);
+  const [companyName, setCompanyName] = useState(() => {
+    const saved = readSoftwareSettings().companyName?.trim();
+    return saved || defaultSoftwareSettings.companyName;
+  });
 
   const menu = [
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN", "FLEET_MANAGER"] },
@@ -334,6 +339,18 @@ export function AppLayout() {
   }, []);
 
   useEffect(() => {
+    function refreshSoftwareSettings() {
+      const saved = readSoftwareSettings().companyName?.trim();
+      setCompanyName(saved || defaultSoftwareSettings.companyName);
+    }
+
+    window.addEventListener("evfleet-settings-updated", refreshSoftwareSettings);
+    return () => {
+      window.removeEventListener("evfleet-settings-updated", refreshSoftwareSettings);
+    };
+  }, []);
+
+  useEffect(() => {
     if (isLoadingMenuVisibility) return;
     if (!user) return;
     if (location.pathname === "/login") return;
@@ -387,9 +404,7 @@ export function AppLayout() {
       >
         <div className="border-b border-slate-800 px-6 py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold tracking-tight">
-              Ev<span className="text-orange-500">Fleet</span>
-            </h1>
+            <h1 className="text-2xl font-bold tracking-tight">{companyName}</h1>
             <button
               type="button"
               aria-label="Fechar menu"
@@ -430,7 +445,7 @@ export function AppLayout() {
             className="block w-full cursor-pointer rounded-2xl bg-slate-800/70 px-4 py-3 text-left transition hover:bg-slate-700/80"
           >
             <p className="text-xs uppercase tracking-wide text-slate-400">Ambiente</p>
-            <p className="mt-1 text-sm font-medium text-slate-200">EvFleet v1.0</p>
+            <p className="mt-1 text-sm font-medium text-slate-200">{companyName} v1.0</p>
           </button>
         </div>
       </aside>
@@ -447,7 +462,7 @@ export function AppLayout() {
               >
                 <Menu size={18} />
               </button>
-              <p className="text-sm font-semibold text-slate-700">Painel EvFleet</p>
+              <p className="text-sm font-semibold text-slate-700">Painel {companyName}</p>
             </div>
             <button
               type="button"
@@ -513,7 +528,7 @@ export function AppLayout() {
           <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm text-slate-600">Nome do sistema: EvFleet</p>
+                <p className="text-sm text-slate-600">Nome do sistema: {companyName}</p>
                 <p className="text-sm text-slate-600">Versão atual: v1.0</p>
               </div>
               <ClipboardList size={22} className="text-orange-600" />

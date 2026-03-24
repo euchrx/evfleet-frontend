@@ -229,7 +229,33 @@ export function DashboardPage() {
       selectedVehicleCategory === "ALL" ||
       vehicleTypeById.get(vehicleId) === selectedVehicleCategory;
 
-    const pendingMaintenance = filteredData.maintenance.filter(
+    const vehiclesByCategory = filteredData.vehicles.filter((vehicle) =>
+      selectedVehicleCategory === "ALL"
+        ? true
+        : vehicle.vehicleType === selectedVehicleCategory
+    );
+
+    const driversByCategory = filteredData.drivers.filter((driver) => {
+      if (selectedVehicleCategory === "ALL") return true;
+
+      const driverVehicleType = driver.vehicleId
+        ? vehicleTypeById.get(driver.vehicleId)
+        : undefined;
+
+      return driverVehicleType === selectedVehicleCategory;
+    });
+
+    const maintenanceByCategory = filteredData.maintenance.filter((record) =>
+      isVehicleMatch(record.vehicleId)
+    );
+    const fuelByCategory = filteredData.fuel.filter((record) =>
+      isVehicleMatch(record.vehicleId)
+    );
+    const debtsByCategory = filteredData.debts.filter((debt) =>
+      isVehicleMatch(debt.vehicleId)
+    );
+
+    const pendingMaintenance = maintenanceByCategory.filter(
       (record) => record.status === "OPEN"
     ).length;
     const fuelInPeriod = filteredData.fuel.filter(
@@ -258,26 +284,26 @@ export function DashboardPage() {
 
     return {
       pendingMaintenance,
-      vehiclesTotal: filteredData.vehicles.length,
-      vehiclesActive: filteredData.vehicles.filter((vehicle) => vehicle.status === "ACTIVE")
+      vehiclesTotal: vehiclesByCategory.length,
+      vehiclesActive: vehiclesByCategory.filter((vehicle) => vehicle.status === "ACTIVE")
         .length,
-      vehiclesMaintenance: filteredData.vehicles.filter(
+      vehiclesMaintenance: vehiclesByCategory.filter(
         (vehicle) => vehicle.status === "MAINTENANCE"
       ).length,
-      driversTotal: filteredData.drivers.length,
-      driversActive: filteredData.drivers.filter((driver) => driver.status === "ACTIVE")
+      driversTotal: driversByCategory.length,
+      driversActive: driversByCategory.filter((driver) => driver.status === "ACTIVE")
         .length,
-      driversInactive: filteredData.drivers.filter((driver) => driver.status !== "ACTIVE")
+      driversInactive: driversByCategory.filter((driver) => driver.status !== "ACTIVE")
         .length,
-      maintenanceTotal: filteredData.maintenance.length,
-      fuelTotal: filteredData.fuel.length,
-      debtsTotal: filteredData.debts.length,
+      maintenanceTotal: maintenanceByCategory.length,
+      fuelTotal: fuelByCategory.length,
+      debtsTotal: debtsByCategory.length,
       fuelOperationsPeriod: fuelInPeriod.length,
       fuelCostPeriod,
       maintenanceCostPeriod,
       debtsCostPeriod,
       totalCostPeriod,
-      pendingDebts: filteredData.debts.filter((debt) => debt.status === "PENDING")
+      pendingDebts: debtsByCategory.filter((debt) => debt.status === "PENDING")
         .length,
     };
   }, [costPeriod, filteredData, selectedVehicleCategory, vehicleTypeById]);
