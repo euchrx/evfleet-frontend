@@ -44,6 +44,7 @@ function maintenanceTypePtBr(value?: string) {
 type CostPeriod = "CURRENT_MONTH" | "LAST_30_DAYS" | "CURRENT_YEAR" | "ALL";
 type CostModalType = "FUEL" | "MAINTENANCE" | "DEBTS";
 type DriverCategory = "LIGHT" | "HEAVY";
+type VehicleCategoryFilter = "ALL" | "LIGHT" | "HEAVY";
 const MAX_RANKING_ITEMS = 10;
 
 function parseDateSafe(dateValue: string) {
@@ -116,7 +117,8 @@ export function DashboardPage() {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
   const [costPeriod, setCostPeriod] = useState<CostPeriod>("CURRENT_MONTH");
-  const [selectedVehicleId, setSelectedVehicleId] = useState("ALL");
+  const [selectedVehicleCategory, setSelectedVehicleCategory] =
+    useState<VehicleCategoryFilter>("ALL");
   const [costModal, setCostModal] = useState<CostModalType | null>(null);
   const [vehicleCostModal, setVehicleCostModal] = useState<{
     vehicleId: string;
@@ -217,9 +219,15 @@ export function DashboardPage() {
     selectedBranchId,
   ]);
 
+  const vehicleTypeById = useMemo(
+    () => new Map(filteredData.vehicles.map((vehicle) => [vehicle.id, vehicle.vehicleType])),
+    [filteredData.vehicles]
+  );
+
   const metrics = useMemo(() => {
     const isVehicleMatch = (vehicleId: string) =>
-      selectedVehicleId === "ALL" || vehicleId === selectedVehicleId;
+      selectedVehicleCategory === "ALL" ||
+      vehicleTypeById.get(vehicleId) === selectedVehicleCategory;
 
     const pendingMaintenance = filteredData.maintenance.filter(
       (record) => record.status === "OPEN"
@@ -272,11 +280,12 @@ export function DashboardPage() {
       pendingDebts: filteredData.debts.filter((debt) => debt.status === "PENDING")
         .length,
     };
-  }, [costPeriod, filteredData, selectedVehicleId]);
+  }, [costPeriod, filteredData, selectedVehicleCategory, vehicleTypeById]);
 
   const topVehiclesByCostByType = useMemo(() => {
     const isVehicleMatch = (vehicleId: string) =>
-      selectedVehicleId === "ALL" || vehicleId === selectedVehicleId;
+      selectedVehicleCategory === "ALL" ||
+      vehicleTypeById.get(vehicleId) === selectedVehicleCategory;
 
     const costMap = new Map<string, number>();
 
@@ -335,7 +344,7 @@ export function DashboardPage() {
         .slice(0, MAX_RANKING_ITEMS)
         .map(({ label, value, vehicleId }) => ({ label, value, vehicleId })),
     };
-  }, [filteredData, costPeriod, selectedVehicleId]);
+  }, [filteredData, costPeriod, selectedVehicleCategory, vehicleTypeById]);
 
   const vehicleCostModalData = useMemo(() => {
     if (!vehicleCostModal) return null;
@@ -410,11 +419,8 @@ export function DashboardPage() {
 
   const bestDriversByEfficiencyByType = useMemo(() => {
     const isVehicleMatch = (vehicleId: string) =>
-      selectedVehicleId === "ALL" || vehicleId === selectedVehicleId;
-
-    const vehicleTypeById = new Map(
-      filteredData.vehicles.map((vehicle) => [vehicle.id, vehicle.vehicleType])
-    );
+      selectedVehicleCategory === "ALL" ||
+      vehicleTypeById.get(vehicleId) === selectedVehicleCategory;
 
     const kmsDrivenByDriver = new Map<string, number>();
     const kmGroups = new Map<string, Array<{ km: number; date: string }>>();
@@ -527,11 +533,12 @@ export function DashboardPage() {
       LIGHT: normalize([...byDriver.LIGHT.values()]),
       HEAVY: normalize([...byDriver.HEAVY.values()]),
     };
-  }, [filteredData.fuel, costPeriod, selectedVehicleId]);
+  }, [filteredData.fuel, costPeriod, selectedVehicleCategory, vehicleTypeById]);
 
   const costDetails = useMemo(() => {
     const isVehicleMatch = (vehicleId: string) =>
-      selectedVehicleId === "ALL" || vehicleId === selectedVehicleId;
+      selectedVehicleCategory === "ALL" ||
+      vehicleTypeById.get(vehicleId) === selectedVehicleCategory;
 
     const fuel = filteredData.fuel
       .filter(
@@ -558,7 +565,14 @@ export function DashboardPage() {
       .sort((a, b) => parseDateSafe(b.debtDate).getTime() - parseDateSafe(a.debtDate).getTime());
 
     return { fuel, maintenance, debts };
-  }, [filteredData.fuel, filteredData.maintenance, filteredData.debts, costPeriod, selectedVehicleId]);
+  }, [
+    filteredData.fuel,
+    filteredData.maintenance,
+    filteredData.debts,
+    costPeriod,
+    selectedVehicleCategory,
+    vehicleTypeById,
+  ]);
 
   const groupedCostDetails = useMemo(() => {
     const fuelByVehicle = new Map<
@@ -641,13 +655,11 @@ export function DashboardPage() {
           : "Todo o período";
 
   const selectedVehicleLabel =
-    selectedVehicleId === "ALL"
-      ? "Todos os veículos"
-      : (() => {
-          const vehicle = filteredData.vehicles.find((item) => item.id === selectedVehicleId);
-          return vehicle ? `${vehicle.brand} ${vehicle.model}` : "Veículo selecionado";
-        })() ||
-        "Veículo selecionado";
+    selectedVehicleCategory === "ALL"
+      ? "Todas as categorias"
+      : selectedVehicleCategory === "LIGHT"
+        ? "Categoria Leve"
+        : "Categoria Pesado";
   const periodReferenceLabel = useMemo(() => {
     const now = new Date();
 
@@ -671,7 +683,8 @@ export function DashboardPage() {
     }
 
     const isVehicleMatch = (vehicleId: string) =>
-      selectedVehicleId === "ALL" || vehicleId === selectedVehicleId;
+      selectedVehicleCategory === "ALL" ||
+      vehicleTypeById.get(vehicleId) === selectedVehicleCategory;
 
     const allDates = [
       ...filteredData.fuel
@@ -694,7 +707,14 @@ export function DashboardPage() {
     const maxDate = new Date(Math.max(...timestamps));
 
     return `Todo o período: desde ${formatDatePtBr(minDate)} até ${formatDatePtBr(maxDate)}`;
-  }, [costPeriod, selectedVehicleId, filteredData.fuel, filteredData.maintenance, filteredData.debts]);
+  }, [
+    costPeriod,
+    selectedVehicleCategory,
+    filteredData.fuel,
+    filteredData.maintenance,
+    filteredData.debts,
+    vehicleTypeById,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -726,16 +746,15 @@ export function DashboardPage() {
         </select>
 
         <select
-          value={selectedVehicleId}
-          onChange={(e) => setSelectedVehicleId(e.target.value)}
+          value={selectedVehicleCategory}
+          onChange={(e) =>
+            setSelectedVehicleCategory(e.target.value as VehicleCategoryFilter)
+          }
           className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
         >
-          <option value="ALL">Todos os veículos</option>
-          {filteredData.vehicles.map((vehicle) => (
-            <option key={vehicle.id} value={vehicle.id}>
-              {vehicle.brand} {vehicle.model}
-            </option>
-          ))}
+          <option value="ALL">Categorias</option>
+          <option value="LIGHT">Categoria Leve</option>
+          <option value="HEAVY">Categoria Pesado</option>
         </select>
       </div>
       <p className="text-xs text-slate-500">
