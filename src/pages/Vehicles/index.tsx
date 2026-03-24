@@ -195,6 +195,9 @@ export function VehiclesPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
   const [deletingVehicle, setDeletingVehicle] = useState(false);
+  const [maxVehiclesAllowed, setMaxVehiclesAllowed] = useState(() =>
+    Number(readSoftwareSettings().maxVehiclesAllowed || 0)
+  );
   const [isBranchLocked, setIsBranchLocked] = useState(() => {
     const settings = readSoftwareSettings();
     return Boolean(settings.lockDefaultBranch && settings.defaultBranchId);
@@ -228,6 +231,8 @@ export function VehiclesPage() {
   }, [isModalOpen]);
 
   useEffect(() => {
+    const settings = readSoftwareSettings();
+    setMaxVehiclesAllowed(Number(settings.maxVehiclesAllowed || 0));
     function refreshBranchLock() {
       const settings = readSoftwareSettings();
       setIsBranchLocked(Boolean(settings.lockDefaultBranch && settings.defaultBranchId));
@@ -235,6 +240,15 @@ export function VehiclesPage() {
     window.addEventListener("evfleet-default-branch-updated", refreshBranchLock);
     return () =>
       window.removeEventListener("evfleet-default-branch-updated", refreshBranchLock);
+  }, []);
+
+  useEffect(() => {
+    function refreshMaxVehiclesAllowed() {
+      const settings = readSoftwareSettings();
+      setMaxVehiclesAllowed(Number(settings.maxVehiclesAllowed || 0));
+    }
+    window.addEventListener("evfleet-settings-updated", refreshMaxVehiclesAllowed);
+    return () => window.removeEventListener("evfleet-settings-updated", refreshMaxVehiclesAllowed);
   }, []);
 
   function clearFieldError(field: keyof VehicleFormData) {
@@ -596,6 +610,11 @@ export function VehiclesPage() {
     };
   }, [vehicles, selectedBranchId]);
 
+  const isVehicleLimitReached = useMemo(
+    () => maxVehiclesAllowed >= 0 && vehicles.length >= maxVehiclesAllowed,
+    [maxVehiclesAllowed, vehicles.length]
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -603,7 +622,17 @@ export function VehiclesPage() {
           <h1 className="text-3xl font-bold text-slate-900">Veículos</h1>
           <p className="text-sm text-slate-500">Cadastro completo da frota.</p>
         </div>
-        <button onClick={openCreate} className="rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white">+ Cadastrar veículo</button>
+        <button
+          onClick={openCreate}
+          disabled={isVehicleLimitReached}
+          className={`rounded-xl px-4 py-3 text-sm font-semibold text-white transition ${
+            isVehicleLimitReached
+              ? "cursor-not-allowed bg-slate-400"
+              : "cursor-pointer bg-orange-500 hover:bg-orange-600"
+          }`}
+        >
+          + Cadastrar veículo
+        </button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
