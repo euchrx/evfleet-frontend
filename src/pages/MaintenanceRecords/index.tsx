@@ -955,6 +955,12 @@ export function MaintenanceRecordsPage() {
         </div>
         {tab === "records" ? (
           <div className="mt-3 flex flex-col gap-3 md:flex-row">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar por veículo, tipo, status, descrição..."
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            />
             <select
               value={recordTypeFilter}
               onChange={(event) => setRecordTypeFilter(event.target.value as "ALL" | "PREVENTIVE" | "CORRECTIVE" | "PERIODIC")}
@@ -1007,7 +1013,7 @@ export function MaintenanceRecordsPage() {
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}

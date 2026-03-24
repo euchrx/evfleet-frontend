@@ -1,4 +1,5 @@
 import axios from "axios";
+import { localizeAxiosError } from "../utils/errorTranslator";
 
 const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 
@@ -27,5 +28,5 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(localizeAxiosError(error))
 );

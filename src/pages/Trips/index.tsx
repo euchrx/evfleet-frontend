@@ -283,9 +283,15 @@ export function TripsPage() {
       return;
     }
     const latestKm = latestKmByVehicle.get(vehicleId);
+    const suggestedDriver = drivers.find(
+      (driver) =>
+        driver.vehicleId === vehicleId &&
+        (driver.status === "ACTIVE" || driver.id === form.driverId)
+    );
     setForm((prev) => ({
       ...prev,
       vehicleId,
+      driverId: suggestedDriver?.id || "",
       departureKm: typeof latestKm === "number" ? String(latestKm) : "",
       returnKm: "",
     }));
