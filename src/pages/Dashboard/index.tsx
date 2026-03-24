@@ -5,6 +5,7 @@ import {
   CircleAlert,
   Fuel,
   Gauge,
+  Route,
   Truck,
   Users,
   Wrench,
@@ -15,12 +16,14 @@ import type { Branch } from "../../types/branch";
 import type { Debt } from "../../types/debt";
 import type { Driver } from "../../types/driver";
 import type { MaintenanceRecord } from "../../types/maintenance-record";
+import type { Trip } from "../../types/trip";
 import type { Vehicle } from "../../types/vehicle";
 import { getBranches } from "../../services/branches";
 import { getDebts } from "../../services/debts";
 import { getDrivers } from "../../services/drivers";
 import { getFuelRecords, type FuelRecord } from "../../services/fuelRecords";
 import { getMaintenanceRecords } from "../../services/maintenanceRecords";
+import { getTrips } from "../../services/trips";
 import { getVehicles } from "../../services/vehicles";
 
 function toCurrency(value: number) {
@@ -116,6 +119,7 @@ export function DashboardPage() {
   );
   const [debts, setDebts] = useState<Debt[]>([]);
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [costPeriod, setCostPeriod] = useState<CostPeriod>("CURRENT_MONTH");
   const [selectedVehicleCategory, setSelectedVehicleCategory] =
     useState<VehicleCategoryFilter>("ALL");
@@ -143,7 +147,7 @@ export function DashboardPage() {
         setLoading(true);
         setErrorMessage("");
 
-        const [vehiclesData, driversData, branchesData, maintenanceData, debtsData, fuelData] =
+        const [vehiclesData, driversData, branchesData, maintenanceData, debtsData, fuelData, tripsData] =
           await Promise.all([
             getVehicles(),
             getDrivers(),
@@ -151,6 +155,7 @@ export function DashboardPage() {
             getMaintenanceRecords(),
             getDebts(),
             getFuelRecords(),
+            getTrips(),
           ]);
 
         setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
@@ -159,6 +164,7 @@ export function DashboardPage() {
         setMaintenanceRecords(Array.isArray(maintenanceData) ? maintenanceData : []);
         setDebts(Array.isArray(debtsData) ? debtsData : []);
         setFuelRecords(Array.isArray(fuelData) ? fuelData : []);
+        setTrips(Array.isArray(tripsData) ? tripsData : []);
       } catch (error) {
         console.error("Erro ao carregar dashboard:", error);
         setErrorMessage("Não foi possível carregar os indicadores do dashboard.");
@@ -200,6 +206,9 @@ export function DashboardPage() {
     const fuelFiltered = fuelRecords.filter((record) =>
       selectedBranchId ? vehicleIds.has(record.vehicleId) : true
     );
+    const tripsFiltered = trips.filter((trip) =>
+      selectedBranchId ? vehicleIds.has(trip.vehicleId) : true
+    );
 
     return {
       vehicles: vehiclesFiltered,
@@ -208,6 +217,7 @@ export function DashboardPage() {
       maintenance: maintenanceFiltered,
       debts: debtsFiltered,
       fuel: fuelFiltered,
+      trips: tripsFiltered,
     };
   }, [
     vehicles,
@@ -216,6 +226,7 @@ export function DashboardPage() {
     maintenanceRecords,
     debts,
     fuelRecords,
+    trips,
     selectedBranchId,
   ]);
 
@@ -253,6 +264,9 @@ export function DashboardPage() {
     );
     const debtsByCategory = filteredData.debts.filter((debt) =>
       isVehicleMatch(debt.vehicleId)
+    );
+    const tripsByCategory = filteredData.trips.filter((trip) =>
+      isVehicleMatch(trip.vehicleId)
     );
 
     const pendingMaintenance = maintenanceByCategory.filter(
@@ -298,6 +312,10 @@ export function DashboardPage() {
       maintenanceTotal: maintenanceByCategory.length,
       fuelTotal: fuelByCategory.length,
       debtsTotal: debtsByCategory.length,
+      tripsTotal: tripsByCategory.length,
+      tripsOpen: tripsByCategory.filter((trip) => trip.status === "OPEN").length,
+      tripsCompleted: tripsByCategory.filter((trip) => trip.status === "COMPLETED")
+        .length,
       fuelOperationsPeriod: fuelInPeriod.length,
       fuelCostPeriod,
       maintenanceCostPeriod,
@@ -1118,6 +1136,26 @@ export function DashboardPage() {
               Pendentes: {loading ? "..." : metrics.pendingMaintenance}
             </span>
           </div>
+        </DashboardCard>
+
+        <DashboardCard
+          title="Viagens"
+          icon={
+            <div className="rounded-xl bg-violet-100 p-2 text-violet-700">
+              <Route size={16} />
+            </div>
+          }
+        >
+          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.tripsTotal}</p>
+          <div className="mt-4 flex items-center gap-2 text-xs">
+            <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-700">
+              Abertas: {loading ? "..." : metrics.tripsOpen}
+            </span>
+            <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
+              Concluídas: {loading ? "..." : metrics.tripsCompleted}
+            </span>
+          </div>
+          <p className="mt-3 text-xs text-slate-500">Total no escopo</p>
         </DashboardCard>
 
         <DashboardCard

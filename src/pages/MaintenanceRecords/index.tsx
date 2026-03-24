@@ -42,8 +42,8 @@ type RecordSortBy = "date" | "vehicle" | "type" | "km" | "cost" | "status";
 type PlanSortBy = "name" | "vehicle" | "interval" | "due" | "status";
 type TireSortBy = "serial" | "tire" | "vehicle" | "km" | "status";
 type RecordFieldKey = "vehicleId" | "type" | "status" | "description" | "maintenanceDate" | "km" | "cost";
-type PlanFieldKey = "vehicleId" | "name" | "intervalValue";
-type TireFieldKey = "serialNumber" | "brand" | "model" | "size";
+type PlanFieldKey = "vehicleId" | "name" | "planType" | "active" | "intervalUnit" | "intervalValue";
+type TireFieldKey = "serialNumber" | "brand" | "model" | "size" | "status";
 type ReadingFieldKey = "readingDate" | "km" | "treadDepthMm" | "pressurePsi";
 
 type RecordFormState = {
@@ -62,14 +62,14 @@ type RecordFormState = {
 type PlanFormState = {
   vehicleId: string;
   name: string;
-  planType: "PREVENTIVE" | "PERIODIC";
-  intervalUnit: "DAY" | "MONTH" | "KM";
+  planType: "PREVENTIVE" | "PERIODIC" | "";
+  intervalUnit: "DAY" | "MONTH" | "KM" | "";
   intervalValue: string;
   alertBeforeDays: string;
   alertBeforeKm: string;
   nextDueDate: string;
   nextDueKm: string;
-  active: boolean;
+  active: boolean | "";
   notes: string;
 };
 
@@ -78,7 +78,7 @@ type TireFormState = {
   brand: string;
   model: string;
   size: string;
-  status: TireStatus;
+  status: TireStatus | "";
   vehicleId: string;
   axlePosition: string;
   wheelPosition: string;
@@ -118,14 +118,14 @@ const initialRecordForm: RecordFormState = {
 const initialPlanForm: PlanFormState = {
   vehicleId: "",
   name: "",
-  planType: "PREVENTIVE",
-  intervalUnit: "KM",
+  planType: "",
+  intervalUnit: "",
   intervalValue: "",
   alertBeforeDays: "",
   alertBeforeKm: "",
   nextDueDate: "",
   nextDueKm: "",
-  active: true,
+  active: "",
   notes: "",
 };
 
@@ -134,7 +134,7 @@ const initialTireForm: TireFormState = {
   brand: "",
   model: "",
   size: "",
-  status: "IN_STOCK",
+  status: "",
   vehicleId: "",
   axlePosition: "",
   wheelPosition: "",
@@ -716,7 +716,7 @@ export function MaintenanceRecordsPage() {
   function openCreatePlan() {
     setEditingPlan(null);
     setPlanFieldErrors({});
-    setPlanForm({ ...initialPlanForm, vehicleId: activeVehicles[0]?.id || "" });
+    setPlanForm({ ...initialPlanForm });
     setPlanModalOpen(true);
   }
 
@@ -726,14 +726,14 @@ export function MaintenanceRecordsPage() {
     setPlanForm({
       vehicleId: plan.vehicleId,
       name: plan.name || "",
-      planType: (plan.planType as PlanFormState["planType"]) || "PREVENTIVE",
-      intervalUnit: (plan.intervalUnit as PlanFormState["intervalUnit"]) || "KM",
+      planType: (plan.planType as PlanFormState["planType"]) || "",
+      intervalUnit: (plan.intervalUnit as PlanFormState["intervalUnit"]) || "",
       intervalValue: String(plan.intervalValue || ""),
       alertBeforeDays: String(plan.alertBeforeDays || ""),
       alertBeforeKm: String(plan.alertBeforeKm || ""),
       nextDueDate: plan.nextDueDate ? String(plan.nextDueDate).slice(0, 10) : "",
       nextDueKm: String(plan.nextDueKm || ""),
-      active: Boolean(plan.active),
+      active: typeof plan.active === "boolean" ? plan.active : "",
       notes: plan.notes || "",
     });
     setPlanModalOpen(true);
@@ -744,6 +744,9 @@ export function MaintenanceRecordsPage() {
     const nextErrors: Partial<Record<PlanFieldKey, string>> = {};
     if (!planForm.vehicleId) nextErrors.vehicleId = "Selecione o veículo.";
     if (!planForm.name.trim()) nextErrors.name = "Informe o nome do plano.";
+    if (!planForm.planType) nextErrors.planType = "Selecione o tipo.";
+    if (planForm.active === "") nextErrors.active = "Selecione o status.";
+    if (!planForm.intervalUnit) nextErrors.intervalUnit = "Selecione a unidade do intervalo.";
     if (!planForm.intervalValue.trim()) nextErrors.intervalValue = "Informe o intervalo.";
     setPlanFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
@@ -753,14 +756,14 @@ export function MaintenanceRecordsPage() {
     const payload: CreateMaintenancePlanInput = {
       vehicleId: planForm.vehicleId,
       name: planForm.name.trim(),
-      planType: planForm.planType,
-      intervalUnit: planForm.intervalUnit,
+      planType: planForm.planType as "PREVENTIVE" | "PERIODIC",
+      intervalUnit: planForm.intervalUnit as "DAY" | "MONTH" | "KM",
       intervalValue: Number(planForm.intervalValue) || 0,
       alertBeforeDays: planForm.alertBeforeDays ? Number(planForm.alertBeforeDays) : undefined,
       alertBeforeKm: planForm.alertBeforeKm ? Number(planForm.alertBeforeKm) : undefined,
       nextDueDate: planForm.nextDueDate || undefined,
       nextDueKm: planForm.nextDueKm ? Number(planForm.nextDueKm) : undefined,
-      active: planForm.active,
+      active: Boolean(planForm.active),
       notes: planForm.notes.trim() || undefined,
     };
 
@@ -789,10 +792,8 @@ export function MaintenanceRecordsPage() {
   function openCreateTire() {
     setEditingTire(null);
     setTireFieldErrors({});
-    const defaultVehicleId = activeVehicles[0]?.id || "";
-    const latestKm = defaultVehicleId
-      ? latestKmByVehicle.get(defaultVehicleId)
-      : undefined;
+    const defaultVehicleId = "";
+    const latestKm = undefined;
     setTireForm({
       ...initialTireForm,
       vehicleId: defaultVehicleId,
@@ -809,7 +810,7 @@ export function MaintenanceRecordsPage() {
       brand: tire.brand || "",
       model: tire.model || "",
       size: tire.size || "",
-      status: tire.status,
+      status: tire.status || "",
       vehicleId: tire.vehicleId || "",
       axlePosition: tire.axlePosition || "",
       wheelPosition: tire.wheelPosition || "",
@@ -830,6 +831,7 @@ export function MaintenanceRecordsPage() {
     event.preventDefault();
     const nextErrors: Partial<Record<TireFieldKey, string>> = {};
     if (!tireForm.serialNumber.trim()) nextErrors.serialNumber = "Informe o DOT/TIN.";
+    if (!tireForm.status) nextErrors.status = "Selecione o status.";
     if (!tireForm.brand.trim()) nextErrors.brand = "Informe a marca.";
     if (!tireForm.model.trim()) nextErrors.model = "Informe o modelo.";
     if (!tireForm.size.trim()) nextErrors.size = "Informe a medida.";
@@ -843,7 +845,7 @@ export function MaintenanceRecordsPage() {
       brand: tireForm.brand.trim(),
       model: tireForm.model.trim(),
       size: tireForm.size.trim(),
-      status: tireForm.status,
+      status: tireForm.status as TireStatus,
       vehicleId: tireForm.vehicleId || undefined,
       axlePosition: tireForm.axlePosition.trim() || undefined,
       wheelPosition: tireForm.wheelPosition.trim() || undefined,
@@ -1355,9 +1357,9 @@ export function MaintenanceRecordsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={planForm.vehicleId} onChange={(event) => { setPlanFieldErrors((prev) => ({ ...prev, vehicleId: undefined })); setPlanForm((prev) => ({ ...prev, vehicleId: event.target.value })); }} className={getFieldClass(Boolean(planFieldErrors.vehicleId))}><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select>{planFieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{planFieldErrors.vehicleId}</p> : null}</div>
                 <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Nome do plano</label><input value={planForm.name} onChange={(event) => { setPlanFieldErrors((prev) => ({ ...prev, name: undefined })); setPlanForm((prev) => ({ ...prev, name: event.target.value })); }} className={getFieldClass(Boolean(planFieldErrors.name))} placeholder="Ex: Revisão geral 10.000 km" />{planFieldErrors.name ? <p className="mt-1 text-xs text-red-600">{planFieldErrors.name}</p> : null}</div>
-                <div><label className="block text-sm font-medium text-slate-700">Tipo</label><select value={planForm.planType} onChange={(event) => setPlanForm((prev) => ({ ...prev, planType: event.target.value as PlanFormState["planType"] }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="PREVENTIVE">Preventivo</option><option value="PERIODIC">Periódico</option></select></div>
-                <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={planForm.active ? "ACTIVE" : "INACTIVE"} onChange={(event) => setPlanForm((prev) => ({ ...prev, active: event.target.value === "ACTIVE" }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="ACTIVE">Ativo</option><option value="INACTIVE">Inativo</option></select></div>
-                <div><label className="block text-sm font-medium text-slate-700">Unidade do intervalo</label><select value={planForm.intervalUnit} onChange={(event) => setPlanForm((prev) => ({ ...prev, intervalUnit: event.target.value as PlanFormState["intervalUnit"] }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="KM">KM</option><option value="DAY">Dia(s)</option><option value="MONTH">Mês(es)</option></select></div>
+                <div><label className="block text-sm font-medium text-slate-700">Tipo</label><select value={planForm.planType} onChange={(event) => { setPlanFieldErrors((prev) => ({ ...prev, planType: undefined })); setPlanForm((prev) => ({ ...prev, planType: event.target.value as PlanFormState["planType"] })); }} className={getFieldClass(Boolean(planFieldErrors.planType))}><option value="">Selecione o tipo</option><option value="PREVENTIVE">Preventivo</option><option value="PERIODIC">Periódico</option></select>{planFieldErrors.planType ? <p className="mt-1 text-xs text-red-600">{planFieldErrors.planType}</p> : null}</div>
+                <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={planForm.active === "" ? "" : planForm.active ? "ACTIVE" : "INACTIVE"} onChange={(event) => { setPlanFieldErrors((prev) => ({ ...prev, active: undefined })); setPlanForm((prev) => ({ ...prev, active: event.target.value === "" ? "" : event.target.value === "ACTIVE" })); }} className={getFieldClass(Boolean(planFieldErrors.active))}><option value="">Selecione o status</option><option value="ACTIVE">Ativo</option><option value="INACTIVE">Inativo</option></select>{planFieldErrors.active ? <p className="mt-1 text-xs text-red-600">{planFieldErrors.active}</p> : null}</div>
+                <div><label className="block text-sm font-medium text-slate-700">Unidade do intervalo</label><select value={planForm.intervalUnit} onChange={(event) => { setPlanFieldErrors((prev) => ({ ...prev, intervalUnit: undefined })); setPlanForm((prev) => ({ ...prev, intervalUnit: event.target.value as PlanFormState["intervalUnit"] })); }} className={getFieldClass(Boolean(planFieldErrors.intervalUnit))}><option value="">Selecione a unidade do intervalo</option><option value="KM">KM</option><option value="DAY">Dia(s)</option><option value="MONTH">Mês(es)</option></select>{planFieldErrors.intervalUnit ? <p className="mt-1 text-xs text-red-600">{planFieldErrors.intervalUnit}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Valor do intervalo</label><input type="number" min={1} value={planForm.intervalValue} onChange={(event) => { setPlanFieldErrors((prev) => ({ ...prev, intervalValue: undefined })); setPlanForm((prev) => ({ ...prev, intervalValue: event.target.value })); }} className={getFieldClass(Boolean(planFieldErrors.intervalValue))} placeholder="Ex: 10000" />{planFieldErrors.intervalValue ? <p className="mt-1 text-xs text-red-600">{planFieldErrors.intervalValue}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Alerta antes (dias)</label><input type="number" min={0} value={planForm.alertBeforeDays} onChange={(event) => setPlanForm((prev) => ({ ...prev, alertBeforeDays: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 5" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Alerta antes (KM)</label><input type="number" min={0} value={planForm.alertBeforeKm} onChange={(event) => setPlanForm((prev) => ({ ...prev, alertBeforeKm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 500" /></div>
@@ -1384,11 +1386,11 @@ export function MaintenanceRecordsPage() {
             <form onSubmit={saveTire} className="space-y-5 p-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div><label className="block text-sm font-medium text-slate-700">DOT/TIN</label><input value={tireForm.serialNumber} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, serialNumber: undefined })); setTireForm((prev) => ({ ...prev, serialNumber: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.serialNumber))} />{tireFieldErrors.serialNumber ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.serialNumber}</p> : null}</div>
-                <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={tireForm.status} onChange={(event) => setTireForm((prev) => ({ ...prev, status: event.target.value as TireStatus }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="IN_STOCK">Estoque</option><option value="INSTALLED">Instalado</option><option value="MAINTENANCE">Manutenção</option><option value="RETREADED">Recapado</option><option value="SCRAPPED">Descartado</option></select></div>
+                <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={tireForm.status} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, status: undefined })); setTireForm((prev) => ({ ...prev, status: event.target.value as TireStatus | "" })); }} className={getFieldClass(Boolean(tireFieldErrors.status))}><option value="">Selecione o status</option><option value="IN_STOCK">Estoque</option><option value="INSTALLED">Instalado</option><option value="MAINTENANCE">Manutenção</option><option value="RETREADED">Recapado</option><option value="SCRAPPED">Descartado</option></select>{tireFieldErrors.status ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.status}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Marca</label><input value={tireForm.brand} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, brand: undefined })); setTireForm((prev) => ({ ...prev, brand: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.brand))} />{tireFieldErrors.brand ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.brand}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Modelo</label><input value={tireForm.model} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, model: undefined })); setTireForm((prev) => ({ ...prev, model: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.model))} />{tireFieldErrors.model ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.model}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Medida</label><input value={tireForm.size} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, size: undefined })); setTireForm((prev) => ({ ...prev, size: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.size))} placeholder="Ex: 295/80R22.5" />{tireFieldErrors.size ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.size}</p> : null}</div>
-                <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => setTireForm((prev) => { const vehicleId = event.target.value; if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; })} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Sem vínculo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select></div>
+                <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => setTireForm((prev) => { const vehicleId = event.target.value; if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; })} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select></div>
                 <div><label className="block text-sm font-medium text-slate-700">Posição do eixo</label><input value={tireForm.axlePosition} onChange={(event) => setTireForm((prev) => ({ ...prev, axlePosition: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Traseiro" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Posição da roda</label><input value={tireForm.wheelPosition} onChange={(event) => setTireForm((prev) => ({ ...prev, wheelPosition: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Dianteira direita" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">KM atual</label><input type="number" min={0} value={tireForm.currentKm} onChange={(event) => setTireForm((prev) => ({ ...prev, currentKm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
