@@ -18,6 +18,7 @@ import { getVehicles } from "../../services/vehicles";
 import { getDrivers } from "../../services/drivers";
 import { useBranch } from "../../contexts/BranchContext";
 import { useLocation } from "react-router-dom";
+import { AlertTriangle, CarFront, Gauge } from "lucide-react";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
@@ -966,59 +967,77 @@ export function FuelRecordsPage() {
 
       {insights && (
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h3 className="text-base font-semibold text-slate-900">
-              Comparacao entre veículos
-            </h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Custos e consumo medio por veículo.
-            </p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Comparação entre veículos
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Custos e eficiência de consumo por veículo.
+                </p>
+              </div>
+              <div className="rounded-xl bg-blue-100 p-2 text-blue-700">
+                <CarFront size={16} />
+              </div>
+            </div>
             <div className="mt-3 space-y-2">
               {insights.comparison.slice(0, 5).map((item) => (
                 <div
                   key={item.vehicleId}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
                 >
                   <p className="font-medium text-slate-900">{item.label}</p>
-                  <p className="text-slate-600">
-                    {item.averageConsumptionKmPerLiter
-                      ? `${item.averageConsumptionKmPerLiter.toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })} km/L`
-                      : "Sem consumo medio"}{" "}
-                    •{" "}
-                    {item.totalValue.toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                      <Gauge size={12} />
+                      {item.averageConsumptionKmPerLiter
+                        ? `${item.averageConsumptionKmPerLiter.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })} km/L`
+                        : "Sem consumo médio"}
+                    </span>
+                    <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                      {item.totalValue.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div id="deteccao-anomalias" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h3 className="text-base font-semibold text-slate-900">
-              Detecção de anomalias
-            </h3>
-            <p className="mt-1 text-xs text-slate-500">
-              {detectedAnomalies.length} anomalia(s) detectada(s).
-            </p>
+          <div id="deteccao-anomalias" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Detecção de anomalias
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  {detectedAnomalies.length} anomalia(s) detectada(s).
+                </p>
+              </div>
+              <div className="rounded-xl bg-orange-100 p-2 text-orange-700">
+                <AlertTriangle size={16} />
+              </div>
+            </div>
             <div className="mt-3 space-y-2">
               {detectedAnomalies.length === 0 ? (
-                <p className="text-sm text-slate-500">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                   Nenhuma anomalia no momento.
-                </p>
+                </div>
               ) : (
                 detectedAnomalies.slice(0, 5).map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800"
+                    className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2.5 text-sm text-orange-800"
                   >
                     <p className="font-semibold">{item.vehicle}</p>
-                    <p>{item.reason}</p>
-                    <p className="text-xs">
+                    <p className="mt-1">{item.reason}</p>
+                    <p className="mt-1 text-xs">
                       {formatLocalDate(item.date)} -{" "}
                       {item.driver}
                     </p>
