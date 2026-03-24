@@ -14,6 +14,7 @@ type BranchFormData = {
   city: string;
   state: string;
 };
+type BranchFieldErrors = Partial<Record<keyof BranchFormData, string>>;
 
 const initialForm: BranchFormData = {
   name: "",
@@ -28,7 +29,7 @@ export function BranchesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
-  const [formErrorMessage, setFormErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<BranchFieldErrors>({});
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<BranchSortBy>("name");
@@ -60,7 +61,7 @@ export function BranchesPage() {
   function openCreateModal() {
     setEditingBranch(null);
     setForm(initialForm);
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(true);
   }
 
@@ -71,14 +72,14 @@ export function BranchesPage() {
       city: branch.city,
       state: branch.state,
     });
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(true);
   }
 
   function closeModal() {
     setEditingBranch(null);
     setForm(initialForm);
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(false);
   }
 
@@ -87,6 +88,14 @@ export function BranchesPage() {
     value: BranchFormData[K]
   ) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+  }
+
+  function inputClass(field: keyof BranchFormData) {
+    if (fieldErrors[field]) {
+      return "mt-1 w-full rounded-xl border border-red-400 bg-red-50 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200";
+    }
+    return "mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200";
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -94,7 +103,7 @@ export function BranchesPage() {
 
     try {
       setSaving(true);
-      setFormErrorMessage("");
+      setFieldErrors({});
 
       const payload = {
         name: form.name.trim(),
@@ -102,8 +111,12 @@ export function BranchesPage() {
         state: form.state.trim().toUpperCase(),
       };
 
-      if (!payload.name || !payload.city || !payload.state) {
-        setFormErrorMessage("Preencha todos os campos obrigatorios.");
+      const nextErrors: BranchFieldErrors = {};
+      if (!payload.name) nextErrors.name = "Informe o nome.";
+      if (!payload.city) nextErrors.city = "Informe a cidade.";
+      if (!payload.state) nextErrors.state = "Informe o estado.";
+      if (Object.keys(nextErrors).length > 0) {
+        setFieldErrors(nextErrors);
         return;
       }
 
@@ -124,13 +137,15 @@ export function BranchesPage() {
         error?.message ||
         "";
 
-      setFormErrorMessage(
-        Array.isArray(apiMessage)
-          ? apiMessage.join(", ")
-          : typeof apiMessage === "string" && apiMessage.trim()
-          ? apiMessage
-          : "Não foi possível salvar a filial."
-      );
+      setFieldErrors((prev) => ({
+        ...prev,
+        name:
+          Array.isArray(apiMessage)
+            ? apiMessage.join(", ")
+            : typeof apiMessage === "string" && apiMessage.trim()
+              ? apiMessage
+              : "Não foi possível salvar. Revise os campos.",
+      }));
     } finally {
       setSaving(false);
     }
@@ -409,9 +424,10 @@ export function BranchesPage() {
                     type="text"
                     value={form.name}
                     onChange={(e) => handleChange("name", e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("name")}
                     placeholder="Nome da filial"
                   />
+                  {fieldErrors.name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p> : null}
                 </div>
 
                 <div className="md:col-span-2">
@@ -422,9 +438,10 @@ export function BranchesPage() {
                     type="text"
                     value={form.city}
                     onChange={(e) => handleChange("city", e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("city")}
                     placeholder="Cidade"
                   />
+                  {fieldErrors.city ? <p className="mt-1 text-xs text-red-600">{fieldErrors.city}</p> : null}
                 </div>
 
                 <div>
@@ -438,17 +455,12 @@ export function BranchesPage() {
                     onChange={(e) =>
                       handleChange("state", e.target.value.toUpperCase())
                     }
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 uppercase outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={`${inputClass("state")} uppercase`}
                     placeholder="PR"
                   />
+                  {fieldErrors.state ? <p className="mt-1 text-xs text-red-600">{fieldErrors.state}</p> : null}
                 </div>
               </div>
-
-              {formErrorMessage && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {formErrorMessage}
-                </div>
-              )}
 
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button

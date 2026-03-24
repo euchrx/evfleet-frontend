@@ -94,7 +94,6 @@ export function FuelRecordsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
-  const [formErrorMessage, setFormErrorMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FuelFieldErrors>({});
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -183,7 +182,6 @@ export function FuelRecordsPage() {
   function openCreateModal() {
     setEditingRecord(null);
     setForm(initialForm);
-    setFormErrorMessage("");
     setFieldErrors({});
     setIsModalOpen(true);
   }
@@ -199,7 +197,6 @@ export function FuelRecordsPage() {
       vehicleId: record.vehicleId,
       driverId: record.driverId || "",
     });
-    setFormErrorMessage("");
     setFieldErrors({});
     setIsModalOpen(true);
   }
@@ -207,7 +204,6 @@ export function FuelRecordsPage() {
   function closeModal() {
     setEditingRecord(null);
     setForm(initialForm);
-    setFormErrorMessage("");
     setFieldErrors({});
     setIsModalOpen(false);
   }
@@ -232,7 +228,6 @@ export function FuelRecordsPage() {
 
     try {
       setSaving(true);
-      setFormErrorMessage("");
       setFieldErrors({});
 
       const payload = {
@@ -288,7 +283,7 @@ export function FuelRecordsPage() {
         "";
 
       if (Array.isArray(apiMessage)) {
-        setFormErrorMessage(apiMessage.join(", "));
+        setFieldErrors((prev) => ({ ...prev, liters: apiMessage.join(", ") }));
         return;
       }
 
@@ -306,11 +301,9 @@ export function FuelRecordsPage() {
         setFieldErrors((prev) => ({ ...prev, fuelDate: "Data invalida." }));
       }
 
-      setFormErrorMessage(
-        typeof apiMessage === "string" && apiMessage.trim()
-          ? apiMessage
-          : "Não foi possível salvar o abastecimento."
-      );
+      if (!apiText.trim()) {
+        setFieldErrors((prev) => ({ ...prev, liters: "Não foi possível salvar. Revise os campos." }));
+      }
     } finally {
       setSaving(false);
     }
@@ -933,11 +926,6 @@ export function FuelRecordsPage() {
                 </div>
               </div>
 
-              {formErrorMessage && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {formErrorMessage}
-                </div>
-              )}
 
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button

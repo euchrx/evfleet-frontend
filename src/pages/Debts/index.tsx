@@ -35,6 +35,7 @@ type DebtFormData = {
   status: string;
   vehicleId: string;
 };
+type DebtFieldErrors = Partial<Record<"description" | "category" | "amount" | "debtDate" | "dueDate" | "status" | "vehicleId", string>>;
 
 const initialForm: DebtFormData = {
   description: "",
@@ -136,7 +137,7 @@ export function DebtsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
-  const [formErrorMessage, setFormErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<DebtFieldErrors>({});
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -363,7 +364,7 @@ export function DebtsPage() {
   function openCreateModal() {
     setEditingDebt(null);
     setForm(initialForm);
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(true);
   }
 
@@ -381,14 +382,14 @@ export function DebtsPage() {
       status: debt.status,
       vehicleId: debt.vehicleId,
     });
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(true);
   }
 
   function closeModal() {
     setEditingDebt(null);
     setForm(initialForm);
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(false);
   }
 
@@ -397,13 +398,23 @@ export function DebtsPage() {
     value: DebtFormData[K],
   ) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    if (field in { description:1, category:1, amount:1, debtDate:1, dueDate:1, status:1, vehicleId:1 }) {
+      setFieldErrors((prev) => ({ ...prev, [field as keyof DebtFieldErrors]: undefined }));
+    }
+  }
+
+  function inputClass(field?: keyof DebtFieldErrors) {
+    if (field && fieldErrors[field]) {
+      return "mt-1 w-full rounded-xl border border-red-400 bg-red-50 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200";
+    }
+    return "mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200";
   }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     try {
       setSaving(true);
-      setFormErrorMessage("");
+      setFieldErrors({});
       const payload = {
         description: form.description.trim(),
         category: form.category as DebtCategory,
@@ -416,7 +427,7 @@ export function DebtsPage() {
         status: form.status,
         vehicleId: form.vehicleId,
       };
-      const nextErrors: Record<string, string> = {};
+      const nextErrors: DebtFieldErrors = {};
       if (!form.category) nextErrors.category = "Selecione uma categoria.";
       if (!form.status) nextErrors.status = "Selecione um status.";
       if (!payload.description) nextErrors.description = "Informe a descrição.";
@@ -428,7 +439,7 @@ export function DebtsPage() {
       if (Number.isNaN(payload.amount) || payload.amount <= 0)
         nextErrors.amount = "Informe um valor válido.";
       if (Object.keys(nextErrors).length > 0) {
-        setFormErrorMessage(Object.values(nextErrors)[0]);
+        setFieldErrors(nextErrors);
         return;
       }
 
@@ -446,11 +457,12 @@ export function DebtsPage() {
         error?.response?.data?.error ||
         error?.message ||
         "";
-      setFormErrorMessage(
-        Array.isArray(apiMessage)
+      setFieldErrors((prev) => ({
+        ...prev,
+        description: Array.isArray(apiMessage)
           ? apiMessage.join(", ")
           : String(apiMessage || "Não foi possível salvar o débito."),
-      );
+      }));
     } finally {
       setSaving(false);
     }
@@ -790,8 +802,7 @@ export function DebtsPage() {
                     onChange={(e) =>
                       handleChange("category", e.target.value as DebtCategory)
                     }
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("category")}
                   >
                     <option value="">Selecione uma categoria</option>
                     {debtCategoryOptions.map((item) => (
@@ -800,6 +811,7 @@ export function DebtsPage() {
                       </option>
                     ))}
                   </select>
+                  {fieldErrors.category ? <p className="mt-1 text-xs text-red-600">{fieldErrors.category}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">
@@ -808,14 +820,14 @@ export function DebtsPage() {
                   <select
                     value={form.status}
                     onChange={(e) => handleChange("status", e.target.value)}
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("status")}
                   >
                     <option value="">Selecione um status</option>
                     <option value="PENDING">Pendente</option>
                     <option value="PAID">Paga</option>
                     <option value="APPEALED">Recorrida</option>
                   </select>
+                  {fieldErrors.status ? <p className="mt-1 text-xs text-red-600">{fieldErrors.status}</p> : null}
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">
@@ -827,10 +839,10 @@ export function DebtsPage() {
                     onChange={(e) =>
                       handleChange("description", e.target.value)
                     }
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("description")}
                     placeholder="Ex: IPVA 2026 cota unica"
                   />
+                  {fieldErrors.description ? <p className="mt-1 text-xs text-red-600">{fieldErrors.description}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">
@@ -842,10 +854,10 @@ export function DebtsPage() {
                     onChange={(e) =>
                       handleChange("amount", formatMoney(e.target.value))
                     }
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("amount")}
                     placeholder="0,00"
                   />
+                  {fieldErrors.amount ? <p className="mt-1 text-xs text-red-600">{fieldErrors.amount}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">
@@ -857,7 +869,7 @@ export function DebtsPage() {
                     value={form.points}
                     onChange={(e) => handleChange("points", e.target.value)}
                     disabled={form.category !== "FINE"}
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass()}
                     placeholder="0"
                   />
                 </div>
@@ -869,9 +881,9 @@ export function DebtsPage() {
                     type="date"
                     value={form.debtDate}
                     onChange={(e) => handleChange("debtDate", e.target.value)}
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("debtDate")}
                   />
+                  {fieldErrors.debtDate ? <p className="mt-1 text-xs text-red-600">{fieldErrors.debtDate}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">
@@ -881,9 +893,9 @@ export function DebtsPage() {
                     type="date"
                     value={form.dueDate}
                     onChange={(e) => handleChange("dueDate", e.target.value)}
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("dueDate")}
                   />
+                  {fieldErrors.dueDate ? <p className="mt-1 text-xs text-red-600">{fieldErrors.dueDate}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">
@@ -893,7 +905,7 @@ export function DebtsPage() {
                     type="text"
                     value={form.creditor}
                     onChange={(e) => handleChange("creditor", e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass()}
                     placeholder="Detran, SEFAZ..."
                   />
                 </div>
@@ -904,8 +916,7 @@ export function DebtsPage() {
                   <select
                     value={form.vehicleId}
                     onChange={(e) => handleChange("vehicleId", e.target.value)}
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("vehicleId")}
                   >
                     <option value="">Selecione um veículo</option>
                     {availableVehicles.map((vehicle) => (
@@ -914,6 +925,7 @@ export function DebtsPage() {
                       </option>
                     ))}
                   </select>
+                  {fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}
                 </div>
                 <label className="md:col-span-2 inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700">
                   <input
@@ -927,11 +939,6 @@ export function DebtsPage() {
                   Débito recorrente
                 </label>
               </div>
-              {formErrorMessage ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {formErrorMessage}
-                </div>
-              ) : null}
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button
                   type="button"

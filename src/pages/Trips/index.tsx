@@ -23,6 +23,7 @@ type TripFormData = {
   status: TripStatus;
   notes: string;
 };
+type TripFieldErrors = Partial<Record<keyof TripFormData, string>>;
 
 type TripSortBy =
   | "vehicle"
@@ -84,7 +85,7 @@ export function TripsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
-  const [formErrorMessage, setFormErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<TripFieldErrors>({});
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<TripSortBy>("departureAt");
@@ -243,7 +244,7 @@ export function TripsPage() {
   function openCreateModal() {
     setEditingTrip(null);
     setForm(initialForm);
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(true);
   }
 
@@ -262,19 +263,27 @@ export function TripsPage() {
       status: trip.status,
       notes: trip.notes || "",
     });
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(true);
   }
 
   function closeModal() {
     setEditingTrip(null);
     setForm(initialForm);
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(false);
   }
 
   function handleChange<K extends keyof TripFormData>(field: K, value: TripFormData[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+  }
+
+  function inputClass(field: keyof TripFormData) {
+    if (fieldErrors[field]) {
+      return "mt-1 w-full rounded-xl border border-red-400 bg-red-50 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200";
+    }
+    return "mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200";
   }
 
   function handleVehicleChange(vehicleId: string) {
@@ -301,7 +310,7 @@ export function TripsPage() {
     event.preventDefault();
     try {
       setSaving(true);
-      setFormErrorMessage("");
+      setFieldErrors({});
       const payload = {
         vehicleId: form.vehicleId,
         driverId: form.driverId || null,
@@ -316,16 +325,21 @@ export function TripsPage() {
         notes: form.notes.trim() || undefined,
       };
 
-      if (!payload.vehicleId || !payload.origin || !payload.destination || !payload.departureAt) {
-        setFormErrorMessage("Preencha veículo, origem, destino e data de saída.");
+      const nextErrors: TripFieldErrors = {};
+      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione o veículo.";
+      if (!payload.origin) nextErrors.origin = "Informe a origem.";
+      if (!payload.destination) nextErrors.destination = "Informe o destino.";
+      if (!payload.departureAt) nextErrors.departureAt = "Informe a data de saída.";
+      if (Object.keys(nextErrors).length > 0) {
+        setFieldErrors(nextErrors);
         return;
       }
       if (Number.isNaN(payload.departureKm) || payload.departureKm < 0) {
-        setFormErrorMessage("KM de saída inválido.");
+        setFieldErrors((prev) => ({ ...prev, departureKm: "KM de saída inválido." }));
         return;
       }
       if (payload.returnKm !== undefined && (Number.isNaN(payload.returnKm) || payload.returnKm < payload.departureKm)) {
-        setFormErrorMessage("KM de retorno deve ser maior ou igual ao KM de saída.");
+        setFieldErrors((prev) => ({ ...prev, returnKm: "KM de retorno deve ser maior ou igual ao KM de saída." }));
         return;
       }
 
@@ -336,7 +350,8 @@ export function TripsPage() {
       await loadData();
     } catch (error: any) {
       const apiMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "";
-      setFormErrorMessage(Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage || "Não foi possível salvar a viagem."));
+      const apiText = Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage || "Não foi possível salvar a viagem.");
+      setFieldErrors((prev) => ({ ...prev, origin: apiText }));
     } finally {
       setSaving(false);
     }
@@ -443,10 +458,10 @@ export function TripsPage() {
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Planejamento</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleVehicleChange(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Motorista</label><select value={form.driverId} onChange={(e) => handleChange("driverId", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um motorista</option>{availableDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Origem</label><input value={form.origin} onChange={(e) => handleChange("origin", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Cidade/filial de saída" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Destino</label><input value={form.destination} onChange={(e) => handleChange("destination", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Cidade/filial de destino" /></div>
+                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleVehicleChange(e.target.value)} className={inputClass("vehicleId")}><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Motorista</label><select value={form.driverId} onChange={(e) => handleChange("driverId", e.target.value)} className={inputClass("driverId")}><option value="">Selecione um motorista</option>{availableDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select>{fieldErrors.driverId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.driverId}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Origem</label><input value={form.origin} onChange={(e) => handleChange("origin", e.target.value)} className={inputClass("origin")} placeholder="Cidade/filial de saída" />{fieldErrors.origin ? <p className="mt-1 text-xs text-red-600">{fieldErrors.origin}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Destino</label><input value={form.destination} onChange={(e) => handleChange("destination", e.target.value)} className={inputClass("destination")} placeholder="Cidade/filial de destino" />{fieldErrors.destination ? <p className="mt-1 text-xs text-red-600">{fieldErrors.destination}</p> : null}</div>
                   <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Motivo da viagem</label><input value={form.reason} onChange={(e) => handleChange("reason", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Entrega regional" /></div>
                 </div>
               </div>
@@ -454,15 +469,14 @@ export function TripsPage() {
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Execucao</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="block text-sm font-medium text-slate-700">Data de saída</label><input type="date" value={form.departureAt} onChange={(e) => handleChange("departureAt", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
+                  <div><label className="block text-sm font-medium text-slate-700">Data de saída</label><input type="date" value={form.departureAt} onChange={(e) => handleChange("departureAt", e.target.value)} className={inputClass("departureAt")} />{fieldErrors.departureAt ? <p className="mt-1 text-xs text-red-600">{fieldErrors.departureAt}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Data de retorno</label><input type="date" value={form.returnAt} onChange={(e) => handleChange("returnAt", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">KM saída</label><input type="number" min="0" value={form.departureKm} onChange={(e) => handleChange("departureKm", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">KM retorno</label><input type="number" min="0" value={form.returnKm} onChange={(e) => handleChange("returnKm", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
+                  <div><label className="block text-sm font-medium text-slate-700">KM saída</label><input type="number" min="0" value={form.departureKm} onChange={(e) => handleChange("departureKm", e.target.value)} className={inputClass("departureKm")} />{fieldErrors.departureKm ? <p className="mt-1 text-xs text-red-600">{fieldErrors.departureKm}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">KM retorno</label><input type="number" min="0" value={form.returnKm} onChange={(e) => handleChange("returnKm", e.target.value)} className={inputClass("returnKm")} />{fieldErrors.returnKm ? <p className="mt-1 text-xs text-red-600">{fieldErrors.returnKm}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={form.status} onChange={(e) => handleChange("status", e.target.value as TripStatus)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="OPEN">Aberta</option><option value="COMPLETED">Concluída</option><option value="CANCELLED">Cancelada</option></select></div>
                   <div><label className="block text-sm font-medium text-slate-700">Observacoes</label><input value={form.notes} onChange={(e) => handleChange("notes", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Opcional" /></div>
                 </div>
               </div>
-              {formErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formErrorMessage}</div> : null}
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button type="button" onClick={closeModal} className="btn-ui btn-ui-neutral">Cancelar</button>
                 <button type="submit" disabled={saving} className="btn-ui btn-ui-primary disabled:cursor-not-allowed disabled:opacity-70">{saving ? "Salvando..." : editingTrip ? "Salvar alterações" : "Registrar viagem"}</button>

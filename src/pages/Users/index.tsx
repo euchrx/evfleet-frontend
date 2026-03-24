@@ -15,6 +15,7 @@ type UserFormData = {
   password: string;
   role: "ADMIN" | "FLEET_MANAGER";
 };
+type UserFieldErrors = Partial<Record<keyof UserFormData, string>>;
 
 const initialForm: UserFormData = {
   name: "",
@@ -30,7 +31,7 @@ export function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
-  const [formErrorMessage, setFormErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<UserFieldErrors>({});
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [roleFilter, setRoleFilter] = useState("ALL");
@@ -63,7 +64,7 @@ export function UsersPage() {
   function openCreateModal() {
     setEditingUser(null);
     setForm(initialForm);
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(true);
   }
 
@@ -75,14 +76,14 @@ export function UsersPage() {
       password: "",
       role: user.role,
     });
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(true);
   }
 
   function closeModal() {
     setEditingUser(null);
     setForm(initialForm);
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(false);
   }
 
@@ -91,6 +92,14 @@ export function UsersPage() {
     value: UserFormData[K]
   ) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+  }
+
+  function inputClass(field: keyof UserFormData) {
+    if (fieldErrors[field]) {
+      return "mt-1 w-full rounded-xl border border-red-400 bg-red-50 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200";
+    }
+    return "mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200";
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -98,7 +107,7 @@ export function UsersPage() {
 
     try {
       setSaving(true);
-      setFormErrorMessage("");
+      setFieldErrors({});
 
       const basePayload = {
         name: form.name.trim(),
@@ -106,19 +115,18 @@ export function UsersPage() {
         role: form.role,
       };
 
-      if (!basePayload.name || !basePayload.email || !basePayload.role) {
-        setFormErrorMessage("Preencha todos os campos obrigatórios.");
+      const nextErrors: UserFieldErrors = {};
+      if (!basePayload.name) nextErrors.name = "Informe o nome.";
+      if (!basePayload.email) nextErrors.email = "Informe o e-mail.";
+      if (!basePayload.role) nextErrors.role = "Selecione o perfil.";
+      if (!editingUser && !form.password.trim()) nextErrors.password = "Informe a senha.";
+      if (Object.keys(nextErrors).length > 0) {
+        setFieldErrors(nextErrors);
         return;
       }
-
       if (editingUser) {
         await updateUser(editingUser.id, basePayload);
       } else {
-        if (!form.password.trim()) {
-          setFormErrorMessage("Informe a senha do usuário.");
-          return;
-        }
-
         await createUser({
           ...basePayload,
           password: form.password.trim(),
@@ -136,13 +144,19 @@ export function UsersPage() {
         error?.message ||
         "";
 
-      setFormErrorMessage(
+      const apiText =
         Array.isArray(apiMessage)
           ? apiMessage.join(", ")
           : typeof apiMessage === "string" && apiMessage.trim()
-          ? apiMessage
-          : "Não foi possível salvar o usuário."
-      );
+            ? apiMessage
+            : "Não foi possível salvar. Revise os campos.";
+      if (/email/i.test(apiText)) {
+        setFieldErrors((prev) => ({ ...prev, email: apiText }));
+      } else if (/senha|password/i.test(apiText)) {
+        setFieldErrors((prev) => ({ ...prev, password: apiText }));
+      } else {
+        setFieldErrors((prev) => ({ ...prev, name: apiText }));
+      }
     } finally {
       setSaving(false);
     }
@@ -399,9 +413,10 @@ export function UsersPage() {
                     type="text"
                     value={form.name}
                     onChange={(e) => handleChange("name", e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("name")}
                     placeholder="Nome completo"
                   />
+                  {fieldErrors.name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p> : null}
                 </div>
 
                 <div className="md:col-span-2">
@@ -410,9 +425,10 @@ export function UsersPage() {
                     type="email"
                     value={form.email}
                     onChange={(e) => handleChange("email", e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("email")}
                     placeholder="usuario@empresa.com"
                   />
+                  {fieldErrors.email ? <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p> : null}
                 </div>
 
                 {!editingUser && (
@@ -422,9 +438,10 @@ export function UsersPage() {
                       type="password"
                       value={form.password}
                       onChange={(e) => handleChange("password", e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                      className={inputClass("password")}
                       placeholder="Senhá do usuário"
                     />
+                    {fieldErrors.password ? <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p> : null}
                   </div>
                 )}
 
@@ -438,19 +455,14 @@ export function UsersPage() {
                         e.target.value as "ADMIN" | "FLEET_MANAGER"
                       )
                     }
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className={inputClass("role")}
                   >
                     <option value="FLEET_MANAGER">Gestor</option>
                     <option value="ADMIN">Administrador</option>
                   </select>
+                  {fieldErrors.role ? <p className="mt-1 text-xs text-red-600">{fieldErrors.role}</p> : null}
                 </div>
               </div>
-
-              {formErrorMessage && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {formErrorMessage}
-                </div>
-              )}
 
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button

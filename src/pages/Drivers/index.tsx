@@ -71,7 +71,6 @@ export function DriversPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
-  const [formErrorMessage, setFormErrorMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<DriverFieldErrors>({});
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -106,7 +105,6 @@ export function DriversPage() {
   function openCreateModal() {
     setEditingDriver(null);
     setForm(initialForm);
-    setFormErrorMessage("");
     setFieldErrors({});
     setIsModalOpen(true);
   }
@@ -123,7 +121,6 @@ export function DriversPage() {
       status: driver.status,
       vehicleId: driver.vehicleId || "",
     });
-    setFormErrorMessage("");
     setFieldErrors({});
     setIsModalOpen(true);
   }
@@ -131,7 +128,6 @@ export function DriversPage() {
   function closeModal() {
     setEditingDriver(null);
     setForm(initialForm);
-    setFormErrorMessage("");
     setFieldErrors({});
     setIsModalOpen(false);
   }
@@ -166,7 +162,6 @@ export function DriversPage() {
     event.preventDefault();
     try {
       setSaving(true);
-      setFormErrorMessage("");
       setFieldErrors({});
 
       const payload = {
@@ -207,7 +202,9 @@ export function DriversPage() {
       const apiText = typeof apiMessage === "string" ? apiMessage : "";
       if (/cpf/i.test(apiText)) setFieldErrors((prev) => ({ ...prev, cpf: "CPF ja cadastrado." }));
       if (/cnh/i.test(apiText)) setFieldErrors((prev) => ({ ...prev, cnh: "CNH ja cadastrada." }));
-      setFormErrorMessage(Array.isArray(apiMessage) ? apiMessage.join(", ") : apiText || "Não foi possível salvar o motorista.");
+      if (!/cpf|cnh/i.test(apiText)) {
+        setFieldErrors((prev) => ({ ...prev, name: "Não foi possível salvar. Revise os campos." }));
+      }
     } finally {
       setSaving(false);
     }
@@ -440,7 +437,6 @@ export function DriversPage() {
                 <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Veículo vinculado</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className={inputClass("vehicleId")}><option value="">Sem vinculo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model}</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
               </div>
 
-              {formErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formErrorMessage}</div> : null}
 
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button type="button" onClick={closeModal} className="cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancelar</button>

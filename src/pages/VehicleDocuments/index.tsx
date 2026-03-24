@@ -23,6 +23,7 @@ type DocumentFormData = {
 };
 
 type DocumentSortBy = "type" | "name" | "vehicle" | "expiryDate" | "status";
+type DocumentFieldErrors = Partial<Record<"vehicleId" | "type" | "status" | "name", string>>;
 
 const initialForm: DocumentFormData = {
   type: "",
@@ -102,7 +103,7 @@ export function VehicleDocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
-  const [formErrorMessage, setFormErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<DocumentFieldErrors>({});
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<DocumentSortBy>("expiryDate");
@@ -253,7 +254,7 @@ export function VehicleDocumentsPage() {
     setEditingDocument(null);
     setForm(initialForm);
     setSelectedFile(null);
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(true);
   }
 
@@ -272,7 +273,7 @@ export function VehicleDocumentsPage() {
       vehicleId: item.vehicleId || "",
     });
     setSelectedFile(null);
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(true);
   }
 
@@ -280,12 +281,22 @@ export function VehicleDocumentsPage() {
     setEditingDocument(null);
     setForm(initialForm);
     setSelectedFile(null);
-    setFormErrorMessage("");
+    setFieldErrors({});
     setIsModalOpen(false);
   }
 
   function handleChange<K extends keyof DocumentFormData>(field: K, value: DocumentFormData[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    if (field === "vehicleId" || field === "type" || field === "status" || field === "name") {
+      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+  }
+
+  function inputClass(field?: keyof DocumentFieldErrors) {
+    if (field && fieldErrors[field]) {
+      return "mt-1 w-full rounded-xl border border-red-400 bg-red-50 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200";
+    }
+    return "mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200";
   }
 
   function resolveFileUrl(fileUrl?: string | null) {
@@ -299,7 +310,7 @@ export function VehicleDocumentsPage() {
     event.preventDefault();
     try {
       setSaving(true);
-      setFormErrorMessage("");
+      setFieldErrors({});
       let nextFileUrl = form.fileUrl.trim() || undefined;
 
       if (selectedFile) {
@@ -320,8 +331,13 @@ export function VehicleDocumentsPage() {
         vehicleId: form.vehicleId,
       };
 
-      if (!payload.vehicleId || !payload.name || !payload.type || !payload.status) {
-        setFormErrorMessage("Preencha veículo, tipo, status e nome do documento.");
+      const nextErrors: DocumentFieldErrors = {};
+      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione o veículo.";
+      if (!payload.type) nextErrors.type = "Selecione o tipo.";
+      if (!payload.status) nextErrors.status = "Selecione o status.";
+      if (!payload.name) nextErrors.name = "Informe o nome do documento.";
+      if (Object.keys(nextErrors).length > 0) {
+        setFieldErrors(nextErrors);
         return;
       }
 
@@ -333,7 +349,8 @@ export function VehicleDocumentsPage() {
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
     } catch (error: any) {
       const apiMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "";
-      setFormErrorMessage(Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage || "Não foi possível salvar o documento."));
+      const apiText = Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage || "Não foi possível salvar o documento.");
+      setFieldErrors((prev) => ({ ...prev, name: apiText }));
     } finally {
       setSaving(false);
     }
@@ -447,20 +464,20 @@ export function VehicleDocumentsPage() {
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Identificação</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Tipo</label><select value={form.type} onChange={(e) => handleChange("type", e.target.value as VehicleDocumentType | "")} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione o tipo</option>{documentTypeOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Nome do documento</label><input value={form.name} onChange={(e) => handleChange("name", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Seguro veicular 2026" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Número</label><input value={form.number} onChange={(e) => handleChange("number", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Opcional" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Órgão emissor</label><input value={form.issuer} onChange={(e) => handleChange("issuer", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Detran, seguradora..." /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={form.status} onChange={(e) => handleChange("status", e.target.value as VehicleDocumentStatus | "")} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione o status</option><option value="VALID">Válido</option><option value="EXPIRING">Vencendo</option><option value="EXPIRED">Vencido</option></select></div>
+                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className={inputClass("vehicleId")}><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Tipo</label><select value={form.type} onChange={(e) => handleChange("type", e.target.value as VehicleDocumentType | "")} className={inputClass("type")}><option value="">Selecione o tipo</option>{documentTypeOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>{fieldErrors.type ? <p className="mt-1 text-xs text-red-600">{fieldErrors.type}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Nome do documento</label><input value={form.name} onChange={(e) => handleChange("name", e.target.value)} className={inputClass("name")} placeholder="Ex: Seguro veicular 2026" />{fieldErrors.name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Número</label><input value={form.number} onChange={(e) => handleChange("number", e.target.value)} className={inputClass()} placeholder="Opcional" /></div>
+                  <div><label className="block text-sm font-medium text-slate-700">Órgão emissor</label><input value={form.issuer} onChange={(e) => handleChange("issuer", e.target.value)} className={inputClass()} placeholder="Detran, seguradora..." /></div>
+                  <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={form.status} onChange={(e) => handleChange("status", e.target.value as VehicleDocumentStatus | "")} className={inputClass("status")}><option value="">Selecione o status</option><option value="VALID">Válido</option><option value="EXPIRING">Vencendo</option><option value="EXPIRED">Vencido</option></select>{fieldErrors.status ? <p className="mt-1 text-xs text-red-600">{fieldErrors.status}</p> : null}</div>
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Vigência</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="block text-sm font-medium text-slate-700">Data de emissão</label><input type="date" value={form.issueDate} onChange={(e) => handleChange("issueDate", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Data de vencimento</label><input type="date" value={form.expiryDate} onChange={(e) => handleChange("expiryDate", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
+                  <div><label className="block text-sm font-medium text-slate-700">Data de emissão</label><input type="date" value={form.issueDate} onChange={(e) => handleChange("issueDate", e.target.value)} className={inputClass()} /></div>
+                  <div><label className="block text-sm font-medium text-slate-700">Data de vencimento</label><input type="date" value={form.expiryDate} onChange={(e) => handleChange("expiryDate", e.target.value)} className={inputClass()} /></div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-700">Anexo do documento</label>
                     <input
@@ -498,10 +515,9 @@ export function VehicleDocumentsPage() {
                       )}
                     </div>
                   </div>
-                  <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Observações</label><textarea value={form.notes} onChange={(e) => handleChange("notes", e.target.value)} rows={3} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Informações adicionais" /></div>
+                  <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Observações</label><textarea value={form.notes} onChange={(e) => handleChange("notes", e.target.value)} rows={3} className={inputClass()} placeholder="Informações adicionais" /></div>
                 </div>
               </div>
-              {formErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formErrorMessage}</div> : null}
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button type="button" onClick={closeModal} className="btn-ui btn-ui-neutral">Cancelar</button>
                 <button type="submit" disabled={saving} className="btn-ui btn-ui-primary disabled:cursor-not-allowed disabled:opacity-70">{saving ? "Salvando..." : editingDocument ? "Salvar alterações" : "Cadastrar documento"}</button>
