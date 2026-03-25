@@ -986,7 +986,7 @@ export function MaintenanceRecordsPage() {
     tab === "records" ? "Registrar manutenção" : tab === "plans" ? "Novo plano de manutenção" : "Cadastrar pneu";
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <section className={`${tab === "records" ? "rounded-t-2xl rounded-b-none border-b-0" : "rounded-2xl"} border border-slate-200 bg-white p-4 shadow-sm`}>
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>

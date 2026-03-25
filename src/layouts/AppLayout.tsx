@@ -387,7 +387,7 @@ export function AppLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
+    <div className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-slate-100">
       {isMobileMenuOpen ? (
         <button
           type="button"
@@ -450,7 +450,7 @@ export function AppLayout() {
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
             <div className="flex items-center justify-between gap-3 lg:hidden">
@@ -518,7 +518,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="flex-1 bg-gradient-to-b from-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 min-w-0 overflow-x-hidden bg-gradient-to-b from-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

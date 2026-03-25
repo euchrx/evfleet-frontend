@@ -617,7 +617,7 @@ export function VehiclesPage() {
   const isCreateButtonBlockedVisual = loading || isVehicleLimitReached;
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Veículos</h1>
@@ -629,10 +629,10 @@ export function VehiclesPage() {
             openCreate();
           }}
           style={{ cursor: isCreateButtonBlockedVisual ? "not-allowed" : "pointer" }}
-          className={`rounded-xl px-4 py-3 text-sm font-semibold text-white transition ${
+          className={`inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-center text-sm font-semibold text-white transition sm:w-auto ${
             isCreateButtonBlockedVisual
-              ? "w-full cursor-not-allowed bg-slate-400 sm:w-auto"
-              : "w-full cursor-pointer bg-orange-500 hover:bg-orange-600 sm:w-auto"
+              ? "cursor-not-allowed bg-slate-400"
+              : "cursor-pointer bg-orange-500 hover:bg-orange-600"
           }`}
         >
           + Cadastrar veículo
