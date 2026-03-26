@@ -275,6 +275,17 @@ export function VehiclesPage() {
     [form.category]
   );
 
+  const selectedProfilePhotoPreview = useMemo(
+    () => (photoFiles[0] ? URL.createObjectURL(photoFiles[0]) : ""),
+    [photoFiles]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (selectedProfilePhotoPreview) URL.revokeObjectURL(selectedProfilePhotoPreview);
+    };
+  }, [selectedProfilePhotoPreview]);
+
   useEffect(() => {
     function refreshMaxVehiclesAllowed() {
       const settings = readSoftwareSettings();
@@ -421,7 +432,9 @@ export function VehiclesPage() {
           | "CNG",
         tankCapacity: Number(form.tankCapacity),
         status: form.status,
-        photoUrls: [...form.photoUrls, ...uploadedPhotoUrls],
+        photoUrls: uploadedPhotoUrls.length
+          ? [uploadedPhotoUrls[0], ...form.photoUrls.filter((url) => url !== uploadedPhotoUrls[0])]
+          : form.photoUrls,
         documentUrls: [...form.documentUrls, ...uploadedDocumentUrls],
         branchId: form.branchId,
       };
@@ -910,6 +923,49 @@ export function VehiclesPage() {
                     <input value={form.renavam} onChange={(e) => { setForm({ ...form, renavam: normalizeRenavam(e.target.value) }); clearFieldError("renavam"); }} className={getFieldClass("renavam")} placeholder="11 dígitos" />
                     {fieldErrors.renavam ? <p className="text-xs text-red-600">{fieldErrors.renavam}</p> : null}
                   </label>
+                  <div className="space-y-2 md:col-span-2">
+                    <span className="text-sm font-medium text-slate-700">Foto de perfil do veículo</span>
+                    <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-3">
+                        {(selectedProfilePhotoPreview || form.photoUrls[0]) ? (
+                          <img
+                            src={selectedProfilePhotoPreview || form.photoUrls[0]}
+                            alt="Foto de perfil do veículo"
+                            className="h-14 w-14 rounded-xl border border-slate-200 object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-xs font-semibold text-slate-400">
+                            Sem foto
+                          </div>
+                        )}
+                        <p className="text-xs text-slate-500">Essa foto será usada na identificação visual dos cards.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
+                          Selecionar foto
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              setPhotoFiles(file ? [file] : []);
+                              e.currentTarget.value = "";
+                            }}
+                          />
+                        </label>
+                        {photoFiles.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setPhotoFiles([])}
+                            className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                          >
+                            Remover
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 

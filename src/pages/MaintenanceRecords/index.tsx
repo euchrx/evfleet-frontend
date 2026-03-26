@@ -1717,7 +1717,20 @@ export function MaintenanceRecordsPage() {
                           onClick={() => openTireVisualModal(item.vehicle)}
                           className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-orange-300 hover:bg-orange-50/40"
                         >
-                          <p className="text-sm font-semibold text-slate-900">{formatVehicleLabel(item.vehicle)}</p>
+                          <div className="flex items-center gap-3">
+                            {item.vehicle.photoUrls?.[0] ? (
+                              <img
+                                src={item.vehicle.photoUrls[0]}
+                                alt={formatVehicleLabel(item.vehicle)}
+                                className="h-11 w-11 rounded-xl border border-slate-200 object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-100 text-xs font-semibold text-slate-500">
+                                {item.vehicle.plate?.slice(0, 2) || "SV"}
+                              </div>
+                            )}
+                            <p className="text-sm font-semibold text-slate-900">{formatVehicleLabel(item.vehicle)}</p>
+                          </div>
                           <p className="mt-2 text-xs text-slate-500">
                             {item.vehicle.status === "ACTIVE"
                               ? "Ativo"
@@ -1748,7 +1761,20 @@ export function MaintenanceRecordsPage() {
                           onClick={() => openTireVisualModal(item.vehicle)}
                           className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-orange-300 hover:bg-orange-50/40"
                         >
-                          <p className="text-sm font-semibold text-slate-900">{formatVehicleLabel(item.vehicle)}</p>
+                          <div className="flex items-center gap-3">
+                            {item.vehicle.photoUrls?.[0] ? (
+                              <img
+                                src={item.vehicle.photoUrls[0]}
+                                alt={formatVehicleLabel(item.vehicle)}
+                                className="h-11 w-11 rounded-xl border border-slate-200 object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-100 text-xs font-semibold text-slate-500">
+                                {item.vehicle.plate?.slice(0, 2) || "SV"}
+                              </div>
+                            )}
+                            <p className="text-sm font-semibold text-slate-900">{formatVehicleLabel(item.vehicle)}</p>
+                          </div>
                           <p className="mt-2 text-xs text-slate-500">
                             {item.vehicle.status === "ACTIVE"
                               ? "Ativo"
