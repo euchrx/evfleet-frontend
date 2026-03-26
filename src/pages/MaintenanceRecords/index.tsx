@@ -1707,15 +1707,71 @@ export function MaintenanceRecordsPage() {
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-semibold text-slate-900">Categoria Leve</p>
                   <p className="mt-2 text-2xl font-bold text-slate-900">{tireCardsByCategory.light.length}</p>
+                  {tireCardsByCategory.light.length === 0 ? (
+                    <p className="mt-3 text-sm text-slate-500">Nenhum veículo leve encontrado.</p>
+                  ) : (
+                    <div className="mt-3 grid gap-3">
+                      {tireCardsByCategory.light.map((item) => (
+                        <button
+                          key={`light-${item.vehicle.id}`}
+                          type="button"
+                          onClick={() => openTireVisualModal(item.vehicle)}
+                          className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-orange-300 hover:bg-orange-50/40"
+                        >
+                          <p className="text-sm font-semibold text-slate-900">{formatVehicleLabel(item.vehicle)}</p>
+                          <p className="mt-2 text-xs text-slate-500">
+                            {item.vehicle.status === "ACTIVE"
+                              ? "Ativo"
+                              : item.vehicle.status === "MAINTENANCE"
+                              ? "Em manutenção"
+                              : "Vendido"}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <span className="status-pill status-active">Pneus: {item.total}</span>
+                            <span className="status-pill status-pending">Instalados: {item.installed}</span>
+                            <span className="status-pill status-anomaly">Em manutenção: {item.maintenance}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <p className="text-xs text-slate-500">veículo(s)</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-semibold text-slate-900">Categoria Pesado</p>
                   <p className="mt-2 text-2xl font-bold text-slate-900">{tireCardsByCategory.heavy.length}</p>
+                  {tireCardsByCategory.heavy.length === 0 ? (
+                    <p className="mt-3 text-sm text-slate-500">Nenhum veículo pesado encontrado.</p>
+                  ) : (
+                    <div className="mt-3 grid gap-3">
+                      {tireCardsByCategory.heavy.map((item) => (
+                        <button
+                          key={`heavy-${item.vehicle.id}`}
+                          type="button"
+                          onClick={() => openTireVisualModal(item.vehicle)}
+                          className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-orange-300 hover:bg-orange-50/40"
+                        >
+                          <p className="text-sm font-semibold text-slate-900">{formatVehicleLabel(item.vehicle)}</p>
+                          <p className="mt-2 text-xs text-slate-500">
+                            {item.vehicle.status === "ACTIVE"
+                              ? "Ativo"
+                              : item.vehicle.status === "MAINTENANCE"
+                              ? "Em manutenção"
+                              : "Vendido"}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <span className="status-pill status-active">Pneus: {item.total}</span>
+                            <span className="status-pill status-pending">Instalados: {item.installed}</span>
+                            <span className="status-pill status-anomaly">Em manutenção: {item.maintenance}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <p className="text-xs text-slate-500">veículo(s)</p>
                 </div>
               </div>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="hidden grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {tireCardsByVehicle.map((item) => (
                 <button
                   key={item.vehicle.id}
