@@ -2030,7 +2030,7 @@ export function MaintenanceRecordsPage() {
                     />
                   </div>
                   {tireAxleOpen && filteredTireAxleSuggestions.length > 0 ? (
-                    <div className="mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                    <div className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
                       {filteredTireAxleSuggestions.map((value) => (
                         <button
                           key={`axle-suggestion-${value}`}
@@ -2089,7 +2089,7 @@ export function MaintenanceRecordsPage() {
                     />
                   </div>
                   {tireWheelOpen && filteredTireWheelSuggestions.length > 0 ? (
-                    <div className="mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                    <div className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
                       {filteredTireWheelSuggestions.map((value) => (
                         <button
                           key={`wheel-suggestion-${value}`}
