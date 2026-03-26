@@ -658,8 +658,23 @@ export function MaintenanceRecordsPage() {
     });
   }, [tires, selectedBranchId, vehicleMap, search]);
 
+  const tireCardVehicles = useMemo(() => {
+    const map = new Map<string, Vehicle>();
+    for (const vehicle of scopedVehicles) {
+      map.set(vehicle.id, vehicle);
+    }
+    for (const tire of scopedTires) {
+      const vehicle = tire.vehicleId ? vehicleMap.get(tire.vehicleId) : undefined;
+      if (!vehicle) continue;
+      if (selectedBranchId && vehicle.branchId !== selectedBranchId) continue;
+      map.set(vehicle.id, vehicle);
+    }
+    return Array.from(map.values());
+  }, [scopedVehicles, scopedTires, vehicleMap, selectedBranchId]);
+
   const tireCardsByVehicle = useMemo(() => {
     const tiresMap = new Map<string, Tire[]>();
+    const searchTerm = search.trim().toLowerCase();
     for (const tire of scopedTires) {
       if (!tire.vehicleId) continue;
       const list = tiresMap.get(tire.vehicleId) || [];
@@ -667,7 +682,7 @@ export function MaintenanceRecordsPage() {
       tiresMap.set(tire.vehicleId, list);
     }
 
-    return scopedVehicles
+    return tireCardVehicles
       .map((vehicle) => {
         const list = tiresMap.get(vehicle.id) || [];
         return {
@@ -678,9 +693,13 @@ export function MaintenanceRecordsPage() {
           maintenance: list.filter((item) => item.status === "MAINTENANCE").length,
         };
       })
-      .filter((item) => item.total > 0)
+      .filter((item) => {
+        if (!searchTerm) return true;
+        const vehicleText = `${item.vehicle.plate} ${formatVehicleLabel(item.vehicle)}`.toLowerCase();
+        return item.total > 0 || vehicleText.includes(searchTerm);
+      })
       .sort((a, b) => a.vehicle.plate.localeCompare(b.vehicle.plate, "pt-BR", { sensitivity: "base" }));
-  }, [scopedTires, scopedVehicles]);
+  }, [scopedTires, tireCardVehicles, search]);
 
   const selectedTireVehicleItems = useMemo(() => {
     if (!selectedTireVehicle) return [];
