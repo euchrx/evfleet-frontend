@@ -220,6 +220,7 @@ type TireViewMode = "table" | "cards";
 type TireVisualSlot = {
   id: string;
   label: string;
+  axleGroup: string;
   axleValue: string;
   wheelValue: string;
   axleKeys: string[];
@@ -227,65 +228,11 @@ type TireVisualSlot = {
   extraKeys?: string[];
 };
 
-const TIRE_VISUAL_SLOTS_TRUCK: TireVisualSlot[] = [
-  {
-    id: "front-left",
-    label: "Dianteiro esquerdo",
-    axleValue: "Dianteiro",
-    wheelValue: "Esquerda",
-    axleKeys: ["dianteir"],
-    wheelKeys: ["esquerd"],
-  },
-  {
-    id: "front-right",
-    label: "Dianteiro direito",
-    axleValue: "Dianteiro",
-    wheelValue: "Direita",
-    axleKeys: ["dianteir"],
-    wheelKeys: ["direit"],
-  },
-  {
-    id: "rear-inner-left",
-    label: "Traseiro interno esquerdo",
-    axleValue: "Traseiro",
-    wheelValue: "Interna esquerda",
-    axleKeys: ["traseir"],
-    wheelKeys: ["esquerd"],
-    extraKeys: ["intern"],
-  },
-  {
-    id: "rear-inner-right",
-    label: "Traseiro interno direito",
-    axleValue: "Traseiro",
-    wheelValue: "Interna direita",
-    axleKeys: ["traseir"],
-    wheelKeys: ["direit"],
-    extraKeys: ["intern"],
-  },
-  {
-    id: "rear-outer-left",
-    label: "Traseiro externo esquerdo",
-    axleValue: "Traseiro",
-    wheelValue: "Externa esquerda",
-    axleKeys: ["traseir"],
-    wheelKeys: ["esquerd"],
-    extraKeys: ["extern"],
-  },
-  {
-    id: "rear-outer-right",
-    label: "Traseiro externo direito",
-    axleValue: "Traseiro",
-    wheelValue: "Externa direita",
-    axleKeys: ["traseir"],
-    wheelKeys: ["direit"],
-    extraKeys: ["extern"],
-  },
-];
-
 const TIRE_VISUAL_SLOTS_CAR: TireVisualSlot[] = [
   {
     id: "front-left",
     label: "Dianteiro esquerdo",
+    axleGroup: "Eixo 1",
     axleValue: "Dianteiro",
     wheelValue: "Esquerda",
     axleKeys: ["dianteir"],
@@ -294,6 +241,7 @@ const TIRE_VISUAL_SLOTS_CAR: TireVisualSlot[] = [
   {
     id: "front-right",
     label: "Dianteiro direito",
+    axleGroup: "Eixo 1",
     axleValue: "Dianteiro",
     wheelValue: "Direita",
     axleKeys: ["dianteir"],
@@ -302,6 +250,7 @@ const TIRE_VISUAL_SLOTS_CAR: TireVisualSlot[] = [
   {
     id: "rear-left",
     label: "Traseiro esquerdo",
+    axleGroup: "Eixo 2",
     axleValue: "Traseiro",
     wheelValue: "Esquerda",
     axleKeys: ["traseir"],
@@ -310,6 +259,7 @@ const TIRE_VISUAL_SLOTS_CAR: TireVisualSlot[] = [
   {
     id: "rear-right",
     label: "Traseiro direito",
+    axleGroup: "Eixo 2",
     axleValue: "Traseiro",
     wheelValue: "Direita",
     axleKeys: ["traseir"],
@@ -318,12 +268,85 @@ const TIRE_VISUAL_SLOTS_CAR: TireVisualSlot[] = [
   {
     id: "spare",
     label: "Estepe",
+    axleGroup: "Reserva",
     axleValue: "Reserva",
     wheelValue: "Estepe",
     axleKeys: ["reserv", "step", "estepe"],
     wheelKeys: ["reserv", "step", "estepe"],
   },
 ];
+
+function createHeavyTireSlots(axles = 9): TireVisualSlot[] {
+  const slots: TireVisualSlot[] = [
+    {
+      id: "axle-1-left",
+      label: "Eixo 1 - Dianteiro esquerdo",
+      axleGroup: "Eixo 1",
+      axleValue: "Eixo 1",
+      wheelValue: "Esquerda",
+      axleKeys: ["eixo 1", "eixo1", "dianteir", "frente"],
+      wheelKeys: ["esquerd"],
+    },
+    {
+      id: "axle-1-right",
+      label: "Eixo 1 - Dianteiro direito",
+      axleGroup: "Eixo 1",
+      axleValue: "Eixo 1",
+      wheelValue: "Direita",
+      axleKeys: ["eixo 1", "eixo1", "dianteir", "frente"],
+      wheelKeys: ["direit"],
+    },
+  ];
+
+  for (let axle = 2; axle <= axles; axle += 1) {
+    const axisLabel = `Eixo ${axle}`;
+    const axisKeys = [`eixo ${axle}`, `eixo${axle}`];
+    slots.push(
+      {
+        id: `axle-${axle}-inner-left`,
+        label: `${axisLabel} - Interno esquerdo`,
+        axleGroup: axisLabel,
+        axleValue: axisLabel,
+        wheelValue: "Interna esquerda",
+        axleKeys: axisKeys,
+        wheelKeys: ["esquerd"],
+        extraKeys: ["intern"],
+      },
+      {
+        id: `axle-${axle}-outer-left`,
+        label: `${axisLabel} - Externo esquerdo`,
+        axleGroup: axisLabel,
+        axleValue: axisLabel,
+        wheelValue: "Externa esquerda",
+        axleKeys: axisKeys,
+        wheelKeys: ["esquerd"],
+        extraKeys: ["extern"],
+      },
+      {
+        id: `axle-${axle}-inner-right`,
+        label: `${axisLabel} - Interno direito`,
+        axleGroup: axisLabel,
+        axleValue: axisLabel,
+        wheelValue: "Interna direita",
+        axleKeys: axisKeys,
+        wheelKeys: ["direit"],
+        extraKeys: ["intern"],
+      },
+      {
+        id: `axle-${axle}-outer-right`,
+        label: `${axisLabel} - Externo direito`,
+        axleGroup: axisLabel,
+        axleValue: axisLabel,
+        wheelValue: "Externa direita",
+        axleKeys: axisKeys,
+        wheelKeys: ["direit"],
+        extraKeys: ["extern"],
+      },
+    );
+  }
+
+  return slots;
+}
 
 export function MaintenanceRecordsPage() {
   const location = useLocation();
@@ -651,9 +674,12 @@ export function MaintenanceRecordsPage() {
   }, [scopedTires, selectedTireVehicle]);
 
   const selectedTireVehicleSlots = useMemo(() => {
-    if (!selectedTireVehicle) return TIRE_VISUAL_SLOTS_TRUCK;
+    if (!selectedTireVehicle) return createHeavyTireSlots(9);
     if (selectedTireVehicle.category === "CAR") return TIRE_VISUAL_SLOTS_CAR;
-    return TIRE_VISUAL_SLOTS_TRUCK;
+    if (selectedTireVehicle.vehicleType === "HEAVY" || selectedTireVehicle.category === "TRUCK") {
+      return createHeavyTireSlots(9);
+    }
+    return TIRE_VISUAL_SLOTS_CAR;
   }, [selectedTireVehicle]);
 
   const recordTotalPages = useMemo(
@@ -1546,7 +1572,7 @@ export function MaintenanceRecordsPage() {
             </div>
 
             <div className="space-y-5 p-6">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2">
                 {selectedTireVehicleSlots.map((slot) => {
                   const tire = selectedTireVehicleItems.find((item) => tireMatchesSlot(item, slot));
 
