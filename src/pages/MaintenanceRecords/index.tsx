@@ -1734,7 +1734,6 @@ export function MaintenanceRecordsPage() {
                       ))}
                     </div>
                   )}
-                  <p className="text-xs text-slate-500">veículo(s)</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-semibold text-slate-900">Categoria Pesado</p>
@@ -1766,7 +1765,6 @@ export function MaintenanceRecordsPage() {
                       ))}
                     </div>
                   )}
-                  <p className="text-xs text-slate-500">veículo(s)</p>
                 </div>
               </div>
               <div className="hidden grid gap-3 md:grid-cols-2 xl:grid-cols-3">
