@@ -111,7 +111,7 @@ export function AdministrationPage() {
 
   async function resetAllSystem() {
     if (!resetJwtToken.trim()) {
-      setResetJwtTokenError("Informe o token do JWT_SECRET.");
+      setResetJwtTokenError("Informe o token de redefinição do DATABASE.");
       return;
     }
 
@@ -405,12 +405,12 @@ export function AdministrationPage() {
             <div className="border-b border-slate-200 px-6 py-4">
               <h3 className="text-lg font-semibold text-slate-900">Confirmar reset all do banco</h3>
               <p className="mt-1 text-sm text-slate-600">
-                Para confirmar, informe o token do <strong>JWT_SECRET</strong>. O sistema não exibe esse valor.
+                Para confirmar, informe o token de <strong>redefinição</strong>.
               </p>
             </div>
             <div className="space-y-4 px-6 py-5">
               <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">Token JWT_SECRET</span>
+                <span className="text-sm font-medium text-slate-700">Token de redefinição</span>
                 <input
                   type="password"
                   id="jwt-reset-token"
