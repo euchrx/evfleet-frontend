@@ -1854,7 +1854,7 @@ export function MaintenanceRecordsPage() {
                   </select>
                   {recordFieldErrors.type ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.type}</p> : null}
                 </div>
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-slate-700">Status</label>
                   <select value={recordForm.status} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, status: undefined })); setRecordForm((prev) => ({ ...prev, status: event.target.value as RecordFormState["status"] })); }} className={getFieldClass(Boolean(recordFieldErrors.status))}>
                     <option value="">Selecione o status</option>
