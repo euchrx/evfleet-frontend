@@ -701,6 +701,22 @@ export function MaintenanceRecordsPage() {
       .sort((a, b) => a.vehicle.plate.localeCompare(b.vehicle.plate, "pt-BR", { sensitivity: "base" }));
   }, [scopedTires, tireCardVehicles, search]);
 
+  const tireCardsByCategory = useMemo(() => {
+    const light: typeof tireCardsByVehicle = [];
+    const heavy: typeof tireCardsByVehicle = [];
+
+    for (const item of tireCardsByVehicle) {
+      const isHeavy = item.vehicle.vehicleType === "HEAVY" || item.vehicle.category === "TRUCK";
+      if (isHeavy) {
+        heavy.push(item);
+      } else {
+        light.push(item);
+      }
+    }
+
+    return { light, heavy };
+  }, [tireCardsByVehicle]);
+
   const selectedTireVehicleItems = useMemo(() => {
     if (!selectedTireVehicle) return [];
     return scopedTires.filter((item) => item.vehicleId === selectedTireVehicle.id);
@@ -1649,7 +1665,20 @@ export function MaintenanceRecordsPage() {
           {tireCardsByVehicle.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-500">Nenhum veículo encontrado.</p>
           ) : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">Categoria Leve</p>
+                  <p className="mt-2 text-2xl font-bold text-slate-900">{tireCardsByCategory.light.length}</p>
+                  <p className="text-xs text-slate-500">veículo(s)</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">Categoria Pesado</p>
+                  <p className="mt-2 text-2xl font-bold text-slate-900">{tireCardsByCategory.heavy.length}</p>
+                  <p className="text-xs text-slate-500">veículo(s)</p>
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {tireCardsByVehicle.map((item) => (
                 <button
                   key={item.vehicle.id}
@@ -1672,6 +1701,7 @@ export function MaintenanceRecordsPage() {
                   </div>
                 </button>
               ))}
+            </div>
             </div>
           )}
         </section>
