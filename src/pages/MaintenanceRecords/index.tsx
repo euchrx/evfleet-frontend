@@ -1706,7 +1706,6 @@ export function MaintenanceRecordsPage() {
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-semibold text-slate-900">Categoria Leve</p>
-                  <p className="mt-2 text-2xl font-bold text-slate-900">{tireCardsByCategory.light.length}</p>
                   {tireCardsByCategory.light.length === 0 ? (
                     <p className="mt-3 text-sm text-slate-500">Nenhum veículo leve encontrado.</p>
                   ) : (
@@ -1739,7 +1738,6 @@ export function MaintenanceRecordsPage() {
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-semibold text-slate-900">Categoria Pesado</p>
-                  <p className="mt-2 text-2xl font-bold text-slate-900">{tireCardsByCategory.heavy.length}</p>
                   {tireCardsByCategory.heavy.length === 0 ? (
                     <p className="mt-3 text-sm text-slate-500">Nenhum veículo pesado encontrado.</p>
                   ) : (
