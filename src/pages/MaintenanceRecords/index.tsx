@@ -177,6 +177,24 @@ function toNumber(value: string) {
   return Number(String(value || "").replace(",", ".")) || 0;
 }
 
+function formatAxleLabel(axle: string) {
+  const normalized = axle.trim().toLowerCase();
+  return normalized.startsWith("eixo") ? axle : `Eixo ${axle}`;
+}
+
+function formatPositionLabel(axle: string, wheel: string) {
+  return `${formatAxleLabel(axle)} | Lado ${wheel}`;
+}
+
+function parsePositionLabel(label: string) {
+  const [leftRaw, rightRaw] = label.split("|").map((item) => item.trim());
+  if (!leftRaw || !rightRaw) return null;
+  const axle = leftRaw.replace(/^eixo\s+/i, "").trim();
+  const wheel = rightRaw.replace(/^lado\s+/i, "").trim();
+  if (!axle || !wheel) return null;
+  return { axlePosition: axle, wheelPosition: wheel };
+}
+
 function maintenanceTypeLabel(value: string) {
   if (value === "CORRECTIVE") return "Corretiva";
   if (value === "PERIODIC") return "Periódica";
@@ -730,13 +748,14 @@ export function MaintenanceRecordsPage() {
     [tireFormVehicleSlots],
   );
 
-  const tireFormAllowedWheels = useMemo(
-    () =>
-      Array.from(new Set(tireFormVehicleSlots.map((slot) => slot.wheelValue))).sort((a, b) =>
-        a.localeCompare(b, "pt-BR"),
-      ),
-    [tireFormVehicleSlots],
-  );
+  const tireFormAllowedPositionLabels = useMemo(() => {
+    const selectedAxles = new Set(tireAxleBatch.map((value) => normalizeSearchText(value)));
+    const hasSelectedAxles = selectedAxles.size > 0;
+    return tireFormVehicleSlots
+      .filter((slot) => !hasSelectedAxles || selectedAxles.has(normalizeSearchText(slot.axleValue)))
+      .map((slot) => formatPositionLabel(slot.axleValue, slot.wheelValue))
+      .sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [tireFormVehicleSlots, tireAxleBatch]);
 
   const filteredTireAxleSuggestions = useMemo(() => {
     const query = normalizeSearchText(tireAxleInput);
@@ -748,11 +767,11 @@ export function MaintenanceRecordsPage() {
 
   const filteredTireWheelSuggestions = useMemo(() => {
     const query = normalizeSearchText(tireWheelInput);
-    return tireFormAllowedWheels
+    return tireFormAllowedPositionLabels
       .filter((item) => !tireWheelBatch.some((selected) => selected.toLowerCase() === item.toLowerCase()))
       .filter((item) => (query ? normalizeSearchText(item).includes(query) : true))
       .slice(0, 12);
-  }, [tireFormAllowedWheels, tireWheelBatch, tireWheelInput]);
+  }, [tireFormAllowedPositionLabels, tireWheelBatch, tireWheelInput]);
 
   const recordTotalPages = useMemo(
     () => Math.max(1, Math.ceil(scopedRecords.length / TABLE_PAGE_SIZE)),
@@ -914,14 +933,24 @@ export function MaintenanceRecordsPage() {
   }
 
   function removeTireAxle(valueToRemove: string) {
-    setTireAxleBatch((prev) => prev.filter((value) => value !== valueToRemove));
+    setTireAxleBatch((prev) => {
+      const next = prev.filter((value) => value !== valueToRemove);
+      setTireWheelBatch((currentPairs) =>
+        currentPairs.filter((label) => {
+          const parsed = parsePositionLabel(label);
+          if (!parsed) return false;
+          return next.some((axle) => normalizeSearchText(axle) === normalizeSearchText(parsed.axlePosition));
+        }),
+      );
+      return next;
+    });
   }
 
   function addTireWheels(values: string[]) {
     const normalized = values.map(normalizeTirePositionLabel).filter(Boolean);
     if (!normalized.length) return;
     const allowedMap = new Map(
-      tireFormAllowedWheels.map((value) => [normalizeSearchText(value), value]),
+      tireFormAllowedPositionLabels.map((value) => [normalizeSearchText(value), value]),
     );
     setTireWheelBatch((prev) => {
       const next = [...prev];
@@ -942,7 +971,7 @@ export function MaintenanceRecordsPage() {
 
   function addSuggestedSlot(slot: TireVisualSlot) {
     addTireAxles([slot.axleValue]);
-    addTireWheels([slot.wheelValue]);
+    addTireWheels([formatPositionLabel(slot.axleValue, slot.wheelValue)]);
   }
 
   function buildPositionPairs(axles: string[], wheels: string[]) {
@@ -1186,7 +1215,7 @@ export function MaintenanceRecordsPage() {
     setTireFieldErrors({});
     setTireAxleBatch([slot.axleValue]);
     setTireAxleInput("");
-    setTireWheelBatch([slot.wheelValue]);
+    setTireWheelBatch([formatPositionLabel(slot.axleValue, slot.wheelValue)]);
     setTireWheelInput("");
     setTireAxleOpen(false);
     setTireWheelOpen(false);
@@ -1211,7 +1240,11 @@ export function MaintenanceRecordsPage() {
     setTireFieldErrors({});
     setTireAxleBatch(tire.axlePosition ? [tire.axlePosition] : []);
     setTireAxleInput("");
-    setTireWheelBatch(tire.wheelPosition ? [tire.wheelPosition] : []);
+    setTireWheelBatch(
+      tire.axlePosition && tire.wheelPosition
+        ? [formatPositionLabel(tire.axlePosition, tire.wheelPosition)]
+        : [],
+    );
     setTireWheelInput("");
     setTireAxleOpen(false);
     setTireWheelOpen(false);
@@ -1237,7 +1270,9 @@ export function MaintenanceRecordsPage() {
   async function saveTire(event: React.FormEvent) {
     event.preventDefault();
     const mergedAxles = [...tireAxleBatch];
-    const mergedWheels = [...tireWheelBatch];
+    const mergedPairs = tireWheelBatch
+      .map((label) => parsePositionLabel(label))
+      .filter((item): item is { axlePosition: string; wheelPosition: string } => Boolean(item));
     const nextErrors: Partial<Record<TireFieldKey, string>> = {};
     if (!tireForm.status) nextErrors.status = "Selecione o status.";
     if (!tireForm.brand.trim()) nextErrors.brand = "Informe a marca.";
@@ -1254,8 +1289,8 @@ export function MaintenanceRecordsPage() {
       size: tireForm.size.trim(),
       status: tireForm.status as TireStatus,
       vehicleId: tireForm.vehicleId || undefined,
-      axlePosition: mergedAxles[0] || tireForm.axlePosition.trim() || undefined,
-      wheelPosition: mergedWheels[0] || tireForm.wheelPosition.trim() || undefined,
+      axlePosition: mergedPairs[0]?.axlePosition || mergedAxles[0] || tireForm.axlePosition.trim() || undefined,
+      wheelPosition: mergedPairs[0]?.wheelPosition || tireForm.wheelPosition.trim() || undefined,
       currentKm: Number(tireForm.currentKm) || 0,
       targetPressurePsi: tireForm.targetPressurePsi ? toNumber(tireForm.targetPressurePsi) : undefined,
       purchaseDate: tireForm.purchaseDate || undefined,
@@ -1273,7 +1308,10 @@ export function MaintenanceRecordsPage() {
           serialNumber: tireForm.serialNumber.trim(),
         });
       } else {
-        const pairs = buildPositionPairsFromSlots(mergedAxles, mergedWheels, tireFormVehicleSlots);
+        const pairs =
+          mergedPairs.length > 0
+            ? mergedPairs
+            : buildPositionPairsFromSlots(mergedAxles, [], tireFormVehicleSlots);
         const failures: number[] = [];
         for (let index = 0; index < pairs.length; index += 1) {
           const pair = pairs[index];
@@ -2082,7 +2120,7 @@ export function MaintenanceRecordsPage() {
                   ) : null}
                 </div>
                 <div className="relative">
-                  <label className="block text-sm font-medium text-slate-700">Posição da roda</label>
+                  <label className="block text-sm font-medium text-slate-700">Posição da roda (eixo + lado)</label>
                   <div className="mt-1 rounded-xl border border-slate-300 px-3 py-3">
                     {tireWheelBatch.length ? (
                       <div className="mb-2 flex flex-wrap gap-2">
@@ -2096,7 +2134,7 @@ export function MaintenanceRecordsPage() {
                     ) : null}
                     <input
                       value={tireWheelInput}
-                      disabled={!tireForm.vehicleId}
+                      disabled={!tireForm.vehicleId || tireAxleBatch.length === 0}
                       onChange={(event) => {
                         setTireWheelInput(event.target.value);
                         setTireWheelOpen(true);
@@ -2118,7 +2156,7 @@ export function MaintenanceRecordsPage() {
                         setTimeout(() => setTireWheelOpen(false), 120);
                       }}
                       className="w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                      placeholder={tireForm.vehicleId ? "Digite uma posição da roda e pressione Enter" : "Selecione um veículo"}
+                      placeholder={!tireForm.vehicleId ? "Selecione um veículo" : tireAxleBatch.length === 0 ? "Selecione o eixo primeiro" : "Selecione a combinação eixo + lado"}
                     />
                   </div>
                   {tireWheelOpen && filteredTireWheelSuggestions.length > 0 ? (
