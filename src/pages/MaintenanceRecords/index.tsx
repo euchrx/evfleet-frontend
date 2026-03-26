@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { LayoutGrid, Table2 } from "lucide-react";
 import { useBranch } from "../../contexts/BranchContext";
 import { getVehicles } from "../../services/vehicles";
 import {
@@ -41,6 +42,7 @@ type SortDirection = "asc" | "desc";
 
 type RecordSortBy = "date" | "vehicle" | "type" | "km" | "cost" | "status";
 type PlanSortBy = "name" | "vehicle" | "interval" | "due" | "status";
+type TireViewMode = "cards" | "table";
 type RecordFieldKey = "vehicleId" | "type" | "status" | "description" | "maintenanceDate" | "km" | "cost";
 type PlanFieldKey = "vehicleId" | "name" | "planType" | "active" | "intervalUnit" | "intervalValue";
 type TireFieldKey = "serialNumber" | "brand" | "model" | "size" | "status";
@@ -383,8 +385,10 @@ export function MaintenanceRecordsPage() {
   const [recordSortDirection, setRecordSortDirection] = useState<SortDirection>("desc");
   const [planSortBy, setPlanSortBy] = useState<PlanSortBy>("name");
   const [planSortDirection, setPlanSortDirection] = useState<SortDirection>("asc");
+  const [tireViewMode, setTireViewMode] = useState<TireViewMode>("cards");
   const [recordPage, setRecordPage] = useState(1);
   const [planPage, setPlanPage] = useState(1);
+  const [tirePage, setTirePage] = useState(1);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
@@ -808,6 +812,10 @@ export function MaintenanceRecordsPage() {
     () => Math.max(1, Math.ceil(scopedPlans.length / TABLE_PAGE_SIZE)),
     [scopedPlans.length]
   );
+  const tireTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(scopedTires.length / TABLE_PAGE_SIZE)),
+    [scopedTires.length]
+  );
 
   const paginatedRecords = useMemo(() => {
     const start = (recordPage - 1) * TABLE_PAGE_SIZE;
@@ -817,6 +825,10 @@ export function MaintenanceRecordsPage() {
     const start = (planPage - 1) * TABLE_PAGE_SIZE;
     return scopedPlans.slice(start, start + TABLE_PAGE_SIZE);
   }, [scopedPlans, planPage]);
+  const paginatedTires = useMemo(() => {
+    const start = (tirePage - 1) * TABLE_PAGE_SIZE;
+    return scopedTires.slice(start, start + TABLE_PAGE_SIZE);
+  }, [scopedTires, tirePage]);
 
   useEffect(() => {
     setRecordPage(1);
@@ -825,11 +837,17 @@ export function MaintenanceRecordsPage() {
     setPlanPage(1);
   }, [search, selectedBranchId, planSortBy, planSortDirection]);
   useEffect(() => {
+    setTirePage(1);
+  }, [search, selectedBranchId, tireViewMode]);
+  useEffect(() => {
     if (recordPage > recordTotalPages) setRecordPage(recordTotalPages);
   }, [recordPage, recordTotalPages]);
   useEffect(() => {
     if (planPage > planTotalPages) setPlanPage(planTotalPages);
   }, [planPage, planTotalPages]);
+  useEffect(() => {
+    if (tirePage > tireTotalPages) setTirePage(tireTotalPages);
+  }, [tirePage, tireTotalPages]);
 
   const maintenanceMetrics = useMemo(() => {
     const pending = scopedRecords.filter((record) => record.status !== "DONE").length;
@@ -1561,7 +1579,26 @@ export function MaintenanceRecordsPage() {
               </select>
             </>
           ) : null}
-          {null}
+          {tab === "tires" ? (
+            <div className="inline-flex w-fit items-center rounded-xl border border-slate-300 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setTireViewMode("cards")}
+                title="Visualizar em cards"
+                className={`cursor-pointer rounded-lg p-2 transition ${tireViewMode === "cards" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setTireViewMode("table")}
+                title="Visualizar em tabela"
+                className={`cursor-pointer rounded-lg p-2 transition ${tireViewMode === "table" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+              >
+                <Table2 className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -1660,7 +1697,7 @@ export function MaintenanceRecordsPage() {
         </section>
       ) : null}
 
-      {!loading && tab === "tires" ? (
+      {!loading && tab === "tires" && tireViewMode === "cards" ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           {tireCardsByVehicle.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-500">Nenhum veículo encontrado.</p>
@@ -1704,6 +1741,76 @@ export function MaintenanceRecordsPage() {
             </div>
             </div>
           )}
+        </section>
+      ) : null}
+
+      {!loading && tab === "tires" && tireViewMode === "table" ? (
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">DOT/TIN</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Pneu</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Veículo / posição</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Leitura</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Status</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedTires.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum pneu encontrado.</td>
+                  </tr>
+                ) : (
+                  paginatedTires.map((item) => {
+                    const vehicle = item.vehicleId ? item.vehicle || vehicleMap.get(item.vehicleId) : undefined;
+                    return (
+                      <tr key={item.id} className="border-t border-slate-200">
+                        <td className="px-6 py-4 text-sm text-slate-700">{item.serialNumber}</td>
+                        <td className="px-6 py-4 text-sm text-slate-900">
+                          <p className="font-medium">{item.brand} {item.model}</p>
+                          <p className="text-xs text-slate-500">{item.size}</p>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-700">
+                          <p>{vehicle ? formatVehicleLabel(vehicle) : "Sem vínculo"}</p>
+                          <p className="text-xs text-slate-500">{item.axlePosition || "-"} / {item.wheelPosition || "-"}</p>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-700">
+                          <p>KM: {(item.currentKm || 0).toLocaleString("pt-BR")}</p>
+                          <p className="text-xs text-slate-500">Pressão recomendada: {item.targetPressurePsi || 0} PSI</p>
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <span className={`status-pill ${item.status === "INSTALLED" ? "status-active" : item.status === "MAINTENANCE" ? "status-pending" : "status-inactive"}`}>
+                            {tireStatusLabel(item.status)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => openReadingModal(item)} className="btn-ui btn-ui-neutral">Leituras</button>
+                            <button type="button" onClick={() => openEditTire(item)} className="btn-ui btn-ui-neutral">Editar</button>
+                            <button type="button" onClick={() => removeTire(item)} className="btn-ui btn-ui-danger">Excluir</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+          {scopedTires.length > 0 ? (
+            <TablePagination
+              currentPage={tirePage}
+              totalPages={tireTotalPages}
+              totalItems={scopedTires.length}
+              pageSize={TABLE_PAGE_SIZE}
+              itemLabel="pneus"
+              onPrevious={() => setTirePage((prev) => Math.max(prev - 1, 1))}
+              onNext={() => setTirePage((prev) => Math.min(prev + 1, tireTotalPages))}
+            />
+          ) : null}
         </section>
       ) : null}
 
