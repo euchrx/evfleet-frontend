@@ -45,8 +45,36 @@ type VehicleFormData = {
   branchId: string;
 };
 
+type VehicleCategory = VehicleFormData["category"];
+type FuelType = Exclude<VehicleFormData["fuelType"], "">;
+
 type ConsumptionRule = { min: number; max: number };
 const CONSUMPTION_RULES_KEY = "evfleet_consumption_rules_v1";
+const FUEL_OPTIONS: Array<{ value: FuelType; label: string }> = [
+  { value: "GASOLINE", label: "Gasolina" },
+  { value: "ETHANOL", label: "Etanol" },
+  { value: "DIESEL", label: "Diesel" },
+  { value: "FLEX", label: "Flex" },
+  { value: "ELECTRIC", label: "Elétrico" },
+  { value: "HYBRID", label: "Híbrido" },
+  { value: "CNG", label: "GNV" },
+];
+const FUEL_BY_CATEGORY: Record<Exclude<VehicleCategory, "">, FuelType[]> = {
+  CAR: ["GASOLINE", "ETHANOL", "FLEX", "ELECTRIC", "HYBRID", "CNG"],
+  TRUCK: ["DIESEL", "CNG"],
+  UTILITY: ["GASOLINE", "ETHANOL", "DIESEL", "FLEX", "CNG"],
+};
+
+function getAllowedFuelByCategory(category: VehicleCategory) {
+  if (!category) return FUEL_OPTIONS;
+  const allowed = FUEL_BY_CATEGORY[category];
+  return FUEL_OPTIONS.filter((item) => allowed.includes(item.value));
+}
+
+function isFuelAllowedForCategory(category: VehicleCategory, fuelType: VehicleFormData["fuelType"]) {
+  if (!category || !fuelType) return true;
+  return FUEL_BY_CATEGORY[category].includes(fuelType as FuelType);
+}
 
 const initialForm: VehicleFormData = {
   plate: "",
@@ -242,6 +270,11 @@ export function VehiclesPage() {
       window.removeEventListener("evfleet-default-branch-updated", refreshBranchLock);
   }, []);
 
+  const allowedFuelOptions = useMemo(
+    () => getAllowedFuelByCategory(form.category),
+    [form.category]
+  );
+
   useEffect(() => {
     function refreshMaxVehiclesAllowed() {
       const settings = readSoftwareSettings();
@@ -401,6 +434,9 @@ export function VehiclesPage() {
       if (!form.vehicleType) nextFieldErrors.vehicleType = "Selecione o tipo de peso.";
       if (!form.category) nextFieldErrors.category = "Selecione o tipo de veículo.";
       if (!form.fuelType) nextFieldErrors.fuelType = "Selecione o combustível.";
+      if (form.category && form.fuelType && !isFuelAllowedForCategory(form.category, form.fuelType)) {
+        nextFieldErrors.fuelType = "Combustível não permitido para o tipo de veículo.";
+      }
       if (!payload.chassis) nextFieldErrors.chassis = "Informe o chassi.";
       if (!payload.renavam) nextFieldErrors.renavam = "Informe o renavam.";
       if (Number.isNaN(payload.year) || payload.year < 1900) {
@@ -417,19 +453,22 @@ export function VehiclesPage() {
 
       const needsConsumptionRule =
         form.vehicleType === "LIGHT" || form.category === "UTILITY";
-      const minConsumption = Number(form.consumptionMinKmPerLiter.replace(",", "."));
-      const maxConsumption = Number(form.consumptionMaxKmPerLiter.replace(",", "."));
+      const minRaw = form.consumptionMinKmPerLiter.trim();
+      const maxRaw = form.consumptionMaxKmPerLiter.trim();
+      const hasConsumptionInput = Boolean(minRaw || maxRaw);
+      const minConsumption = Number(minRaw.replace(",", "."));
+      const maxConsumption = Number(maxRaw.replace(",", "."));
 
-      if (needsConsumptionRule) {
-        if (!form.consumptionMinKmPerLiter || !form.consumptionMaxKmPerLiter) {
-          setFieldErrors((prev) => ({
-            ...prev,
-            consumptionMinKmPerLiter: "Informe a faixa de consumo.",
-            consumptionMaxKmPerLiter: "Informe a faixa de consumo.",
-          }));
-          return;
-        }
+      if (hasConsumptionInput && (!minRaw || !maxRaw)) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          consumptionMinKmPerLiter: "Preencha mínimo e máximo ou deixe ambos em branco.",
+          consumptionMaxKmPerLiter: "Preencha mínimo e máximo ou deixe ambos em branco.",
+        }));
+        return;
+      }
 
+      if (hasConsumptionInput) {
         if (
           Number.isNaN(minConsumption) ||
           Number.isNaN(maxConsumption) ||
@@ -453,7 +492,7 @@ export function VehiclesPage() {
       const savedVehicleId = savedVehicle.id;
       const currentRules = readConsumptionRules();
 
-      if (needsConsumptionRule) {
+      if (needsConsumptionRule && hasConsumptionInput) {
         currentRules[savedVehicleId] = { min: minConsumption, max: maxConsumption };
       } else if (currentRules[savedVehicleId]) {
         delete currentRules[savedVehicleId];
@@ -900,8 +939,15 @@ export function VehiclesPage() {
                     <select
                       value={form.category}
                       onChange={(e) => {
-                        setForm({ ...form, category: e.target.value as "CAR" | "TRUCK" | "UTILITY" });
+                        const nextCategory = e.target.value as "CAR" | "TRUCK" | "UTILITY" | "";
+                        setForm((prev) => {
+                          const allowed = getAllowedFuelByCategory(nextCategory).map((item) => item.value);
+                          const nextFuelType =
+                            prev.fuelType && allowed.includes(prev.fuelType as FuelType) ? prev.fuelType : "";
+                          return { ...prev, category: nextCategory, fuelType: nextFuelType };
+                        });
                         clearFieldError("category");
+                        clearFieldError("fuelType");
                       }}
                       className={getFieldClass("category")}
                     >
@@ -923,13 +969,11 @@ export function VehiclesPage() {
                       className={getFieldClass("fuelType")}
                     >
                       <option value="">Selecione o combustível</option>
-                      <option value="GASOLINE">Gasolina</option>
-                      <option value="ETHANOL">Etanol</option>
-                      <option value="DIESEL">Diesel</option>
-                      <option value="FLEX">Flex</option>
-                      <option value="ELECTRIC">Elétrico</option>
-                      <option value="HYBRID">Híbrido</option>
-                      <option value="CNG">GNV</option>
+                      {allowedFuelOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                     {fieldErrors.fuelType ? <p className="text-xs text-red-600">{fieldErrors.fuelType}</p> : null}
                   </label>

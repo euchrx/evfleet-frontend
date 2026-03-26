@@ -10,13 +10,14 @@ function clean(value: string | null | undefined) {
 
 export function formatVehicleLabel(vehicle?: VehicleLike | null) {
   if (!vehicle) return "Veículo não identificado";
+
   const brand = clean(vehicle.brand);
   const model = clean(vehicle.model);
   const plate = clean(vehicle.plate);
-
   const modelLabel = [brand, model].filter(Boolean).join(" ").trim();
-  if (modelLabel && plate) return `${modelLabel} (${plate})`;
+
+  if (plate && modelLabel) return `${plate} • ${modelLabel}`;
+  if (plate) return plate;
   if (modelLabel) return modelLabel;
-  if (plate) return `Placa ${plate}`;
   return "Veículo não identificado";
 }
