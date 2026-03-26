@@ -215,6 +215,73 @@ function planDueLabel(plan: MaintenancePlan) {
 
 const TABLE_PAGE_SIZE = 10;
 
+type TireViewMode = "table" | "cards";
+
+type TireVisualSlot = {
+  id: string;
+  label: string;
+  axleValue: string;
+  wheelValue: string;
+  axleKey: string;
+  wheelKey: string;
+  extraKey?: string;
+};
+
+const TIRE_VISUAL_SLOTS: TireVisualSlot[] = [
+  {
+    id: "front-left",
+    label: "Dianteiro esquerdo",
+    axleValue: "Dianteiro",
+    wheelValue: "Esquerda",
+    axleKey: "dianteir",
+    wheelKey: "esquerd",
+  },
+  {
+    id: "front-right",
+    label: "Dianteiro direito",
+    axleValue: "Dianteiro",
+    wheelValue: "Direita",
+    axleKey: "dianteir",
+    wheelKey: "direit",
+  },
+  {
+    id: "rear-inner-left",
+    label: "Traseiro interno esquerdo",
+    axleValue: "Traseiro",
+    wheelValue: "Interna esquerda",
+    axleKey: "traseir",
+    wheelKey: "esquerd",
+    extraKey: "intern",
+  },
+  {
+    id: "rear-inner-right",
+    label: "Traseiro interno direito",
+    axleValue: "Traseiro",
+    wheelValue: "Interna direita",
+    axleKey: "traseir",
+    wheelKey: "direit",
+    extraKey: "intern",
+  },
+  {
+    id: "rear-outer-left",
+    label: "Traseiro externo esquerdo",
+    axleValue: "Traseiro",
+    wheelValue: "Externa esquerda",
+    axleKey: "traseir",
+    wheelKey: "esquerd",
+    extraKey: "extern",
+  },
+  {
+    id: "rear-outer-right",
+    label: "Traseiro externo direito",
+    axleValue: "Traseiro",
+    wheelValue: "Externa direita",
+    axleKey: "traseir",
+    wheelKey: "direit",
+    extraKey: "extern",
+  },
+];
+
 export function MaintenanceRecordsPage() {
   const location = useLocation();
   const { selectedBranchId } = useBranch();
@@ -233,6 +300,7 @@ export function MaintenanceRecordsPage() {
   const [planSortDirection, setPlanSortDirection] = useState<SortDirection>("asc");
   const [tireSortBy, setTireSortBy] = useState<TireSortBy>("serial");
   const [tireSortDirection, setTireSortDirection] = useState<SortDirection>("asc");
+  const [tireViewMode, setTireViewMode] = useState<TireViewMode>("table");
   const [recordPage, setRecordPage] = useState(1);
   const [planPage, setPlanPage] = useState(1);
   const [tirePage, setTirePage] = useState(1);
@@ -263,6 +331,8 @@ export function MaintenanceRecordsPage() {
   const [tireForm, setTireForm] = useState<TireFormState>(initialTireForm);
   const [tireSerialInput, setTireSerialInput] = useState("");
   const [tireSerialBatch, setTireSerialBatch] = useState<string[]>([]);
+  const [tireVisualModalOpen, setTireVisualModalOpen] = useState(false);
+  const [selectedTireVehicle, setSelectedTireVehicle] = useState<Vehicle | null>(null);
 
   const [readingModalOpen, setReadingModalOpen] = useState(false);
   const [readingSaving, setReadingSaving] = useState(false);
@@ -508,6 +578,35 @@ export function MaintenanceRecordsPage() {
     });
   }, [tires, selectedBranchId, vehicleMap, search, tireSortBy, tireSortDirection]);
 
+  const tireCardsByVehicle = useMemo(() => {
+    const tiresMap = new Map<string, Tire[]>();
+    for (const tire of scopedTires) {
+      if (!tire.vehicleId) continue;
+      const list = tiresMap.get(tire.vehicleId) || [];
+      list.push(tire);
+      tiresMap.set(tire.vehicleId, list);
+    }
+
+    return scopedVehicles
+      .map((vehicle) => {
+        const list = tiresMap.get(vehicle.id) || [];
+        return {
+          vehicle,
+          tires: list,
+          total: list.length,
+          installed: list.filter((item) => item.status === "INSTALLED").length,
+          maintenance: list.filter((item) => item.status === "MAINTENANCE").length,
+        };
+      })
+      .filter((item) => item.total > 0 || vehicleMap.has(item.vehicle.id))
+      .sort((a, b) => a.vehicle.plate.localeCompare(b.vehicle.plate, "pt-BR", { sensitivity: "base" }));
+  }, [scopedTires, scopedVehicles, vehicleMap]);
+
+  const selectedTireVehicleItems = useMemo(() => {
+    if (!selectedTireVehicle) return [];
+    return scopedTires.filter((item) => item.vehicleId === selectedTireVehicle.id);
+  }, [scopedTires, selectedTireVehicle]);
+
   const recordTotalPages = useMemo(
     () => Math.max(1, Math.ceil(scopedRecords.length / TABLE_PAGE_SIZE)),
     [scopedRecords.length]
@@ -598,6 +697,22 @@ export function MaintenanceRecordsPage() {
       .replace(/[.,;]+$/g, "")
       .trim()
       .toUpperCase();
+  }
+
+  function normalizeSearchText(value: string) {
+    return value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  }
+
+  function tireMatchesSlot(tire: Tire, slot: TireVisualSlot) {
+    const axle = normalizeSearchText(tire.axlePosition || "");
+    const wheel = normalizeSearchText(tire.wheelPosition || "");
+    if (!axle.includes(slot.axleKey)) return false;
+    if (!wheel.includes(slot.wheelKey)) return false;
+    if (slot.extraKey && !wheel.includes(slot.extraKey)) return false;
+    return true;
   }
 
   function getFieldClass(hasError: boolean) {
@@ -824,6 +939,27 @@ export function MaintenanceRecordsPage() {
       currentKm: typeof latestKm === "number" ? String(latestKm) : "",
     });
     setTireModalOpen(true);
+  }
+
+  function openCreateTireForSlot(vehicle: Vehicle, slot: TireVisualSlot) {
+    setEditingTire(null);
+    setTireFieldErrors({});
+    setTireSerialBatch([]);
+    setTireSerialInput("");
+    const latestKm = latestKmByVehicle.get(vehicle.id);
+    setTireForm({
+      ...initialTireForm,
+      vehicleId: vehicle.id,
+      axlePosition: slot.axleValue,
+      wheelPosition: slot.wheelValue,
+      currentKm: typeof latestKm === "number" ? String(latestKm) : "",
+    });
+    setTireModalOpen(true);
+  }
+
+  function openTireVisualModal(vehicle: Vehicle) {
+    setSelectedTireVehicle(vehicle);
+    setTireVisualModalOpen(true);
   }
 
   function openEditTire(tire: Tire) {
@@ -1137,6 +1273,32 @@ export function MaintenanceRecordsPage() {
               </select>
             </>
           ) : null}
+          {tab === "tires" ? (
+            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setTireViewMode("table")}
+                className={`cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  tireViewMode === "table"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-800"
+                }`}
+              >
+                Tabela
+              </button>
+              <button
+                type="button"
+                onClick={() => setTireViewMode("cards")}
+                className={`cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  tireViewMode === "cards"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-800"
+                }`}
+              >
+                Cards
+              </button>
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -1235,7 +1397,7 @@ export function MaintenanceRecordsPage() {
         </section>
       ) : null}
 
-      {!loading && tab === "tires" ? (
+      {!loading && tab === "tires" && tireViewMode === "table" ? (
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full">
@@ -1278,6 +1440,133 @@ export function MaintenanceRecordsPage() {
             />
           ) : null}
         </section>
+      ) : null}
+
+      {!loading && tab === "tires" && tireViewMode === "cards" ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          {tireCardsByVehicle.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">Nenhum veículo encontrado.</p>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {tireCardsByVehicle.map((item) => (
+                <button
+                  key={item.vehicle.id}
+                  type="button"
+                  onClick={() => openTireVisualModal(item.vehicle)}
+                  className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-orange-300 hover:bg-orange-50/40"
+                >
+                  <p className="text-sm font-semibold text-slate-900">{formatVehicleLabel(item.vehicle)}</p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {item.vehicle.status === "ACTIVE"
+                      ? "Ativo"
+                      : item.vehicle.status === "MAINTENANCE"
+                      ? "Em manutenção"
+                      : "Vendido"}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="status-pill status-active">Pneus: {item.total}</span>
+                    <span className="status-pill status-pending">Instalados: {item.installed}</span>
+                    <span className="status-pill status-anomaly">Em manutenção: {item.maintenance}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {tireVisualModalOpen && selectedTireVehicle ? (
+        <div className="fixed inset-0 z-[61] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Posições dos pneus</h2>
+                <p className="text-sm text-slate-500">{formatVehicleLabel(selectedTireVehicle)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setTireVisualModalOpen(false);
+                  setSelectedTireVehicle(null);
+                }}
+                className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-5 p-6">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {TIRE_VISUAL_SLOTS.map((slot) => {
+                  const tire = selectedTireVehicleItems.find((item) => tireMatchesSlot(item, slot));
+
+                  return (
+                    <div key={slot.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm font-semibold text-slate-900">{slot.label}</p>
+                      {tire ? (
+                        <div className="mt-2 space-y-2">
+                          <p className="text-xs text-slate-600">{tire.serialNumber}</p>
+                          <p className="text-xs text-slate-500">
+                            {tire.brand} {tire.model} • {tire.size}
+                          </p>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <button type="button" onClick={() => openReadingModal(tire)} className="btn-ui btn-ui-neutral">
+                              Leituras
+                            </button>
+                            <button type="button" onClick={() => openEditTire(tire)} className="btn-ui btn-ui-neutral">
+                              Editar
+                            </button>
+                            <button type="button" onClick={() => removeTire(tire)} className="btn-ui btn-ui-danger">
+                              Excluir
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2">
+                          <p className="text-xs text-slate-500">Sem pneu vinculado nesta posição.</p>
+                          <button
+                            type="button"
+                            onClick={() => openCreateTireForSlot(selectedTireVehicle, slot)}
+                            className="btn-ui btn-ui-neutral mt-3"
+                          >
+                            + Adicionar pneu
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {selectedTireVehicleItems.filter(
+                (item) => !TIRE_VISUAL_SLOTS.some((slot) => tireMatchesSlot(item, slot)),
+              ).length > 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold text-slate-900">Pneus sem posição mapeada</p>
+                  <div className="mt-3 space-y-2">
+                    {selectedTireVehicleItems
+                      .filter((item) => !TIRE_VISUAL_SLOTS.some((slot) => tireMatchesSlot(item, slot)))
+                      .map((item) => (
+                        <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                          <p className="text-sm text-slate-700">
+                            {item.serialNumber} • {item.brand} {item.model} ({item.size})
+                          </p>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => openEditTire(item)} className="btn-ui btn-ui-neutral">
+                              Editar
+                            </button>
+                            <button type="button" onClick={() => removeTire(item)} className="btn-ui btn-ui-danger">
+                              Excluir
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {recordModalOpen ? (
