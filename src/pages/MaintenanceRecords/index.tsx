@@ -395,8 +395,10 @@ export function MaintenanceRecordsPage() {
   const [tireFieldErrors, setTireFieldErrors] = useState<Partial<Record<TireFieldKey, string>>>({});
   const [editingTire, setEditingTire] = useState<Tire | null>(null);
   const [tireForm, setTireForm] = useState<TireFormState>(initialTireForm);
-  const [tireSerialInput, setTireSerialInput] = useState("");
-  const [tireSerialBatch, setTireSerialBatch] = useState<string[]>([]);
+  const [tireAxleInput, setTireAxleInput] = useState("");
+  const [tireAxleBatch, setTireAxleBatch] = useState<string[]>([]);
+  const [tireWheelInput, setTireWheelInput] = useState("");
+  const [tireWheelBatch, setTireWheelBatch] = useState<string[]>([]);
   const [tireVisualModalOpen, setTireVisualModalOpen] = useState(false);
   const [selectedTireVehicle, setSelectedTireVehicle] = useState<Vehicle | null>(null);
 
@@ -783,11 +785,14 @@ export function MaintenanceRecordsPage() {
     return value.replace(/[.,;]+$/g, "").trim();
   }
 
-  function normalizeSerialLabel(value: string) {
-    return value
-      .replace(/[.,;]+$/g, "")
-      .trim()
-      .toUpperCase();
+  function normalizeTirePositionLabel(value: string) {
+    return value.replace(/[.,;]+$/g, "").trim();
+  }
+
+  function generateAutoTireSerial(index: number) {
+    const base = Date.now().toString(36).toUpperCase();
+    const suffix = String(index + 1).padStart(2, "0");
+    return `AUTO-${base}-${suffix}`;
   }
 
   function normalizeSearchText(value: string) {
@@ -835,22 +840,65 @@ export function MaintenanceRecordsPage() {
     }));
   }
 
-  function addTireSerials(serials: string[]) {
-    const normalized = serials.map(normalizeSerialLabel).filter(Boolean);
+  function addTireAxles(values: string[]) {
+    const normalized = values.map(normalizeTirePositionLabel).filter(Boolean);
     if (!normalized.length) return;
-    setTireSerialBatch((prev) => {
+    setTireAxleBatch((prev) => {
       const next = [...prev];
-      for (const serial of normalized) {
-        if (!next.some((item) => item.toLowerCase() === serial.toLowerCase())) {
-          next.push(serial);
+      for (const value of normalized) {
+        if (!next.some((item) => item.toLowerCase() === value.toLowerCase())) {
+          next.push(value);
         }
       }
       return next;
     });
   }
 
-  function removeTireSerial(serialToRemove: string) {
-    setTireSerialBatch((prev) => prev.filter((serial) => serial !== serialToRemove));
+  function removeTireAxle(valueToRemove: string) {
+    setTireAxleBatch((prev) => prev.filter((value) => value !== valueToRemove));
+  }
+
+  function addTireWheels(values: string[]) {
+    const normalized = values.map(normalizeTirePositionLabel).filter(Boolean);
+    if (!normalized.length) return;
+    setTireWheelBatch((prev) => {
+      const next = [...prev];
+      for (const value of normalized) {
+        if (!next.some((item) => item.toLowerCase() === value.toLowerCase())) {
+          next.push(value);
+        }
+      }
+      return next;
+    });
+  }
+
+  function removeTireWheel(valueToRemove: string) {
+    setTireWheelBatch((prev) => prev.filter((value) => value !== valueToRemove));
+  }
+
+  function buildPositionPairs(axles: string[], wheels: string[]) {
+    if (!axles.length && !wheels.length) {
+      return [{ axlePosition: undefined, wheelPosition: undefined }];
+    }
+    if (!axles.length) {
+      return wheels.map((wheelPosition) => ({ axlePosition: undefined, wheelPosition }));
+    }
+    if (!wheels.length) {
+      return axles.map((axlePosition) => ({ axlePosition, wheelPosition: undefined }));
+    }
+    if (axles.length === wheels.length) {
+      return axles.map((axlePosition, index) => ({
+        axlePosition,
+        wheelPosition: wheels[index],
+      }));
+    }
+    const pairs: Array<{ axlePosition: string; wheelPosition: string }> = [];
+    for (const axlePosition of axles) {
+      for (const wheelPosition of wheels) {
+        pairs.push({ axlePosition, wheelPosition });
+      }
+    }
+    return pairs;
   }
 
   function openCreateRecord() {
@@ -1021,8 +1069,10 @@ export function MaintenanceRecordsPage() {
   function openCreateTire() {
     setEditingTire(null);
     setTireFieldErrors({});
-    setTireSerialBatch([]);
-    setTireSerialInput("");
+    setTireAxleBatch([]);
+    setTireAxleInput("");
+    setTireWheelBatch([]);
+    setTireWheelInput("");
     const defaultVehicleId = "";
     const latestKm = undefined;
     setTireForm({
@@ -1036,8 +1086,10 @@ export function MaintenanceRecordsPage() {
   function openCreateTireForSlot(vehicle: Vehicle, slot: TireVisualSlot) {
     setEditingTire(null);
     setTireFieldErrors({});
-    setTireSerialBatch([]);
-    setTireSerialInput("");
+    setTireAxleBatch([slot.axleValue]);
+    setTireAxleInput("");
+    setTireWheelBatch([slot.wheelValue]);
+    setTireWheelInput("");
     const latestKm = latestKmByVehicle.get(vehicle.id);
     setTireForm({
       ...initialTireForm,
@@ -1057,8 +1109,10 @@ export function MaintenanceRecordsPage() {
   function openEditTire(tire: Tire) {
     setEditingTire(tire);
     setTireFieldErrors({});
-    setTireSerialBatch([]);
-    setTireSerialInput("");
+    setTireAxleBatch(tire.axlePosition ? [tire.axlePosition] : []);
+    setTireAxleInput("");
+    setTireWheelBatch(tire.wheelPosition ? [tire.wheelPosition] : []);
+    setTireWheelInput("");
     setTireForm({
       serialNumber: tire.serialNumber || "",
       brand: tire.brand || "",
@@ -1080,16 +1134,15 @@ export function MaintenanceRecordsPage() {
 
   async function saveTire(event: React.FormEvent) {
     event.preventDefault();
-    const pendingSerial = normalizeSerialLabel(tireSerialInput);
-    const mergedSerials = pendingSerial
-      ? Array.from(new Set([...tireSerialBatch, pendingSerial]))
-      : tireSerialBatch;
+    const pendingAxle = normalizeTirePositionLabel(tireAxleInput);
+    const pendingWheel = normalizeTirePositionLabel(tireWheelInput);
+    const mergedAxles = pendingAxle
+      ? Array.from(new Set([...tireAxleBatch, pendingAxle]))
+      : tireAxleBatch;
+    const mergedWheels = pendingWheel
+      ? Array.from(new Set([...tireWheelBatch, pendingWheel]))
+      : tireWheelBatch;
     const nextErrors: Partial<Record<TireFieldKey, string>> = {};
-    if (editingTire) {
-      if (!tireForm.serialNumber.trim()) nextErrors.serialNumber = "Informe o DOT/TIN.";
-    } else if (!mergedSerials.length) {
-      nextErrors.serialNumber = "Informe ao menos um DOT/TIN.";
-    }
     if (!tireForm.status) nextErrors.status = "Selecione o status.";
     if (!tireForm.brand.trim()) nextErrors.brand = "Informe a marca.";
     if (!tireForm.model.trim()) nextErrors.model = "Informe o modelo.";
@@ -1105,8 +1158,8 @@ export function MaintenanceRecordsPage() {
       size: tireForm.size.trim(),
       status: tireForm.status as TireStatus,
       vehicleId: tireForm.vehicleId || undefined,
-      axlePosition: tireForm.axlePosition.trim() || undefined,
-      wheelPosition: tireForm.wheelPosition.trim() || undefined,
+      axlePosition: mergedAxles[0] || tireForm.axlePosition.trim() || undefined,
+      wheelPosition: mergedWheels[0] || tireForm.wheelPosition.trim() || undefined,
       currentKm: Number(tireForm.currentKm) || 0,
       targetPressurePsi: tireForm.targetPressurePsi ? toNumber(tireForm.targetPressurePsi) : undefined,
       purchaseDate: tireForm.purchaseDate || undefined,
@@ -1121,35 +1174,41 @@ export function MaintenanceRecordsPage() {
       if (editingTire) {
         await updateTire(editingTire.id, {
           ...payloadBase,
-          serialNumber: tireForm.serialNumber.trim().toUpperCase(),
+          serialNumber: tireForm.serialNumber.trim(),
         });
       } else {
-        const failures: string[] = [];
-        for (const serialNumber of mergedSerials) {
+        const pairs = buildPositionPairs(mergedAxles, mergedWheels);
+        const failures: number[] = [];
+        for (let index = 0; index < pairs.length; index += 1) {
+          const pair = pairs[index];
           try {
             await createTire({
               ...payloadBase,
-              serialNumber,
+              serialNumber: generateAutoTireSerial(index),
+              axlePosition: pair.axlePosition || payloadBase.axlePosition,
+              wheelPosition: pair.wheelPosition || payloadBase.wheelPosition,
             });
           } catch {
-            failures.push(serialNumber);
+            failures.push(index + 1);
           }
         }
 
         if (failures.length) {
           setTireFieldErrors((prev) => ({
             ...prev,
-            serialNumber:
-              failures.length === mergedSerials.length
-                ? "Nao foi possivel cadastrar os DOT/TIN informados. Revise os dados."
-                : `Alguns DOT/TIN nao foram cadastrados: ${failures.slice(0, 5).join(", ")}${failures.length > 5 ? "..." : ""}`,
+            brand:
+              failures.length === pairs.length
+                ? "Não foi possível cadastrar os pneus nas posições selecionadas."
+                : `Algumas posições não foram cadastradas: ${failures.slice(0, 5).join(", ")}${failures.length > 5 ? "..." : ""}`,
           }));
           return;
         }
       }
       setTireModalOpen(false);
-      setTireSerialBatch([]);
-      setTireSerialInput("");
+      setTireAxleBatch([]);
+      setTireAxleInput("");
+      setTireWheelBatch([]);
+      setTireWheelInput("");
       await loadData();
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
     } catch {
@@ -1861,88 +1920,81 @@ export function MaintenanceRecordsPage() {
             </div>
             <form onSubmit={saveTire} className="space-y-5 p-6">
               <div className="grid gap-4 md:grid-cols-2">
-                {editingTire ? (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">DOT/TIN</label>
-                    <input
-                      value={tireForm.serialNumber}
-                      onChange={(event) => {
-                        setTireFieldErrors((prev) => ({ ...prev, serialNumber: undefined }));
-                        setTireForm((prev) => ({ ...prev, serialNumber: event.target.value }));
-                      }}
-                      className={getFieldClass(Boolean(tireFieldErrors.serialNumber))}
-                      placeholder="Ex: 4B08 A3R 2219"
-                    />
-                    {tireFieldErrors.serialNumber ? (
-                      <p className="mt-1 text-xs text-red-600">{tireFieldErrors.serialNumber}</p>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700">DOT/TIN (lote)</label>
-                    <div
-                      className={`mt-1 rounded-xl border px-3 py-3 ${
-                        tireFieldErrors.serialNumber ? "border-red-400 bg-red-50" : "border-slate-300"
-                      }`}
-                    >
-                      {tireSerialBatch.length ? (
-                        <div className="mb-2 flex flex-wrap gap-2">
-                          {tireSerialBatch.map((serial) => (
-                            <span
-                              key={serial}
-                              className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
-                            >
-                              {serial}
-                              <button
-                                type="button"
-                                onClick={() => removeTireSerial(serial)}
-                                className="cursor-pointer text-slate-500 hover:text-slate-700"
-                              >
-                                x
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                      <input
-                        value={tireSerialInput}
-                        onChange={(event) => {
-                          setTireFieldErrors((prev) => ({ ...prev, serialNumber: undefined }));
-                          setTireSerialInput(event.target.value);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === "," || event.key === ".") {
-                            event.preventDefault();
-                            const chunks = tireSerialInput.split(/[,.]/).map((item) => item.trim());
-                            addTireSerials(chunks);
-                            setTireSerialInput("");
-                          }
-                        }}
-                        onBlur={() => {
-                          if (tireSerialInput.trim()) {
-                            addTireSerials([tireSerialInput]);
-                            setTireSerialInput("");
-                          }
-                        }}
-                        className="w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                        placeholder="Digite o DOT/TIN e pressione Enter, vírgula ou ponto"
-                      />
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Cadastre vários pneus de uma vez com mesma marca/modelo/medida.
-                    </p>
-                    {tireFieldErrors.serialNumber ? (
-                      <p className="mt-1 text-xs text-red-600">{tireFieldErrors.serialNumber}</p>
-                    ) : null}
-                  </div>
-                )}
                 <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={tireForm.status} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, status: undefined })); setTireForm((prev) => ({ ...prev, status: event.target.value as TireStatus | "" })); }} className={getFieldClass(Boolean(tireFieldErrors.status))}><option value="">Selecione o status</option><option value="IN_STOCK">Estoque</option><option value="INSTALLED">Instalado</option><option value="MAINTENANCE">Manutenção</option><option value="RETREADED">Recapado</option><option value="SCRAPPED">Descartado</option></select>{tireFieldErrors.status ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.status}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Marca</label><input value={tireForm.brand} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, brand: undefined })); setTireForm((prev) => ({ ...prev, brand: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.brand))} placeholder="Ex: Michelin" />{tireFieldErrors.brand ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.brand}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Modelo</label><input value={tireForm.model} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, model: undefined })); setTireForm((prev) => ({ ...prev, model: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.model))} placeholder="Ex: X Multi D" />{tireFieldErrors.model ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.model}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Medida</label><input value={tireForm.size} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, size: undefined })); setTireForm((prev) => ({ ...prev, size: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.size))} placeholder="Ex: 295/80R22.5" />{tireFieldErrors.size ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.size}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => setTireForm((prev) => { const vehicleId = event.target.value; if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; })} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select></div>
-                <div><label className="block text-sm font-medium text-slate-700">Posição do eixo</label><input value={tireForm.axlePosition} onChange={(event) => setTireForm((prev) => ({ ...prev, axlePosition: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Traseiro" /></div>
-                <div><label className="block text-sm font-medium text-slate-700">Posição da roda</label><input value={tireForm.wheelPosition} onChange={(event) => setTireForm((prev) => ({ ...prev, wheelPosition: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Dianteira direita" /></div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Posição do eixo</label>
+                  <div className="mt-1 rounded-xl border border-slate-300 px-3 py-3">
+                    {tireAxleBatch.length ? (
+                      <div className="mb-2 flex flex-wrap gap-2">
+                        {tireAxleBatch.map((axle) => (
+                          <span key={axle} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                            {axle}
+                            <button type="button" onClick={() => removeTireAxle(axle)} className="cursor-pointer text-slate-500 hover:text-slate-700">x</button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <input
+                      value={tireAxleInput}
+                      onChange={(event) => setTireAxleInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === "," || event.key === ".") {
+                          event.preventDefault();
+                          const chunks = tireAxleInput.split(/[,.]/).map((item) => item.trim());
+                          addTireAxles(chunks);
+                          setTireAxleInput("");
+                        }
+                      }}
+                      onBlur={() => {
+                        if (tireAxleInput.trim()) {
+                          addTireAxles([tireAxleInput]);
+                          setTireAxleInput("");
+                        }
+                      }}
+                      className="w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                      placeholder="Digite uma posição do eixo e pressione Enter"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Posição da roda</label>
+                  <div className="mt-1 rounded-xl border border-slate-300 px-3 py-3">
+                    {tireWheelBatch.length ? (
+                      <div className="mb-2 flex flex-wrap gap-2">
+                        {tireWheelBatch.map((wheel) => (
+                          <span key={wheel} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                            {wheel}
+                            <button type="button" onClick={() => removeTireWheel(wheel)} className="cursor-pointer text-slate-500 hover:text-slate-700">x</button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <input
+                      value={tireWheelInput}
+                      onChange={(event) => setTireWheelInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === "," || event.key === ".") {
+                          event.preventDefault();
+                          const chunks = tireWheelInput.split(/[,.]/).map((item) => item.trim());
+                          addTireWheels(chunks);
+                          setTireWheelInput("");
+                        }
+                      }}
+                      onBlur={() => {
+                        if (tireWheelInput.trim()) {
+                          addTireWheels([tireWheelInput]);
+                          setTireWheelInput("");
+                        }
+                      }}
+                      className="w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                      placeholder="Digite uma posição da roda e pressione Enter"
+                    />
+                  </div>
+                </div>
                 <div><label className="block text-sm font-medium text-slate-700">KM atual</label><input type="number" min={0} value={tireForm.currentKm} onChange={(event) => setTireForm((prev) => ({ ...prev, currentKm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 128500" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Pressão recomendada (PSI)</label><input value={tireForm.targetPressurePsi} onChange={(event) => setTireForm((prev) => ({ ...prev, targetPressurePsi: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 100" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Data de compra</label><input type="date" value={tireForm.purchaseDate} onChange={(event) => setTireForm((prev) => ({ ...prev, purchaseDate: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
