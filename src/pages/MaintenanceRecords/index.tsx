@@ -682,6 +682,22 @@ export function MaintenanceRecordsPage() {
     return TIRE_VISUAL_SLOTS_CAR;
   }, [selectedTireVehicle]);
 
+  const selectedTireSlotGroups = useMemo(() => {
+    const grouped = new Map<string, TireVisualSlot[]>();
+    for (const slot of selectedTireVehicleSlots) {
+      const list = grouped.get(slot.axleGroup) || [];
+      list.push(slot);
+      grouped.set(slot.axleGroup, list);
+    }
+    return Array.from(grouped.entries()).map(([axleGroup, slots]) => ({
+      axleGroup,
+      slots,
+      filled: slots.filter((slot) =>
+        selectedTireVehicleItems.some((item) => tireMatchesSlot(item, slot)),
+      ).length,
+    }));
+  }, [selectedTireVehicleSlots, selectedTireVehicleItems]);
+
   const recordTotalPages = useMemo(
     () => Math.max(1, Math.ceil(scopedRecords.length / TABLE_PAGE_SIZE)),
     [scopedRecords.length]
@@ -1572,7 +1588,46 @@ export function MaintenanceRecordsPage() {
             </div>
 
             <div className="space-y-5 p-6">
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-4">
+                {selectedTireSlotGroups.map((group) => (
+                  <section key={group.axleGroup} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-slate-900">{group.axleGroup}</h3>
+                      <span className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
+                        {group.filled}/{group.slots.length} posições
+                      </span>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {group.slots.map((slot) => {
+                        const tire = selectedTireVehicleItems.find((item) => tireMatchesSlot(item, slot));
+                        return (
+                          <div key={`${group.axleGroup}-${slot.id}`} className="rounded-xl border border-slate-200 bg-white p-4">
+                            <p className="text-sm font-semibold text-slate-900">{slot.label}</p>
+                            {tire ? (
+                              <div className="mt-2 space-y-2">
+                                <p className="text-xs text-slate-600">{tire.serialNumber}</p>
+                                <p className="text-xs text-slate-500">{tire.brand} {tire.model} • {tire.size}</p>
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                  <button type="button" onClick={() => openReadingModal(tire)} className="btn-ui btn-ui-neutral">Leituras</button>
+                                  <button type="button" onClick={() => openEditTire(tire)} className="btn-ui btn-ui-neutral">Editar</button>
+                                  <button type="button" onClick={() => removeTire(tire)} className="btn-ui btn-ui-danger">Excluir</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-2">
+                                <p className="text-xs text-slate-500">Sem pneu vinculado nesta posição.</p>
+                                <button type="button" onClick={() => openCreateTireForSlot(selectedTireVehicle, slot)} className="btn-ui btn-ui-neutral mt-3">+ Adicionar pneu</button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+
+              <div className="hidden grid gap-3 md:grid-cols-2">
                 {selectedTireVehicleSlots.map((slot) => {
                   const tire = selectedTireVehicleItems.find((item) => tireMatchesSlot(item, slot));
 
