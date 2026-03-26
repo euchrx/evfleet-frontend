@@ -720,6 +720,22 @@ export function MaintenanceRecordsPage() {
     return tireFormVehicleSlots.filter((slot) => !vehicleTires.some((item) => tireMatchesSlot(item, slot)));
   }, [tireFormVehicle, tireFormVehicleSlots, scopedTires]);
 
+  const tireFormMissingAxles = useMemo(
+    () =>
+      Array.from(new Set(tireFormMissingSlots.map((slot) => slot.axleValue))).sort((a, b) =>
+        a.localeCompare(b, "pt-BR"),
+      ),
+    [tireFormMissingSlots],
+  );
+
+  const tireFormMissingWheels = useMemo(
+    () =>
+      Array.from(new Set(tireFormMissingSlots.map((slot) => slot.wheelValue))).sort((a, b) =>
+        a.localeCompare(b, "pt-BR"),
+      ),
+    [tireFormMissingSlots],
+  );
+
   const recordTotalPages = useMemo(
     () => Math.max(1, Math.ceil(scopedRecords.length / TABLE_PAGE_SIZE)),
     [scopedRecords.length]
@@ -1965,6 +1981,7 @@ export function MaintenanceRecordsPage() {
                     ) : null}
                     <input
                       value={tireAxleInput}
+                      list="tire-axle-suggestions"
                       onChange={(event) => setTireAxleInput(event.target.value)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === "," || event.key === ".") {
@@ -1983,6 +2000,11 @@ export function MaintenanceRecordsPage() {
                       className="w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
                       placeholder="Digite uma posição do eixo e pressione Enter"
                     />
+                    <datalist id="tire-axle-suggestions">
+                      {tireFormMissingAxles.map((value) => (
+                        <option key={`axle-suggestion-${value}`} value={value} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
                 <div>
@@ -2000,6 +2022,7 @@ export function MaintenanceRecordsPage() {
                     ) : null}
                     <input
                       value={tireWheelInput}
+                      list="tire-wheel-suggestions"
                       onChange={(event) => setTireWheelInput(event.target.value)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === "," || event.key === ".") {
@@ -2018,9 +2041,14 @@ export function MaintenanceRecordsPage() {
                       className="w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
                       placeholder="Digite uma posição da roda e pressione Enter"
                     />
+                    <datalist id="tire-wheel-suggestions">
+                      {tireFormMissingWheels.map((value) => (
+                        <option key={`wheel-suggestion-${value}`} value={value} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
-                {!editingTire && tireForm.vehicleId ? (
+                {false && !editingTire && tireForm.vehicleId ? (
                   <div className="md:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                       Sugestões sem pneu vinculado
