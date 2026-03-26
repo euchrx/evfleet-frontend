@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { Building2, Settings2, ShieldCheck } from "lucide-react";
-import { addSystemLog, clearSystemLogs } from "../../services/systemLogs";
+import { addSystemLog } from "../../services/systemLogs";
 import { getBranches } from "../../services/branches";
 import type { Branch } from "../../types/branch";
 import {
-  ADMIN_SETTINGS_STORAGE_KEY,
   defaultSoftwareSettings,
   readSoftwareSettings,
   saveSoftwareSettings,
   type SoftwareSettings,
 } from "../../services/adminSettings";
+import { resetAllDatabase } from "../../services/systemReset";
 import {
   MENU_VISIBILITY_ITEMS,
   fetchMenuVisibilityMap,
@@ -108,42 +108,32 @@ export function AdministrationPage() {
 
   async function resetAllSystem() {
     const confirmed = window.confirm(
-      "Tem certeza que deseja executar o RESET ALL? Essa ação irá limpar configurações e dados locais do sistema neste navegador."
+      "Tem certeza que deseja executar o RESET ALL do banco de dados? Essa ação é irreversível e apagará os dados operacionais."
     );
     if (!confirmed) return;
 
     try {
       setResettingAll(true);
-
-      const defaultMenu = getDefaultMenuVisibilityMap();
-      await saveMenuVisibilityMap(defaultMenu);
-      setMenuVisibility(defaultMenu);
-
-      saveSoftwareSettings(defaultSoftwareSettings);
-      setSettings(defaultSoftwareSettings);
-
-      clearSystemLogs();
-
-      const keysToRemove = [
-        ADMIN_SETTINGS_STORAGE_KEY,
-        "evfleet_menu_visibility_cache_v2",
-        "evfleet_consumption_rules_v1",
-        "evfleet_how_to_videos_v1",
-        "selectedBranchId",
-        "token",
-        "auth_user_name",
-      ];
-      keysToRemove.forEach((key) => localStorage.removeItem(key));
+      await resetAllDatabase();
 
       window.dispatchEvent(new CustomEvent("evfleet-settings-updated"));
       window.dispatchEvent(new CustomEvent("evfleet-default-branch-updated"));
       window.dispatchEvent(new CustomEvent("evfleet-menu-visibility-updated"));
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
 
-      setSaveMessage("Reset all concluído. O sistema será recarregado.");
-      window.setTimeout(() => {
-        window.location.href = "/login";
-      }, 900);
+      const defaultMenu = getDefaultMenuVisibilityMap();
+      setMenuVisibility(defaultMenu);
+      setSettings(readSoftwareSettings());
+      setSaveMessage("Reset all do banco concluído com sucesso.");
+      window.setTimeout(() => setSaveMessage(""), 3000);
+      getBranches().then((items) => setBranches(Array.isArray(items) ? items : []));
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Não foi possível executar o reset do banco.";
+      setSaveMessage(String(message));
+      window.setTimeout(() => setSaveMessage(""), 3500);
     } finally {
       setResettingAll(false);
     }
@@ -375,12 +365,12 @@ export function AdministrationPage() {
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-red-700">Reset do sistema</h2>
           <p className="text-sm text-slate-600">
-            Use esta opção para executar um reset all dos dados locais (configurações, visibilidade de menu, logs, sessão e preferências deste navegador).
+            Use esta opção para executar um reset all do banco de dados (dados operacionais do sistema).
           </p>
         </div>
 
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          Atenção: esta ação é irreversível no navegador atual e desconecta a sessão.
+          Atenção: esta ação é irreversível e apaga os registros do banco (usuários são preservados).
         </div>
 
         <div className="mt-4 flex justify-end">
