@@ -399,6 +399,8 @@ export function MaintenanceRecordsPage() {
   const [tireAxleBatch, setTireAxleBatch] = useState<string[]>([]);
   const [tireWheelInput, setTireWheelInput] = useState("");
   const [tireWheelBatch, setTireWheelBatch] = useState<string[]>([]);
+  const [tireAxleOpen, setTireAxleOpen] = useState(false);
+  const [tireWheelOpen, setTireWheelOpen] = useState(false);
   const [tireVisualModalOpen, setTireVisualModalOpen] = useState(false);
   const [selectedTireVehicle, setSelectedTireVehicle] = useState<Vehicle | null>(null);
 
@@ -735,6 +737,22 @@ export function MaintenanceRecordsPage() {
       ),
     [tireFormMissingSlots],
   );
+
+  const filteredTireAxleSuggestions = useMemo(() => {
+    const query = normalizeSearchText(tireAxleInput);
+    return tireFormMissingAxles
+      .filter((item) => !tireAxleBatch.some((selected) => selected.toLowerCase() === item.toLowerCase()))
+      .filter((item) => (query ? normalizeSearchText(item).includes(query) : true))
+      .slice(0, 12);
+  }, [tireFormMissingAxles, tireAxleBatch, tireAxleInput]);
+
+  const filteredTireWheelSuggestions = useMemo(() => {
+    const query = normalizeSearchText(tireWheelInput);
+    return tireFormMissingWheels
+      .filter((item) => !tireWheelBatch.some((selected) => selected.toLowerCase() === item.toLowerCase()))
+      .filter((item) => (query ? normalizeSearchText(item).includes(query) : true))
+      .slice(0, 12);
+  }, [tireFormMissingWheels, tireWheelBatch, tireWheelInput]);
 
   const recordTotalPages = useMemo(
     () => Math.max(1, Math.ceil(scopedRecords.length / TABLE_PAGE_SIZE)),
@@ -1114,6 +1132,8 @@ export function MaintenanceRecordsPage() {
     setTireAxleInput("");
     setTireWheelBatch([]);
     setTireWheelInput("");
+    setTireAxleOpen(false);
+    setTireWheelOpen(false);
     const defaultVehicleId = "";
     const latestKm = undefined;
     setTireForm({
@@ -1131,6 +1151,8 @@ export function MaintenanceRecordsPage() {
     setTireAxleInput("");
     setTireWheelBatch([slot.wheelValue]);
     setTireWheelInput("");
+    setTireAxleOpen(false);
+    setTireWheelOpen(false);
     const latestKm = latestKmByVehicle.get(vehicle.id);
     setTireForm({
       ...initialTireForm,
@@ -1154,6 +1176,8 @@ export function MaintenanceRecordsPage() {
     setTireAxleInput("");
     setTireWheelBatch(tire.wheelPosition ? [tire.wheelPosition] : []);
     setTireWheelInput("");
+    setTireAxleOpen(false);
+    setTireWheelOpen(false);
     setTireForm({
       serialNumber: tire.serialNumber || "",
       brand: tire.brand || "",
@@ -1820,7 +1844,7 @@ export function MaintenanceRecordsPage() {
                   </select>
                   {recordFieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.vehicleId}</p> : null}
                 </div>
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-slate-700">Tipo</label>
                   <select value={recordForm.type} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, type: undefined })); setRecordForm((prev) => ({ ...prev, type: event.target.value as RecordFormState["type"] })); }} className={getFieldClass(Boolean(recordFieldErrors.type))}>
                     <option value="">Selecione o tipo</option>
@@ -1981,8 +2005,11 @@ export function MaintenanceRecordsPage() {
                     ) : null}
                     <input
                       value={tireAxleInput}
-                      list="tire-axle-suggestions"
-                      onChange={(event) => setTireAxleInput(event.target.value)}
+                      onChange={(event) => {
+                        setTireAxleInput(event.target.value);
+                        setTireAxleOpen(true);
+                      }}
+                      onFocus={() => setTireAxleOpen(true)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === "," || event.key === ".") {
                           event.preventDefault();
@@ -1996,18 +2023,33 @@ export function MaintenanceRecordsPage() {
                           addTireAxles([tireAxleInput]);
                           setTireAxleInput("");
                         }
+                        setTimeout(() => setTireAxleOpen(false), 120);
                       }}
                       className="w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
                       placeholder="Digite uma posição do eixo e pressione Enter"
                     />
-                    <datalist id="tire-axle-suggestions">
-                      {tireFormMissingAxles.map((value) => (
-                        <option key={`axle-suggestion-${value}`} value={value} />
-                      ))}
-                    </datalist>
                   </div>
+                  {tireAxleOpen && filteredTireAxleSuggestions.length > 0 ? (
+                    <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                      {filteredTireAxleSuggestions.map((value) => (
+                        <button
+                          key={`axle-suggestion-${value}`}
+                          type="button"
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            addTireAxles([value]);
+                            setTireAxleInput("");
+                            setTireAxleOpen(false);
+                          }}
+                          className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                        >
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-slate-700">Posição da roda</label>
                   <div className="mt-1 rounded-xl border border-slate-300 px-3 py-3">
                     {tireWheelBatch.length ? (
@@ -2022,8 +2064,11 @@ export function MaintenanceRecordsPage() {
                     ) : null}
                     <input
                       value={tireWheelInput}
-                      list="tire-wheel-suggestions"
-                      onChange={(event) => setTireWheelInput(event.target.value)}
+                      onChange={(event) => {
+                        setTireWheelInput(event.target.value);
+                        setTireWheelOpen(true);
+                      }}
+                      onFocus={() => setTireWheelOpen(true)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === "," || event.key === ".") {
                           event.preventDefault();
@@ -2037,16 +2082,31 @@ export function MaintenanceRecordsPage() {
                           addTireWheels([tireWheelInput]);
                           setTireWheelInput("");
                         }
+                        setTimeout(() => setTireWheelOpen(false), 120);
                       }}
                       className="w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
                       placeholder="Digite uma posição da roda e pressione Enter"
                     />
-                    <datalist id="tire-wheel-suggestions">
-                      {tireFormMissingWheels.map((value) => (
-                        <option key={`wheel-suggestion-${value}`} value={value} />
-                      ))}
-                    </datalist>
                   </div>
+                  {tireWheelOpen && filteredTireWheelSuggestions.length > 0 ? (
+                    <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                      {filteredTireWheelSuggestions.map((value) => (
+                        <button
+                          key={`wheel-suggestion-${value}`}
+                          type="button"
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            addTireWheels([value]);
+                            setTireWheelInput("");
+                            setTireWheelOpen(false);
+                          }}
+                          className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                        >
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 {false && !editingTire && tireForm.vehicleId ? (
                   <div className="md:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
