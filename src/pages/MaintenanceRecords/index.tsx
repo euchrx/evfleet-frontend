@@ -700,6 +700,26 @@ export function MaintenanceRecordsPage() {
     }));
   }, [selectedTireVehicleSlots, selectedTireVehicleItems]);
 
+  const tireFormVehicle = useMemo(
+    () => (tireForm.vehicleId ? scopedVehicles.find((vehicle) => vehicle.id === tireForm.vehicleId) || null : null),
+    [scopedVehicles, tireForm.vehicleId],
+  );
+
+  const tireFormVehicleSlots = useMemo(() => {
+    if (!tireFormVehicle) return [];
+    if (tireFormVehicle.category === "CAR") return TIRE_VISUAL_SLOTS_CAR;
+    if (tireFormVehicle.vehicleType === "HEAVY" || tireFormVehicle.category === "TRUCK") {
+      return createHeavyTireSlots(9);
+    }
+    return TIRE_VISUAL_SLOTS_CAR;
+  }, [tireFormVehicle]);
+
+  const tireFormMissingSlots = useMemo(() => {
+    if (!tireFormVehicle) return [];
+    const vehicleTires = scopedTires.filter((item) => item.vehicleId === tireFormVehicle.id);
+    return tireFormVehicleSlots.filter((slot) => !vehicleTires.some((item) => tireMatchesSlot(item, slot)));
+  }, [tireFormVehicle, tireFormVehicleSlots, scopedTires]);
+
   const recordTotalPages = useMemo(
     () => Math.max(1, Math.ceil(scopedRecords.length / TABLE_PAGE_SIZE)),
     [scopedRecords.length]
@@ -874,6 +894,11 @@ export function MaintenanceRecordsPage() {
 
   function removeTireWheel(valueToRemove: string) {
     setTireWheelBatch((prev) => prev.filter((value) => value !== valueToRemove));
+  }
+
+  function addSuggestedSlot(slot: TireVisualSlot) {
+    addTireAxles([slot.axleValue]);
+    addTireWheels([slot.wheelValue]);
   }
 
   function buildPositionPairs(axles: string[], wheels: string[]) {
@@ -1995,6 +2020,31 @@ export function MaintenanceRecordsPage() {
                     />
                   </div>
                 </div>
+                {!editingTire && tireForm.vehicleId ? (
+                  <div className="md:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                      Sugestões sem pneu vinculado
+                    </p>
+                    {tireFormMissingSlots.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {tireFormMissingSlots.map((slot) => (
+                          <button
+                            key={`missing-slot-${slot.id}`}
+                            type="button"
+                            onClick={() => addSuggestedSlot(slot)}
+                            className="cursor-pointer rounded-full border border-emerald-300 bg-white px-3 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
+                          >
+                            {slot.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-xs text-emerald-700">
+                        Todas as posições desse veículo já possuem pneu cadastrado.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
                 <div><label className="block text-sm font-medium text-slate-700">KM atual</label><input type="number" min={0} value={tireForm.currentKm} onChange={(event) => setTireForm((prev) => ({ ...prev, currentKm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 128500" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Pressão recomendada (PSI)</label><input value={tireForm.targetPressurePsi} onChange={(event) => setTireForm((prev) => ({ ...prev, targetPressurePsi: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 100" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Data de compra</label><input type="date" value={tireForm.purchaseDate} onChange={(event) => setTireForm((prev) => ({ ...prev, purchaseDate: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
