@@ -9,7 +9,7 @@ import {
   saveSoftwareSettings,
   type SoftwareSettings,
 } from "../../services/adminSettings";
-import { resetAllDatabase } from "../../services/systemReset";
+import { resetAllDatabaseWithToken } from "../../services/systemReset";
 import {
   MENU_VISIBILITY_ITEMS,
   fetchMenuVisibilityMap,
@@ -28,6 +28,9 @@ export function AdministrationPage() {
   const [updateMessage, setUpdateMessage] = useState("");
   const [updateFeedback, setUpdateFeedback] = useState("");
   const [resettingAll, setResettingAll] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetJwtToken, setResetJwtToken] = useState("");
+  const [resetJwtTokenError, setResetJwtTokenError] = useState("");
 
   useEffect(() => {
     setSettings(readSoftwareSettings());
@@ -107,14 +110,15 @@ export function AdministrationPage() {
   }
 
   async function resetAllSystem() {
-    const confirmed = window.confirm(
-      "Tem certeza que deseja executar o RESET ALL do banco de dados? Essa ação é irreversível e apagará os dados operacionais."
-    );
-    if (!confirmed) return;
+    if (!resetJwtToken.trim()) {
+      setResetJwtTokenError("Informe o token do JWT_SECRET.");
+      return;
+    }
 
     try {
       setResettingAll(true);
-      await resetAllDatabase();
+      setResetJwtTokenError("");
+      await resetAllDatabaseWithToken(resetJwtToken.trim());
 
       window.dispatchEvent(new CustomEvent("evfleet-settings-updated"));
       window.dispatchEvent(new CustomEvent("evfleet-default-branch-updated"));
@@ -127,13 +131,19 @@ export function AdministrationPage() {
       setSaveMessage("Reset all do banco concluído com sucesso.");
       window.setTimeout(() => setSaveMessage(""), 3000);
       getBranches().then((items) => setBranches(Array.isArray(items) ? items : []));
+      setIsResetModalOpen(false);
+      setResetJwtToken("");
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
         error?.message ||
         "Não foi possível executar o reset do banco.";
-      setSaveMessage(String(message));
-      window.setTimeout(() => setSaveMessage(""), 3500);
+      if (/jwt_secret|token/i.test(String(message))) {
+        setResetJwtTokenError(String(message));
+      } else {
+        setSaveMessage(String(message));
+        window.setTimeout(() => setSaveMessage(""), 3500);
+      }
     } finally {
       setResettingAll(false);
     }
@@ -376,7 +386,11 @@ export function AdministrationPage() {
         <div className="mt-4 flex justify-end">
           <button
             type="button"
-            onClick={resetAllSystem}
+            onClick={() => {
+              setResetJwtToken("");
+              setResetJwtTokenError("");
+              setIsResetModalOpen(true);
+            }}
             disabled={resettingAll}
             className="cursor-pointer rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
@@ -384,6 +398,59 @@ export function AdministrationPage() {
           </button>
         </div>
       </div>
+
+      {isResetModalOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="border-b border-slate-200 px-6 py-4">
+              <h3 className="text-lg font-semibold text-slate-900">Confirmar reset all do banco</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Para confirmar, informe o token do <strong>JWT_SECRET</strong>. O sistema não exibe esse valor.
+              </p>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">Token JWT_SECRET</span>
+                <input
+                  type="password"
+                  value={resetJwtToken}
+                  onChange={(e) => {
+                    setResetJwtToken(e.target.value);
+                    setResetJwtTokenError("");
+                  }}
+                  placeholder="Informe o token"
+                  className={`w-full rounded-xl border px-4 py-3 outline-none ${
+                    resetJwtTokenError
+                      ? "border-red-400 bg-red-50 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                      : "border-slate-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  }`}
+                />
+                {resetJwtTokenError ? <p className="text-xs text-red-600">{resetJwtTokenError}</p> : null}
+              </label>
+              <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                Esta ação é irreversível e apaga os dados operacionais do banco.
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setIsResetModalOpen(false)}
+                className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={resetAllSystem}
+                disabled={resettingAll}
+                className="cursor-pointer rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {resettingAll ? "Executando..." : "Confirmar reset all"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
