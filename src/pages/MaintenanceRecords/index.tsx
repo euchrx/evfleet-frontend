@@ -222,63 +222,106 @@ type TireVisualSlot = {
   label: string;
   axleValue: string;
   wheelValue: string;
-  axleKey: string;
-  wheelKey: string;
-  extraKey?: string;
+  axleKeys: string[];
+  wheelKeys: string[];
+  extraKeys?: string[];
 };
 
-const TIRE_VISUAL_SLOTS: TireVisualSlot[] = [
+const TIRE_VISUAL_SLOTS_TRUCK: TireVisualSlot[] = [
   {
     id: "front-left",
     label: "Dianteiro esquerdo",
     axleValue: "Dianteiro",
     wheelValue: "Esquerda",
-    axleKey: "dianteir",
-    wheelKey: "esquerd",
+    axleKeys: ["dianteir"],
+    wheelKeys: ["esquerd"],
   },
   {
     id: "front-right",
     label: "Dianteiro direito",
     axleValue: "Dianteiro",
     wheelValue: "Direita",
-    axleKey: "dianteir",
-    wheelKey: "direit",
+    axleKeys: ["dianteir"],
+    wheelKeys: ["direit"],
   },
   {
     id: "rear-inner-left",
     label: "Traseiro interno esquerdo",
     axleValue: "Traseiro",
     wheelValue: "Interna esquerda",
-    axleKey: "traseir",
-    wheelKey: "esquerd",
-    extraKey: "intern",
+    axleKeys: ["traseir"],
+    wheelKeys: ["esquerd"],
+    extraKeys: ["intern"],
   },
   {
     id: "rear-inner-right",
     label: "Traseiro interno direito",
     axleValue: "Traseiro",
     wheelValue: "Interna direita",
-    axleKey: "traseir",
-    wheelKey: "direit",
-    extraKey: "intern",
+    axleKeys: ["traseir"],
+    wheelKeys: ["direit"],
+    extraKeys: ["intern"],
   },
   {
     id: "rear-outer-left",
     label: "Traseiro externo esquerdo",
     axleValue: "Traseiro",
     wheelValue: "Externa esquerda",
-    axleKey: "traseir",
-    wheelKey: "esquerd",
-    extraKey: "extern",
+    axleKeys: ["traseir"],
+    wheelKeys: ["esquerd"],
+    extraKeys: ["extern"],
   },
   {
     id: "rear-outer-right",
     label: "Traseiro externo direito",
     axleValue: "Traseiro",
     wheelValue: "Externa direita",
-    axleKey: "traseir",
-    wheelKey: "direit",
-    extraKey: "extern",
+    axleKeys: ["traseir"],
+    wheelKeys: ["direit"],
+    extraKeys: ["extern"],
+  },
+];
+
+const TIRE_VISUAL_SLOTS_CAR: TireVisualSlot[] = [
+  {
+    id: "front-left",
+    label: "Dianteiro esquerdo",
+    axleValue: "Dianteiro",
+    wheelValue: "Esquerda",
+    axleKeys: ["dianteir"],
+    wheelKeys: ["esquerd"],
+  },
+  {
+    id: "front-right",
+    label: "Dianteiro direito",
+    axleValue: "Dianteiro",
+    wheelValue: "Direita",
+    axleKeys: ["dianteir"],
+    wheelKeys: ["direit"],
+  },
+  {
+    id: "rear-left",
+    label: "Traseiro esquerdo",
+    axleValue: "Traseiro",
+    wheelValue: "Esquerda",
+    axleKeys: ["traseir"],
+    wheelKeys: ["esquerd"],
+  },
+  {
+    id: "rear-right",
+    label: "Traseiro direito",
+    axleValue: "Traseiro",
+    wheelValue: "Direita",
+    axleKeys: ["traseir"],
+    wheelKeys: ["direit"],
+  },
+  {
+    id: "spare",
+    label: "Estepe",
+    axleValue: "Reserva",
+    wheelValue: "Estepe",
+    axleKeys: ["reserv", "step", "estepe"],
+    wheelKeys: ["reserv", "step", "estepe"],
   },
 ];
 
@@ -607,6 +650,12 @@ export function MaintenanceRecordsPage() {
     return scopedTires.filter((item) => item.vehicleId === selectedTireVehicle.id);
   }, [scopedTires, selectedTireVehicle]);
 
+  const selectedTireVehicleSlots = useMemo(() => {
+    if (!selectedTireVehicle) return TIRE_VISUAL_SLOTS_TRUCK;
+    if (selectedTireVehicle.category === "CAR") return TIRE_VISUAL_SLOTS_CAR;
+    return TIRE_VISUAL_SLOTS_TRUCK;
+  }, [selectedTireVehicle]);
+
   const recordTotalPages = useMemo(
     () => Math.max(1, Math.ceil(scopedRecords.length / TABLE_PAGE_SIZE)),
     [scopedRecords.length]
@@ -709,9 +758,10 @@ export function MaintenanceRecordsPage() {
   function tireMatchesSlot(tire: Tire, slot: TireVisualSlot) {
     const axle = normalizeSearchText(tire.axlePosition || "");
     const wheel = normalizeSearchText(tire.wheelPosition || "");
-    if (!axle.includes(slot.axleKey)) return false;
-    if (!wheel.includes(slot.wheelKey)) return false;
-    if (slot.extraKey && !wheel.includes(slot.extraKey)) return false;
+    const matchesAxle = slot.axleKeys.some((key) => axle.includes(key));
+    const matchesWheel = slot.wheelKeys.some((key) => wheel.includes(key));
+    if (!matchesAxle && !matchesWheel) return false;
+    if (slot.extraKeys && !slot.extraKeys.some((key) => wheel.includes(key) || axle.includes(key))) return false;
     return true;
   }
 
@@ -1497,7 +1547,7 @@ export function MaintenanceRecordsPage() {
 
             <div className="space-y-5 p-6">
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {TIRE_VISUAL_SLOTS.map((slot) => {
+                {selectedTireVehicleSlots.map((slot) => {
                   const tire = selectedTireVehicleItems.find((item) => tireMatchesSlot(item, slot));
 
                   return (
@@ -1538,14 +1588,14 @@ export function MaintenanceRecordsPage() {
                 })}
               </div>
 
-              {selectedTireVehicleItems.filter(
-                (item) => !TIRE_VISUAL_SLOTS.some((slot) => tireMatchesSlot(item, slot)),
+                {selectedTireVehicleItems.filter(
+                (item) => !selectedTireVehicleSlots.some((slot) => tireMatchesSlot(item, slot)),
               ).length > 0 ? (
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
                   <p className="text-sm font-semibold text-slate-900">Pneus sem posição mapeada</p>
                   <div className="mt-3 space-y-2">
                     {selectedTireVehicleItems
-                      .filter((item) => !TIRE_VISUAL_SLOTS.some((slot) => tireMatchesSlot(item, slot)))
+                      .filter((item) => !selectedTireVehicleSlots.some((slot) => tireMatchesSlot(item, slot)))
                       .map((item) => (
                         <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
                           <p className="text-sm text-slate-700">
