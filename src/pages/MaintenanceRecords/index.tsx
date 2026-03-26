@@ -1873,7 +1873,7 @@ export function MaintenanceRecordsPage() {
                   <input type="date" value={recordForm.maintenanceDate} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, maintenanceDate: undefined })); setRecordForm((prev) => ({ ...prev, maintenanceDate: event.target.value })); }} className={getFieldClass(Boolean(recordFieldErrors.maintenanceDate))} />
                   {recordFieldErrors.maintenanceDate ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.maintenanceDate}</p> : null}
                 </div>
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-slate-700">KM</label>
                   <input type="number" min={0} value={recordForm.km} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, km: undefined })); setRecordForm((prev) => ({ ...prev, km: event.target.value })); }} className={getFieldClass(Boolean(recordFieldErrors.km))} placeholder="0" />
                   {recordFieldErrors.km ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.km}</p> : null}
