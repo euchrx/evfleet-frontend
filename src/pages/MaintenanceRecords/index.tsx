@@ -1868,7 +1868,7 @@ export function MaintenanceRecordsPage() {
                   <input value={recordForm.description} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, description: undefined })); setRecordForm((prev) => ({ ...prev, description: event.target.value })); }} className={getFieldClass(Boolean(recordFieldErrors.description))} placeholder="Ex: troca de embreagem, revisão 20.000 km..." />
                   {recordFieldErrors.description ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.description}</p> : null}
                 </div>
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-slate-700">Data</label>
                   <input type="date" value={recordForm.maintenanceDate} onChange={(event) => { setRecordFieldErrors((prev) => ({ ...prev, maintenanceDate: undefined })); setRecordForm((prev) => ({ ...prev, maintenanceDate: event.target.value })); }} className={getFieldClass(Boolean(recordFieldErrors.maintenanceDate))} />
                   {recordFieldErrors.maintenanceDate ? <p className="mt-1 text-xs text-red-600">{recordFieldErrors.maintenanceDate}</p> : null}
