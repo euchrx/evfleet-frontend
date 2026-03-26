@@ -1990,7 +1990,7 @@ export function MaintenanceRecordsPage() {
                 <div><label className="block text-sm font-medium text-slate-700">Modelo</label><input value={tireForm.model} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, model: undefined })); setTireForm((prev) => ({ ...prev, model: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.model))} placeholder="Ex: X Multi D" />{tireFieldErrors.model ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.model}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Medida</label><input value={tireForm.size} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, size: undefined })); setTireForm((prev) => ({ ...prev, size: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.size))} placeholder="Ex: 295/80R22.5" />{tireFieldErrors.size ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.size}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => setTireForm((prev) => { const vehicleId = event.target.value; if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; })} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select></div>
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-slate-700">Posição do eixo</label>
                   <div className="mt-1 rounded-xl border border-slate-300 px-3 py-3">
                     {tireAxleBatch.length ? (
@@ -2030,7 +2030,7 @@ export function MaintenanceRecordsPage() {
                     />
                   </div>
                   {tireAxleOpen && filteredTireAxleSuggestions.length > 0 ? (
-                    <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    <div className="mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white">
                       {filteredTireAxleSuggestions.map((value) => (
                         <button
                           key={`axle-suggestion-${value}`}
@@ -2089,7 +2089,7 @@ export function MaintenanceRecordsPage() {
                     />
                   </div>
                   {tireWheelOpen && filteredTireWheelSuggestions.length > 0 ? (
-                    <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    <div className="mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white">
                       {filteredTireWheelSuggestions.map((value) => (
                         <button
                           key={`wheel-suggestion-${value}`}
