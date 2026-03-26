@@ -41,7 +41,6 @@ type SortDirection = "asc" | "desc";
 
 type RecordSortBy = "date" | "vehicle" | "type" | "km" | "cost" | "status";
 type PlanSortBy = "name" | "vehicle" | "interval" | "due" | "status";
-type TireSortBy = "serial" | "tire" | "vehicle" | "km" | "status";
 type RecordFieldKey = "vehicleId" | "type" | "status" | "description" | "maintenanceDate" | "km" | "cost";
 type PlanFieldKey = "vehicleId" | "name" | "planType" | "active" | "intervalUnit" | "intervalValue";
 type TireFieldKey = "serialNumber" | "brand" | "model" | "size" | "status";
@@ -182,15 +181,26 @@ function formatAxleLabel(axle: string) {
   return normalized.startsWith("eixo") ? axle : `Eixo ${axle}`;
 }
 
+function normalizeWheelToMasculine(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "direita") return "Direito";
+  if (normalized === "esquerda") return "Esquerdo";
+  if (normalized === "interna esquerda") return "Interno esquerdo";
+  if (normalized === "interna direita") return "Interno direito";
+  if (normalized === "externa esquerda") return "Externo esquerdo";
+  if (normalized === "externa direita") return "Externo direito";
+  return value;
+}
+
 function formatPositionLabel(axle: string, wheel: string) {
-  return `${formatAxleLabel(axle)} | Lado ${wheel}`;
+  return `${formatAxleLabel(axle)} | Lado ${normalizeWheelToMasculine(wheel)}`;
 }
 
 function parsePositionLabel(label: string) {
   const [leftRaw, rightRaw] = label.split("|").map((item) => item.trim());
   if (!leftRaw || !rightRaw) return null;
   const axle = leftRaw.replace(/^eixo\s+/i, "").trim();
-  const wheel = rightRaw.replace(/^lado\s+/i, "").trim();
+  const wheel = normalizeWheelToMasculine(rightRaw.replace(/^lado\s+/i, "").trim());
   if (!axle || !wheel) return null;
   return { axlePosition: axle, wheelPosition: wheel };
 }
@@ -213,13 +223,6 @@ function tireStatusLabel(value: TireStatus) {
   return "Descartado";
 }
 
-function tireStatusClass(value: TireStatus) {
-  if (value === "INSTALLED") return "status-active";
-  if (value === "IN_STOCK") return "status-pending";
-  if (value === "MAINTENANCE") return "status-anomaly";
-  return "status-inactive";
-}
-
 function planIntervalLabel(plan: MaintenancePlan) {
   const unitMap: Record<string, string> = { KM: "km", DAY: "dia(s)", MONTH: "mês(es)" };
   return `${plan.intervalValue} ${unitMap[plan.intervalUnit] || plan.intervalUnit}`;
@@ -232,8 +235,6 @@ function planDueLabel(plan: MaintenancePlan) {
 }
 
 const TABLE_PAGE_SIZE = 10;
-
-type TireViewMode = "table" | "cards";
 
 type TireVisualSlot = {
   id: string;
@@ -382,12 +383,8 @@ export function MaintenanceRecordsPage() {
   const [recordSortDirection, setRecordSortDirection] = useState<SortDirection>("desc");
   const [planSortBy, setPlanSortBy] = useState<PlanSortBy>("name");
   const [planSortDirection, setPlanSortDirection] = useState<SortDirection>("asc");
-  const [tireSortBy, setTireSortBy] = useState<TireSortBy>("serial");
-  const [tireSortDirection, setTireSortDirection] = useState<SortDirection>("asc");
-  const [tireViewMode, setTireViewMode] = useState<TireViewMode>("table");
   const [recordPage, setRecordPage] = useState(1);
   const [planPage, setPlanPage] = useState(1);
-  const [tirePage, setTirePage] = useState(1);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
@@ -650,21 +647,16 @@ export function MaintenanceRecordsPage() {
       });
     }
 
-    const direction = tireSortDirection === "asc" ? 1 : -1;
     return [...filtered].sort((a, b) => {
       const va = a.vehicleId ? a.vehicle || vehicleMap.get(a.vehicleId) : undefined;
       const vb = b.vehicleId ? b.vehicle || vehicleMap.get(b.vehicleId) : undefined;
-      if (tireSortBy === "serial") return a.serialNumber.localeCompare(b.serialNumber, "pt-BR") * direction;
-      if (tireSortBy === "tire") return `${a.brand} ${a.model}`.localeCompare(`${b.brand} ${b.model}`, "pt-BR") * direction;
-      if (tireSortBy === "vehicle") {
-        const sa = va ? `${va.brand} ${va.model}` : "";
-        const sb = vb ? `${vb.brand} ${vb.model}` : "";
-        return sa.localeCompare(sb, "pt-BR", { sensitivity: "base" }) * direction;
-      }
-      if (tireSortBy === "km") return ((a.currentKm || 0) - (b.currentKm || 0)) * direction;
-      return tireStatusLabel(a.status).localeCompare(tireStatusLabel(b.status), "pt-BR") * direction;
+      const sa = va ? `${va.brand} ${va.model}` : "";
+      const sb = vb ? `${vb.brand} ${vb.model}` : "";
+      const byVehicle = sa.localeCompare(sb, "pt-BR", { sensitivity: "base" });
+      if (byVehicle !== 0) return byVehicle;
+      return a.serialNumber.localeCompare(b.serialNumber, "pt-BR");
     });
-  }, [tires, selectedBranchId, vehicleMap, search, tireSortBy, tireSortDirection]);
+  }, [tires, selectedBranchId, vehicleMap, search]);
 
   const tireCardsByVehicle = useMemo(() => {
     const tiresMap = new Map<string, Tire[]>();
@@ -686,9 +678,9 @@ export function MaintenanceRecordsPage() {
           maintenance: list.filter((item) => item.status === "MAINTENANCE").length,
         };
       })
-      .filter((item) => item.total > 0 || vehicleMap.has(item.vehicle.id))
+      .filter((item) => item.total > 0)
       .sort((a, b) => a.vehicle.plate.localeCompare(b.vehicle.plate, "pt-BR", { sensitivity: "base" }));
-  }, [scopedTires, scopedVehicles, vehicleMap]);
+  }, [scopedTires, scopedVehicles]);
 
   const selectedTireVehicleItems = useMemo(() => {
     if (!selectedTireVehicle) return [];
@@ -781,10 +773,6 @@ export function MaintenanceRecordsPage() {
     () => Math.max(1, Math.ceil(scopedPlans.length / TABLE_PAGE_SIZE)),
     [scopedPlans.length]
   );
-  const tireTotalPages = useMemo(
-    () => Math.max(1, Math.ceil(scopedTires.length / TABLE_PAGE_SIZE)),
-    [scopedTires.length]
-  );
 
   const paginatedRecords = useMemo(() => {
     const start = (recordPage - 1) * TABLE_PAGE_SIZE;
@@ -794,10 +782,6 @@ export function MaintenanceRecordsPage() {
     const start = (planPage - 1) * TABLE_PAGE_SIZE;
     return scopedPlans.slice(start, start + TABLE_PAGE_SIZE);
   }, [scopedPlans, planPage]);
-  const paginatedTires = useMemo(() => {
-    const start = (tirePage - 1) * TABLE_PAGE_SIZE;
-    return scopedTires.slice(start, start + TABLE_PAGE_SIZE);
-  }, [scopedTires, tirePage]);
 
   useEffect(() => {
     setRecordPage(1);
@@ -806,18 +790,11 @@ export function MaintenanceRecordsPage() {
     setPlanPage(1);
   }, [search, selectedBranchId, planSortBy, planSortDirection]);
   useEffect(() => {
-    setTirePage(1);
-  }, [search, selectedBranchId, tireSortBy, tireSortDirection]);
-
-  useEffect(() => {
     if (recordPage > recordTotalPages) setRecordPage(recordTotalPages);
   }, [recordPage, recordTotalPages]);
   useEffect(() => {
     if (planPage > planTotalPages) setPlanPage(planTotalPages);
   }, [planPage, planTotalPages]);
-  useEffect(() => {
-    if (tirePage > tireTotalPages) setTirePage(tireTotalPages);
-  }, [tirePage, tireTotalPages]);
 
   const maintenanceMetrics = useMemo(() => {
     const pending = scopedRecords.filter((record) => record.status !== "DONE").length;
@@ -1457,15 +1434,6 @@ export function MaintenanceRecordsPage() {
     setPlanSortDirection("asc");
   }
 
-  function handleTireSort(column: TireSortBy) {
-    if (tireSortBy === column) {
-      setTireSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
-      return;
-    }
-    setTireSortBy(column);
-    setTireSortDirection("asc");
-  }
-
   function sortArrow(activeColumn: string, currentColumn: string, direction: SortDirection) {
     if (activeColumn !== currentColumn) return "↕";
     return direction === "asc" ? "↑" : "↓";
@@ -1558,32 +1526,7 @@ export function MaintenanceRecordsPage() {
               </select>
             </>
           ) : null}
-          {tab === "tires" ? (
-            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-              <button
-                type="button"
-                onClick={() => setTireViewMode("table")}
-                className={`cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                  tireViewMode === "table"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-600 hover:text-slate-800"
-                }`}
-              >
-                Tabela
-              </button>
-              <button
-                type="button"
-                onClick={() => setTireViewMode("cards")}
-                className={`cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                  tireViewMode === "cards"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-600 hover:text-slate-800"
-                }`}
-              >
-                Cards
-              </button>
-            </div>
-          ) : null}
+          {null}
         </div>
       </section>
 
@@ -1682,52 +1625,7 @@ export function MaintenanceRecordsPage() {
         </section>
       ) : null}
 
-      {!loading && tab === "tires" && tireViewMode === "table" ? (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleTireSort("serial")} className="cursor-pointer">DOT/TIN {sortArrow("serial", tireSortBy, tireSortDirection)}</button></th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleTireSort("tire")} className="cursor-pointer">Pneu {sortArrow("tire", tireSortBy, tireSortDirection)}</button></th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleTireSort("vehicle")} className="cursor-pointer">Veículo / posição {sortArrow("vehicle", tireSortBy, tireSortDirection)}</button></th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleTireSort("km")} className="cursor-pointer">Leitura {sortArrow("km", tireSortBy, tireSortDirection)}</button></th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleTireSort("status")} className="cursor-pointer">Status {sortArrow("status", tireSortBy, tireSortDirection)}</button></th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scopedTires.length === 0 ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum pneu encontrado.</td></tr> : paginatedTires.map((tire) => {
-                  const vehicle = tire.vehicle || (tire.vehicleId ? vehicleMap.get(tire.vehicleId) : undefined);
-                  return (
-                    <tr key={tire.id} className="border-t border-slate-200">
-                      <td className="px-6 py-4 text-sm text-slate-700">{tire.serialNumber}</td>
-                      <td className="px-6 py-4 text-sm text-slate-900"><p className="font-medium">{tire.brand} {tire.model}</p><p className="text-xs text-slate-500">{tire.size}</p></td>
-                      <td className="px-6 py-4 text-sm text-slate-700"><p>{vehicle ? formatVehicleLabel(vehicle) : "Sem veículo"}</p><p className="text-xs text-slate-500">{tire.axlePosition || "-"} / {tire.wheelPosition || "-"}</p></td>
-                      <td className="px-6 py-4 text-sm text-slate-700"><p>KM: {tire.currentKm || 0}</p><p className="text-xs text-slate-500">Pressão recomendada: {typeof tire.targetPressurePsi === "number" ? `${tire.targetPressurePsi} PSI` : "-"}</p></td>
-                      <td className="px-6 py-4 text-sm"><span className={`status-pill ${tireStatusClass(tire.status)}`}>{tireStatusLabel(tire.status)}</span></td>
-                      <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button type="button" onClick={() => openReadingModal(tire)} className="btn-ui btn-ui-neutral">Leituras</button><button type="button" onClick={() => openEditTire(tire)} className="btn-ui btn-ui-neutral">Editar</button><button type="button" onClick={() => removeTire(tire)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {scopedTires.length > 0 ? (
-            <TablePagination
-              currentPage={tirePage}
-              totalPages={tireTotalPages}
-              totalItems={scopedTires.length}
-              pageSize={TABLE_PAGE_SIZE}
-              itemLabel="pneus"
-              onPrevious={() => setTirePage((prev) => Math.max(prev - 1, 1))}
-              onNext={() => setTirePage((prev) => Math.min(prev + 1, tireTotalPages))}
-            />
-          ) : null}
-        </section>
-      ) : null}
-
-      {!loading && tab === "tires" && tireViewMode === "cards" ? (
+      {!loading && tab === "tires" ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           {tireCardsByVehicle.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-500">Nenhum veículo encontrado.</p>
