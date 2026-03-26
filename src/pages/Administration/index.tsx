@@ -413,11 +413,20 @@ export function AdministrationPage() {
                 <span className="text-sm font-medium text-slate-700">Token JWT_SECRET</span>
                 <input
                   type="password"
+                  id="jwt-reset-token"
+                  name="jwt_reset_token"
                   value={resetJwtToken}
                   onChange={(e) => {
                     setResetJwtToken(e.target.value);
                     setResetJwtTokenError("");
                   }}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  data-form-type="other"
                   placeholder="Informe o token"
                   className={`w-full rounded-xl border px-4 py-3 outline-none ${
                     resetJwtTokenError
