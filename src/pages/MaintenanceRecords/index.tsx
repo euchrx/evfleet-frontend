@@ -722,37 +722,37 @@ export function MaintenanceRecordsPage() {
     return tireFormVehicleSlots.filter((slot) => !vehicleTires.some((item) => tireMatchesSlot(item, slot)));
   }, [tireFormVehicle, tireFormVehicleSlots, scopedTires]);
 
-  const tireFormMissingAxles = useMemo(
+  const tireFormAllowedAxles = useMemo(
     () =>
-      Array.from(new Set(tireFormMissingSlots.map((slot) => slot.axleValue))).sort((a, b) =>
+      Array.from(new Set(tireFormVehicleSlots.map((slot) => slot.axleValue))).sort((a, b) =>
         a.localeCompare(b, "pt-BR"),
       ),
-    [tireFormMissingSlots],
+    [tireFormVehicleSlots],
   );
 
-  const tireFormMissingWheels = useMemo(
+  const tireFormAllowedWheels = useMemo(
     () =>
-      Array.from(new Set(tireFormMissingSlots.map((slot) => slot.wheelValue))).sort((a, b) =>
+      Array.from(new Set(tireFormVehicleSlots.map((slot) => slot.wheelValue))).sort((a, b) =>
         a.localeCompare(b, "pt-BR"),
       ),
-    [tireFormMissingSlots],
+    [tireFormVehicleSlots],
   );
 
   const filteredTireAxleSuggestions = useMemo(() => {
     const query = normalizeSearchText(tireAxleInput);
-    return tireFormMissingAxles
+    return tireFormAllowedAxles
       .filter((item) => !tireAxleBatch.some((selected) => selected.toLowerCase() === item.toLowerCase()))
       .filter((item) => (query ? normalizeSearchText(item).includes(query) : true))
       .slice(0, 12);
-  }, [tireFormMissingAxles, tireAxleBatch, tireAxleInput]);
+  }, [tireFormAllowedAxles, tireAxleBatch, tireAxleInput]);
 
   const filteredTireWheelSuggestions = useMemo(() => {
     const query = normalizeSearchText(tireWheelInput);
-    return tireFormMissingWheels
+    return tireFormAllowedWheels
       .filter((item) => !tireWheelBatch.some((selected) => selected.toLowerCase() === item.toLowerCase()))
       .filter((item) => (query ? normalizeSearchText(item).includes(query) : true))
       .slice(0, 12);
-  }, [tireFormMissingWheels, tireWheelBatch, tireWheelInput]);
+  }, [tireFormAllowedWheels, tireWheelBatch, tireWheelInput]);
 
   const recordTotalPages = useMemo(
     () => Math.max(1, Math.ceil(scopedRecords.length / TABLE_PAGE_SIZE)),
@@ -861,7 +861,7 @@ export function MaintenanceRecordsPage() {
     const wheel = normalizeSearchText(tire.wheelPosition || "");
     const matchesAxle = slot.axleKeys.some((key) => axle.includes(key));
     const matchesWheel = slot.wheelKeys.some((key) => wheel.includes(key));
-    if (!matchesAxle && !matchesWheel) return false;
+    if (!matchesAxle || !matchesWheel) return false;
     if (slot.extraKeys && !slot.extraKeys.some((key) => wheel.includes(key) || axle.includes(key))) return false;
     return true;
   }
@@ -897,11 +897,16 @@ export function MaintenanceRecordsPage() {
   function addTireAxles(values: string[]) {
     const normalized = values.map(normalizeTirePositionLabel).filter(Boolean);
     if (!normalized.length) return;
+    const allowedMap = new Map(
+      tireFormAllowedAxles.map((value) => [normalizeSearchText(value), value]),
+    );
     setTireAxleBatch((prev) => {
       const next = [...prev];
       for (const value of normalized) {
-        if (!next.some((item) => item.toLowerCase() === value.toLowerCase())) {
-          next.push(value);
+        const canonical = allowedMap.get(normalizeSearchText(value));
+        if (!canonical) continue;
+        if (!next.some((item) => item.toLowerCase() === canonical.toLowerCase())) {
+          next.push(canonical);
         }
       }
       return next;
@@ -915,11 +920,16 @@ export function MaintenanceRecordsPage() {
   function addTireWheels(values: string[]) {
     const normalized = values.map(normalizeTirePositionLabel).filter(Boolean);
     if (!normalized.length) return;
+    const allowedMap = new Map(
+      tireFormAllowedWheels.map((value) => [normalizeSearchText(value), value]),
+    );
     setTireWheelBatch((prev) => {
       const next = [...prev];
       for (const value of normalized) {
-        if (!next.some((item) => item.toLowerCase() === value.toLowerCase())) {
-          next.push(value);
+        const canonical = allowedMap.get(normalizeSearchText(value));
+        if (!canonical) continue;
+        if (!next.some((item) => item.toLowerCase() === canonical.toLowerCase())) {
+          next.push(canonical);
         }
       }
       return next;
@@ -958,6 +968,33 @@ export function MaintenanceRecordsPage() {
       }
     }
     return pairs;
+  }
+
+  function buildPositionPairsFromSlots(axles: string[], wheels: string[], slots: TireVisualSlot[]) {
+    const normalizedAxles = new Set(axles.map((value) => normalizeSearchText(value)));
+    const normalizedWheels = new Set(wheels.map((value) => normalizeSearchText(value)));
+    const hasAxles = normalizedAxles.size > 0;
+    const hasWheels = normalizedWheels.size > 0;
+
+    const slotPairs = slots
+      .filter((slot) => {
+        const slotAxle = normalizeSearchText(slot.axleValue);
+        const slotWheel = normalizeSearchText(slot.wheelValue);
+        const axleOk = !hasAxles || normalizedAxles.has(slotAxle);
+        const wheelOk = !hasWheels || normalizedWheels.has(slotWheel);
+        return axleOk && wheelOk;
+      })
+      .map((slot) => ({
+        axlePosition: slot.axleValue,
+        wheelPosition: slot.wheelValue,
+      }));
+
+    const deduped = Array.from(
+      new Map(slotPairs.map((pair) => [`${pair.axlePosition}|${pair.wheelPosition}`, pair])).values(),
+    );
+
+    if (deduped.length > 0) return deduped;
+    return buildPositionPairs(axles, wheels);
   }
 
   function openCreateRecord() {
@@ -1199,14 +1236,8 @@ export function MaintenanceRecordsPage() {
 
   async function saveTire(event: React.FormEvent) {
     event.preventDefault();
-    const pendingAxle = normalizeTirePositionLabel(tireAxleInput);
-    const pendingWheel = normalizeTirePositionLabel(tireWheelInput);
-    const mergedAxles = pendingAxle
-      ? Array.from(new Set([...tireAxleBatch, pendingAxle]))
-      : tireAxleBatch;
-    const mergedWheels = pendingWheel
-      ? Array.from(new Set([...tireWheelBatch, pendingWheel]))
-      : tireWheelBatch;
+    const mergedAxles = [...tireAxleBatch];
+    const mergedWheels = [...tireWheelBatch];
     const nextErrors: Partial<Record<TireFieldKey, string>> = {};
     if (!tireForm.status) nextErrors.status = "Selecione o status.";
     if (!tireForm.brand.trim()) nextErrors.brand = "Informe a marca.";
@@ -1242,7 +1273,7 @@ export function MaintenanceRecordsPage() {
           serialNumber: tireForm.serialNumber.trim(),
         });
       } else {
-        const pairs = buildPositionPairs(mergedAxles, mergedWheels);
+        const pairs = buildPositionPairsFromSlots(mergedAxles, mergedWheels, tireFormVehicleSlots);
         const failures: number[] = [];
         for (let index = 0; index < pairs.length; index += 1) {
           const pair = pairs[index];
@@ -1985,11 +2016,11 @@ export function MaintenanceRecordsPage() {
             </div>
             <form onSubmit={saveTire} className="space-y-5 p-6">
               <div className="grid gap-4 md:grid-cols-2">
-                <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={tireForm.status} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, status: undefined })); setTireForm((prev) => ({ ...prev, status: event.target.value as TireStatus | "" })); }} className={getFieldClass(Boolean(tireFieldErrors.status))}><option value="">Selecione o status</option><option value="IN_STOCK">Estoque</option><option value="INSTALLED">Instalado</option><option value="MAINTENANCE">Manutenção</option><option value="RETREADED">Recapado</option><option value="SCRAPPED">Descartado</option></select>{tireFieldErrors.status ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.status}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Marca</label><input value={tireForm.brand} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, brand: undefined })); setTireForm((prev) => ({ ...prev, brand: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.brand))} placeholder="Ex: Michelin" />{tireFieldErrors.brand ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.brand}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Modelo</label><input value={tireForm.model} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, model: undefined })); setTireForm((prev) => ({ ...prev, model: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.model))} placeholder="Ex: X Multi D" />{tireFieldErrors.model ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.model}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Medida</label><input value={tireForm.size} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, size: undefined })); setTireForm((prev) => ({ ...prev, size: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.size))} placeholder="Ex: 295/80R22.5" />{tireFieldErrors.size ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.size}</p> : null}</div>
-                <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => setTireForm((prev) => { const vehicleId = event.target.value; if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; })} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select></div>
+                <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={tireForm.status} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, status: undefined })); setTireForm((prev) => ({ ...prev, status: event.target.value as TireStatus | "" })); }} className={getFieldClass(Boolean(tireFieldErrors.status))}><option value="">Selecione o status</option><option value="IN_STOCK">Estoque</option><option value="INSTALLED">Instalado</option><option value="MAINTENANCE">Manutenção</option><option value="RETREADED">Recapado</option><option value="SCRAPPED">Descartado</option></select>{tireFieldErrors.status ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.status}</p> : null}</div>
+                <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => { const vehicleId = event.target.value; setTireAxleBatch([]); setTireAxleInput(""); setTireWheelBatch([]); setTireWheelInput(""); setTireAxleOpen(false); setTireWheelOpen(false); setTireForm((prev) => { if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; }); }} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select></div>
                 <div className="relative">
                   <label className="block text-sm font-medium text-slate-700">Posição do eixo</label>
                   <div className="mt-1 rounded-xl border border-slate-300 px-3 py-3">
@@ -2005,6 +2036,7 @@ export function MaintenanceRecordsPage() {
                     ) : null}
                     <input
                       value={tireAxleInput}
+                      disabled={!tireForm.vehicleId}
                       onChange={(event) => {
                         setTireAxleInput(event.target.value);
                         setTireAxleOpen(true);
@@ -2026,7 +2058,7 @@ export function MaintenanceRecordsPage() {
                         setTimeout(() => setTireAxleOpen(false), 120);
                       }}
                       className="w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                      placeholder="Digite uma posição do eixo e pressione Enter"
+                      placeholder={tireForm.vehicleId ? "Digite uma posição do eixo e pressione Enter" : "Selecione um veículo"}
                     />
                   </div>
                   {tireAxleOpen && filteredTireAxleSuggestions.length > 0 ? (
@@ -2064,6 +2096,7 @@ export function MaintenanceRecordsPage() {
                     ) : null}
                     <input
                       value={tireWheelInput}
+                      disabled={!tireForm.vehicleId}
                       onChange={(event) => {
                         setTireWheelInput(event.target.value);
                         setTireWheelOpen(true);
@@ -2085,7 +2118,7 @@ export function MaintenanceRecordsPage() {
                         setTimeout(() => setTireWheelOpen(false), 120);
                       }}
                       className="w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                      placeholder="Digite uma posição da roda e pressione Enter"
+                      placeholder={tireForm.vehicleId ? "Digite uma posição da roda e pressione Enter" : "Selecione um veículo"}
                     />
                   </div>
                   {tireWheelOpen && filteredTireWheelSuggestions.length > 0 ? (
