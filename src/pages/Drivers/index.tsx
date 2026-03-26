@@ -6,6 +6,7 @@ import { getVehicles } from "../../services/vehicles";
 import { useBranch } from "../../contexts/BranchContext";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
+import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
 type DriverFormData = {
   name: string;
@@ -264,7 +265,7 @@ export function DriversPage() {
             driver.cnhCategory,
             driver.phone || "",
             getDriverStatusLabel(driver.status),
-            driver.vehicle ? `${driver.vehicle.brand} ${driver.vehicle.model}` : "",
+            driver.vehicle ? formatVehicleLabel(driver.vehicle) : "",
             driver.vehicle?.plate || "",
           ]
             .join(" ")
@@ -281,8 +282,8 @@ export function DriversPage() {
       if (sortBy === "cnh") return a.cnh.localeCompare(b.cnh, "pt-BR") * direction;
       if (sortBy === "cnhCategory") return a.cnhCategory.localeCompare(b.cnhCategory, "pt-BR") * direction;
       if (sortBy === "vehicle") {
-        const aVehicle = a.vehicle ? `${a.vehicle.brand} ${a.vehicle.model}` : "";
-        const bVehicle = b.vehicle ? `${b.vehicle.brand} ${b.vehicle.model}` : "";
+        const aVehicle = a.vehicle ? formatVehicleLabel(a.vehicle) : "";
+        const bVehicle = b.vehicle ? formatVehicleLabel(b.vehicle) : "";
         return aVehicle.localeCompare(bVehicle, "pt-BR", { sensitivity: "base" }) * direction;
       }
       if (sortBy === "status") return a.status.localeCompare(b.status, "pt-BR") * direction;
@@ -392,7 +393,9 @@ export function DriversPage() {
                     <td className="px-6 py-4 text-sm text-slate-600">{formatCpf(driver.cpf)}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{driver.cnh}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{driver.cnhCategory}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{driver.vehicle ? `${driver.vehicle.brand} ${driver.vehicle.model}` : "Sem vinculo"}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      {driver.vehicle ? formatVehicleLabel(driver.vehicle) : "Sem vinculo"}
+                    </td>
                     <td className="px-6 py-4 text-sm"><span className={`status-pill ${driver.status === "ACTIVE" ? "status-active" : "status-inactive"}`}>{getDriverStatusLabel(driver.status)}</span></td>
                     <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openEditModal(driver)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => handleDelete(driver)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
                   </tr>
@@ -434,7 +437,7 @@ export function DriversPage() {
                 <div><label className="block text-sm font-medium text-slate-700">Categoria CNH</label><input type="text" value={form.cnhCategory} onChange={(e) => handleChange("cnhCategory", e.target.value.toUpperCase())} className={`${inputClass("cnhCategory")} uppercase`} placeholder="AB" />{fieldErrors.cnhCategory ? <p className="mt-1 text-xs text-red-600">{fieldErrors.cnhCategory}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Vencimento da CNH</label><input type="date" value={form.cnhExpiresAt} onChange={(e) => handleChange("cnhExpiresAt", e.target.value)} className={inputClass("cnhExpiresAt")} />{fieldErrors.cnhExpiresAt ? <p className="mt-1 text-xs text-red-600">{fieldErrors.cnhExpiresAt}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={form.status} onChange={(e) => handleChange("status", e.target.value)} className={inputClass("status")}><option value="ACTIVE">Ativo</option><option value="INACTIVE">Inativo</option></select>{fieldErrors.status ? <p className="mt-1 text-xs text-red-600">{fieldErrors.status}</p> : null}</div>
-                <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Veículo vinculado</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className={inputClass("vehicleId")}><option value="">Sem vinculo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model}</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
+                <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Veículo vinculado</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className={inputClass("vehicleId")}><option value="">Sem vinculo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
               </div>
 
 

@@ -22,6 +22,7 @@ import { AlertTriangle, CarFront, Gauge } from "lucide-react";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
+import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
 type FuelFormData = {
   liters: string;
@@ -444,7 +445,7 @@ export function FuelRecordsPage() {
             getRecordBranchName(record),
             record.station || "",
             record.vehicle?.plate || "",
-            record.vehicle ? `${record.vehicle.brand} ${record.vehicle.model}` : "",
+            record.vehicle ? formatVehicleLabel(record.vehicle) : "",
             record.driver?.name || "",
             record.fuelType,
             formatLocalDate(record.fuelDate),
@@ -677,9 +678,7 @@ export function FuelRecordsPage() {
                       {getRecordBranchName(record)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      {record.vehicle
-                        ? `${record.vehicle.brand} ${record.vehicle.model}`
-                        : record.vehicleId}
+                      {record.vehicle ? formatVehicleLabel(record.vehicle) : record.vehicleId}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {record.driver?.name || "Sem motorista"}
@@ -786,7 +785,7 @@ export function FuelRecordsPage() {
                     <option value="">Selecione um veículo</option>
                     {availableVehicles.map((vehicle) => (
                       <option key={vehicle.id} value={vehicle.id}>
-                        {vehicle.brand} {vehicle.model}
+                        {formatVehicleLabel(vehicle)}
                       </option>
                     ))}
                   </select>

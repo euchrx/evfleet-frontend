@@ -482,11 +482,16 @@ export function VehiclesPage() {
       if (/branch|filial/i.test(message)) {
         duplicatedFieldErrors.branchId = "Filial invalida.";
       }
-      if (/chassi.+minimo|minimo.+chassi|chassis.+longer than or equal to/i.test(message)) {
-        duplicatedFieldErrors.chassis = "Chassi deve ter no minimo 8 caracteres.";
+      if (
+        /chassi.+mínimo|mínimo.+chassi|chassi.+minimo|minimo.+chassi|chassis.+longer than or equal to/i.test(
+          message,
+        )
+      ) {
+        duplicatedFieldErrors.chassis = "Chassi deve ter no mínimo 8 caracteres.";
       }
 
       if (Object.keys(duplicatedFieldErrors).length > 0) {
+        setFormErrorMessage("");
         setFieldErrors((prev) => ({ ...prev, ...duplicatedFieldErrors }));
       } else {
         setFormErrorMessage(message);

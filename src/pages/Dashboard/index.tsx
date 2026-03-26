@@ -25,6 +25,7 @@ import { getFuelRecords, type FuelRecord } from "../../services/fuelRecords";
 import { getMaintenanceRecords } from "../../services/maintenanceRecords";
 import { getTrips } from "../../services/trips";
 import { getVehicles } from "../../services/vehicles";
+import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
 function toCurrency(value: number) {
   return value.toLocaleString("pt-BR", {
@@ -370,7 +371,7 @@ export function DashboardPage() {
       .map(([vehicleId, total]) => {
         const vehicle = toLabel.get(vehicleId);
         const label = vehicle
-          ? `${vehicle.brand} ${vehicle.model}`
+          ? formatVehicleLabel(vehicle)
           : `Veículo ${vehicleId.slice(0, 8)}`;
         const vehicleType = vehicle?.vehicleType;
         return { vehicleId, label, value: total, vehicleType };
@@ -626,7 +627,7 @@ export function DashboardPage() {
     costDetails.fuel.forEach((record) => {
       const key = record.vehicleId;
       const plate = record.vehicle?.plate || "";
-      const label = record.vehicle ? `${record.vehicle.brand} ${record.vehicle.model}` : "Veículo não identificado";
+      const label = record.vehicle ? formatVehicleLabel(record.vehicle) : "Veículo não identificado";
       const current = fuelByVehicle.get(key) || {
         label,
         plate,
@@ -647,7 +648,7 @@ export function DashboardPage() {
     costDetails.maintenance.forEach((record) => {
       const key = record.vehicleId;
       const plate = record.vehicle?.plate || "";
-      const label = record.vehicle ? `${record.vehicle.brand} ${record.vehicle.model}` : "Veículo não identificado";
+      const label = record.vehicle ? formatVehicleLabel(record.vehicle) : "Veículo não identificado";
       const current = maintenanceByVehicle.get(key) || {
         label,
         plate,
@@ -668,7 +669,7 @@ export function DashboardPage() {
     costDetails.debts.forEach((debt) => {
       const key = debt.vehicleId;
       const plate = debt.vehicle?.plate || "";
-      const label = debt.vehicle ? `${debt.vehicle.brand} ${debt.vehicle.model}` : "Veículo não identificado";
+      const label = debt.vehicle ? formatVehicleLabel(debt.vehicle) : "Veículo não identificado";
       const current = debtsByVehicle.get(key) || {
         label,
         plate,

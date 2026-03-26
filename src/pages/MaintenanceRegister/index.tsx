@@ -10,6 +10,7 @@ import {
 } from "../../services/maintenanceRecords";
 import type { Vehicle } from "../../types/vehicle";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
+import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
 type RegisterForm = {
   recordId?: string;
@@ -256,7 +257,7 @@ export function MaintenanceRegisterPage() {
                   <option value="">Selecione</option>
                   {availableVehicles.map((vehicle) => (
                     <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.brand} {vehicle.model}
+                      {formatVehicleLabel(vehicle)}
                     </option>
                   ))}
                 </select>
@@ -389,11 +390,8 @@ export function MaintenanceRegisterPage() {
             {selectedVehicle ? (
               <div className="mt-3 space-y-2 text-sm text-slate-700">
                 <p>
-                  <span className="font-semibold text-slate-900">Placa:</span> {selectedVehicle.plate}
-                </p>
-                <p>
-                  <span className="font-semibold text-slate-900">Modelo:</span>{" "}
-                  {selectedVehicle.brand} {selectedVehicle.model}
+                  <span className="font-semibold text-slate-900">Veículo:</span>{" "}
+                  {formatVehicleLabel(selectedVehicle)}
                 </p>
                 <p>
                   <span className="font-semibold text-slate-900">Status:</span>{" "}

@@ -12,6 +12,7 @@ import { getVehicles } from "../../services/vehicles";
 import { useBranch } from "../../contexts/BranchContext";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
+import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
 type DebtCategory = Debt["category"];
 type DebtSortBy =
@@ -247,7 +248,7 @@ export function DebtsPage() {
           categoryLabel(debt.category),
           statusLabel(getEffectiveDebtStatus(debt)),
           debt.vehicle?.plate || "",
-          debt.vehicle ? `${debt.vehicle.brand} ${debt.vehicle.model}` : "",
+          debt.vehicle ? formatVehicleLabel(debt.vehicle) : "",
           String(debt.amount),
           toDateText(debt.debtDate),
           toDateText(debt.dueDate || debt.debtDate),
@@ -268,8 +269,8 @@ export function DebtsPage() {
           ) * direction
         );
       if (sortBy === "vehicle") {
-        const av = a.vehicle ? `${a.vehicle.brand} ${a.vehicle.model}` : "";
-        const bv = b.vehicle ? `${b.vehicle.brand} ${b.vehicle.model}` : "";
+        const av = a.vehicle ? formatVehicleLabel(a.vehicle) : "";
+        const bv = b.vehicle ? formatVehicleLabel(b.vehicle) : "";
         return av.localeCompare(bv, "pt-BR") * direction;
       }
       if (sortBy === "debtDate")
@@ -713,7 +714,7 @@ export function DebtsPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-700">
                         {debt.vehicle
-                          ? `${debt.vehicle.brand} ${debt.vehicle.model}`
+                          ? formatVehicleLabel(debt.vehicle)
                           : debt.vehicleId}
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-700">
@@ -921,7 +922,7 @@ export function DebtsPage() {
                     <option value="">Selecione um veículo</option>
                     {availableVehicles.map((vehicle) => (
                       <option key={vehicle.id} value={vehicle.id}>
-                        {vehicle.brand} {vehicle.model} ({vehicle.plate})
+                        {formatVehicleLabel(vehicle)}
                       </option>
                     ))}
                   </select>

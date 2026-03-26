@@ -8,6 +8,7 @@ import { api } from "../../services/api";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { useLocation } from "react-router-dom";
 import { TablePagination } from "../../components/TablePagination";
+import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
 type DocumentFormData = {
   type: VehicleDocumentType | "";
@@ -183,7 +184,7 @@ export function VehicleDocumentsPage() {
           documentTypeLabel(item.type),
           item.number || "",
           item.issuer || "",
-          item.vehicle ? `${item.vehicle.brand} ${item.vehicle.model}` : "",
+          item.vehicle ? formatVehicleLabel(item.vehicle) : "",
           item.vehicle?.plate || "",
           statusLabel(getEffectiveStatus(item)),
         ]
@@ -198,8 +199,8 @@ export function VehicleDocumentsPage() {
       if (sortBy === "type") return documentTypeLabel(a.type).localeCompare(documentTypeLabel(b.type), "pt-BR", { sensitivity: "base" }) * direction;
       if (sortBy === "name") return a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }) * direction;
       if (sortBy === "vehicle") {
-        const av = a.vehicle ? `${a.vehicle.brand} ${a.vehicle.model}` : "";
-        const bv = b.vehicle ? `${b.vehicle.brand} ${b.vehicle.model}` : "";
+        const av = a.vehicle ? formatVehicleLabel(a.vehicle) : "";
+        const bv = b.vehicle ? formatVehicleLabel(b.vehicle) : "";
         return av.localeCompare(bv, "pt-BR", { sensitivity: "base" }) * direction;
       }
       if (sortBy === "expiryDate") return ((parseLocalDate(a.expiryDate)?.getTime() || 0) - (parseLocalDate(b.expiryDate)?.getTime() || 0)) * direction;
@@ -432,7 +433,7 @@ export function VehicleDocumentsPage() {
                   <tr id={`vehicle-document-row-${item.id}`} key={item.id} className={`border-t border-slate-200 ${isHighlighted ? "notification-highlight" : ""}`}>
                     <td className="px-6 py-4 text-sm text-slate-700">{documentTypeLabel(item.type)}</td>
                     <td className="px-6 py-4 text-sm text-slate-700"><p className="font-medium text-slate-900">{item.name}</p><p className="text-xs text-slate-500">{item.number || "Sem número"}</p>{item.fileUrl ? <a href={resolveFileUrl(item.fileUrl)} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-blue-700 hover:underline">Ver anexo</a> : null}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{item.vehicle ? `${item.vehicle.brand} ${item.vehicle.model} (${item.vehicle.plate})` : item.vehicleId}</td>
+                    <td className="px-6 py-4 text-sm text-slate-700">{item.vehicle ? formatVehicleLabel(item.vehicle) : item.vehicleId}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{toDateText(item.expiryDate)}</td>
                     <td className="px-6 py-4 text-sm"><span className={`status-pill ${statusClass(effectiveStatus)}`}>{statusLabel(effectiveStatus)}</span></td>
                     <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openEditModal(item)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => handleDelete(item)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
@@ -469,7 +470,7 @@ export function VehicleDocumentsPage() {
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Identificação</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className={inputClass("vehicleId")}><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className={inputClass("vehicleId")}><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Tipo</label><select value={form.type} onChange={(e) => handleChange("type", e.target.value as VehicleDocumentType | "")} className={inputClass("type")}><option value="">Selecione o tipo</option>{documentTypeOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>{fieldErrors.type ? <p className="mt-1 text-xs text-red-600">{fieldErrors.type}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Nome do documento</label><input value={form.name} onChange={(e) => handleChange("name", e.target.value)} className={inputClass("name")} placeholder="Ex: Seguro veicular 2026" />{fieldErrors.name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Número</label><input value={form.number} onChange={(e) => handleChange("number", e.target.value)} className={inputClass()} placeholder="Opcional" /></div>

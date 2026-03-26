@@ -13,6 +13,7 @@ import type { Debt } from "../../types/debt";
 import type { Driver } from "../../types/driver";
 import type { MaintenanceRecord } from "../../types/maintenance-record";
 import type { Vehicle } from "../../types/vehicle";
+import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
 type ReportModule = "FUEL" | "MAINTENANCE" | "DEBTS";
 type VehicleTypeFilter = "LIGHT" | "HEAVY";
@@ -302,7 +303,7 @@ export function ReportsPage() {
     () =>
       availableVehicles.map((item) => ({
         id: item.id,
-        label: `${item.plate} - ${item.brand} ${item.model}`,
+        label: formatVehicleLabel(item),
       })),
     [availableVehicles]
   );

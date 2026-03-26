@@ -9,6 +9,7 @@ import type { Driver } from "../../types/driver";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
+import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
 type TripFormData = {
   vehicleId: string;
@@ -148,7 +149,7 @@ export function TripsPage() {
       const term = search.toLowerCase();
       filtered = filtered.filter((trip) =>
         [
-          trip.vehicle ? `${trip.vehicle.brand} ${trip.vehicle.model}` : "",
+          trip.vehicle ? formatVehicleLabel(trip.vehicle) : "",
           trip.vehicle?.plate || "",
           trip.driver?.name || "",
           trip.origin,
@@ -164,8 +165,8 @@ export function TripsPage() {
     const direction = sortDirection === "asc" ? 1 : -1;
     return [...filtered].sort((a, b) => {
       if (sortBy === "vehicle") {
-        const av = a.vehicle ? `${a.vehicle.brand} ${a.vehicle.model}` : "";
-        const bv = b.vehicle ? `${b.vehicle.brand} ${b.vehicle.model}` : "";
+        const av = a.vehicle ? formatVehicleLabel(a.vehicle) : "";
+        const bv = b.vehicle ? formatVehicleLabel(b.vehicle) : "";
         return av.localeCompare(bv, "pt-BR", { sensitivity: "base" }) * direction;
       }
       if (sortBy === "driver") {
@@ -423,7 +424,7 @@ export function TripsPage() {
             <tbody>
               {loading ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Carregando viagens...</td></tr> : filteredTrips.length === 0 ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma viagem encontrada.</td></tr> : paginatedTrips.map((trip) => (
                 <tr key={trip.id} className="border-t border-slate-200">
-                  <td className="px-6 py-4 text-sm text-slate-700">{trip.vehicle ? `${trip.vehicle.brand} ${trip.vehicle.model} (${trip.vehicle.plate})` : trip.vehicleId}</td>
+                  <td className="px-6 py-4 text-sm text-slate-700">{trip.vehicle ? formatVehicleLabel(trip.vehicle) : trip.vehicleId}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{trip.driver?.name || "Sem motorista"}</td>
                   <td className="px-6 py-4 text-sm text-slate-700"><span className="font-medium">{trip.origin}</span><span className="mx-2 text-slate-400">→</span>{trip.destination}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{toDateText(trip.departureAt)}</td>
@@ -463,7 +464,7 @@ export function TripsPage() {
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Planejamento</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleVehicleChange(e.target.value)} className={inputClass("vehicleId")}><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.brand} {vehicle.model} ({vehicle.plate})</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleVehicleChange(e.target.value)} className={inputClass("vehicleId")}><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Motorista</label><select value={form.driverId} onChange={(e) => handleChange("driverId", e.target.value)} className={inputClass("driverId")}><option value="">Selecione um motorista</option>{availableDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select>{fieldErrors.driverId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.driverId}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Origem</label><input value={form.origin} onChange={(e) => handleChange("origin", e.target.value)} className={inputClass("origin")} placeholder="Cidade/filial de saída" />{fieldErrors.origin ? <p className="mt-1 text-xs text-red-600">{fieldErrors.origin}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Destino</label><input value={form.destination} onChange={(e) => handleChange("destination", e.target.value)} className={inputClass("destination")} placeholder="Cidade/filial de destino" />{fieldErrors.destination ? <p className="mt-1 text-xs text-red-600">{fieldErrors.destination}</p> : null}</div>
