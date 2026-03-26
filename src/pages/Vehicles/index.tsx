@@ -468,18 +468,22 @@ export function VehiclesPage() {
       const msg = e?.response?.data?.message || "Não foi possível salvar o veículo.";
       const message = Array.isArray(msg) ? msg.join(", ") : String(msg);
       const duplicatedFieldErrors: VehicleFieldErrors = {};
+      const isDuplicateMessage = /(ja existe|já existe|cadastrado)/i.test(message);
 
-      if (/placa/i.test(message)) {
+      if (isDuplicateMessage && /placa/i.test(message)) {
         duplicatedFieldErrors.plate = "Placa ja cadastrada.";
       }
-      if (/chassi/i.test(message)) {
+      if (isDuplicateMessage && /chassi/i.test(message)) {
         duplicatedFieldErrors.chassis = "Chassi ja cadastrado.";
       }
-      if (/renavam/i.test(message)) {
+      if (isDuplicateMessage && /renavam/i.test(message)) {
         duplicatedFieldErrors.renavam = "Renavam ja cadastrado.";
       }
       if (/branch|filial/i.test(message)) {
         duplicatedFieldErrors.branchId = "Filial invalida.";
+      }
+      if (/chassi.+minimo|minimo.+chassi|chassis.+longer than or equal to/i.test(message)) {
+        duplicatedFieldErrors.chassis = "Chassi deve ter no minimo 8 caracteres.";
       }
 
       if (Object.keys(duplicatedFieldErrors).length > 0) {
