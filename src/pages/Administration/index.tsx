@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Building2, Settings2, ShieldCheck } from "lucide-react";
-import { addSystemLog } from "../../services/systemLogs";
+import { addSystemLog, clearSystemLogs } from "../../services/systemLogs";
 import { getBranches } from "../../services/branches";
 import type { Branch } from "../../types/branch";
 import {
+  ADMIN_SETTINGS_STORAGE_KEY,
   defaultSoftwareSettings,
   readSoftwareSettings,
   saveSoftwareSettings,
@@ -26,6 +27,7 @@ export function AdministrationPage() {
   const [updateTitle, setUpdateTitle] = useState("");
   const [updateMessage, setUpdateMessage] = useState("");
   const [updateFeedback, setUpdateFeedback] = useState("");
+  const [resettingAll, setResettingAll] = useState(false);
 
   useEffect(() => {
     setSettings(readSoftwareSettings());
@@ -102,6 +104,49 @@ export function AdministrationPage() {
     setUpdateFeedback("Atualização registrada no system logs.");
     window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
     window.setTimeout(() => setUpdateFeedback(""), 2500);
+  }
+
+  async function resetAllSystem() {
+    const confirmed = window.confirm(
+      "Tem certeza que deseja executar o RESET ALL? Essa ação irá limpar configurações e dados locais do sistema neste navegador."
+    );
+    if (!confirmed) return;
+
+    try {
+      setResettingAll(true);
+
+      const defaultMenu = getDefaultMenuVisibilityMap();
+      await saveMenuVisibilityMap(defaultMenu);
+      setMenuVisibility(defaultMenu);
+
+      saveSoftwareSettings(defaultSoftwareSettings);
+      setSettings(defaultSoftwareSettings);
+
+      clearSystemLogs();
+
+      const keysToRemove = [
+        ADMIN_SETTINGS_STORAGE_KEY,
+        "evfleet_menu_visibility_cache_v2",
+        "evfleet_consumption_rules_v1",
+        "evfleet_how_to_videos_v1",
+        "selectedBranchId",
+        "token",
+        "auth_user_name",
+      ];
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
+
+      window.dispatchEvent(new CustomEvent("evfleet-settings-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-default-branch-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-menu-visibility-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+
+      setSaveMessage("Reset all concluído. O sistema será recarregado.");
+      window.setTimeout(() => {
+        window.location.href = "/login";
+      }, 900);
+    } finally {
+      setResettingAll(false);
+    }
   }
 
   return (
@@ -322,6 +367,30 @@ export function AdministrationPage() {
             className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
           >
             Informar atualização
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-red-200 bg-white p-5 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-red-700">Reset do sistema</h2>
+          <p className="text-sm text-slate-600">
+            Use esta opção para executar um reset all dos dados locais (configurações, visibilidade de menu, logs, sessão e preferências deste navegador).
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Atenção: esta ação é irreversível no navegador atual e desconecta a sessão.
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={resetAllSystem}
+            disabled={resettingAll}
+            className="cursor-pointer rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {resettingAll ? "Executando reset..." : "Reset all"}
           </button>
         </div>
       </div>
