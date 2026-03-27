@@ -423,6 +423,7 @@ export function MaintenanceRecordsPage() {
   const [tireWheelOpen, setTireWheelOpen] = useState(false);
   const [tireVisualModalOpen, setTireVisualModalOpen] = useState(false);
   const [selectedTireVehicle, setSelectedTireVehicle] = useState<Vehicle | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<{ src: string; label: string } | null>(null);
 
   const [readingModalOpen, setReadingModalOpen] = useState(false);
   const [readingSaving, setReadingSaving] = useState(false);
@@ -1266,6 +1267,12 @@ export function MaintenanceRecordsPage() {
     setTireVisualModalOpen(true);
   }
 
+  function openPhotoPreview(url?: string | null, label?: string) {
+    const src = resolveApiMediaUrl(url);
+    if (!src) return;
+    setPhotoPreview({ src, label: label || "Foto do veículo" });
+  }
+
   function openEditTire(tire: Tire) {
     setEditingTire(tire);
     setTireFieldErrors({});
@@ -1723,7 +1730,15 @@ export function MaintenanceRecordsPage() {
                               <img
                                 src={resolveApiMediaUrl(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0])}
                                 alt={formatVehicleLabel(item.vehicle)}
-                                className="h-14 w-14 rounded-2xl border border-slate-200 object-cover"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openPhotoPreview(
+                                    item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0],
+                                    formatVehicleLabel(item.vehicle),
+                                  );
+                                }}
+                                className="h-14 w-14 cursor-zoom-in rounded-2xl border border-slate-200 object-cover"
+                                title="Clique para ampliar"
                               />
                             ) : (
                               <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-100 text-sm font-semibold text-slate-500">
@@ -1785,7 +1800,15 @@ export function MaintenanceRecordsPage() {
                               <img
                                 src={resolveApiMediaUrl(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0])}
                                 alt={formatVehicleLabel(item.vehicle)}
-                                className="h-14 w-14 rounded-2xl border border-slate-200 object-cover"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openPhotoPreview(
+                                    item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0],
+                                    formatVehicleLabel(item.vehicle),
+                                  );
+                                }}
+                                className="h-14 w-14 cursor-zoom-in rounded-2xl border border-slate-200 object-cover"
+                                title="Clique para ampliar"
                               />
                             ) : (
                               <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-100 text-sm font-semibold text-slate-500">
@@ -1927,6 +1950,32 @@ export function MaintenanceRecordsPage() {
             />
           ) : null}
         </section>
+      ) : null}
+
+      {photoPreview ? (
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/80 p-4"
+          onClick={() => setPhotoPreview(null)}
+        >
+          <div
+            className="relative w-full max-w-4xl rounded-2xl bg-white p-3 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPhotoPreview(null)}
+              className="absolute right-3 top-3 z-10 cursor-pointer rounded-lg bg-white/90 px-3 py-1.5 text-sm font-semibold text-slate-700 shadow transition hover:bg-white"
+            >
+              Fechar
+            </button>
+            <img
+              src={photoPreview.src}
+              alt={photoPreview.label}
+              className="max-h-[82vh] w-full rounded-xl object-contain"
+            />
+            <p className="px-2 pb-1 pt-3 text-center text-sm font-medium text-slate-600">{photoPreview.label}</p>
+          </div>
+        </div>
       ) : null}
 
       {tireVisualModalOpen && selectedTireVehicle ? (
