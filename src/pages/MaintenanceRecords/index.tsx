@@ -1737,7 +1737,7 @@ export function MaintenanceRecordsPage() {
                                     formatVehicleLabel(item.vehicle),
                                   );
                                 }}
-                                className="h-14 w-14 cursor-zoom-in rounded-2xl border border-slate-200 object-cover"
+                                className="h-14 w-14 cursor-pointer rounded-2xl border border-slate-200 object-cover transition-transform duration-200 ease-out hover:scale-110"
                                 title="Clique para ampliar"
                               />
                             ) : (
@@ -1807,7 +1807,7 @@ export function MaintenanceRecordsPage() {
                                     formatVehicleLabel(item.vehicle),
                                   );
                                 }}
-                                className="h-14 w-14 cursor-zoom-in rounded-2xl border border-slate-200 object-cover"
+                                className="h-14 w-14 cursor-pointer rounded-2xl border border-slate-200 object-cover transition-transform duration-200 ease-out hover:scale-110"
                                 title="Clique para ampliar"
                               />
                             ) : (
