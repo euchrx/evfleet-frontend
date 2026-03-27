@@ -1718,9 +1718,9 @@ export function MaintenanceRecordsPage() {
                           className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-orange-300 hover:bg-orange-50/40"
                         >
                           <div className="flex items-center gap-3">
-                            {item.vehicle.photoUrls?.[0] ? (
+                            {(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0]) ? (
                               <img
-                                src={item.vehicle.photoUrls[0]}
+                                src={item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0]}
                                 alt={formatVehicleLabel(item.vehicle)}
                                 className="h-11 w-11 rounded-xl border border-slate-200 object-cover"
                               />
@@ -1762,9 +1762,9 @@ export function MaintenanceRecordsPage() {
                           className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-orange-300 hover:bg-orange-50/40"
                         >
                           <div className="flex items-center gap-3">
-                            {item.vehicle.photoUrls?.[0] ? (
+                            {(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0]) ? (
                               <img
-                                src={item.vehicle.photoUrls[0]}
+                                src={item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0]}
                                 alt={formatVehicleLabel(item.vehicle)}
                                 className="h-11 w-11 rounded-xl border border-slate-200 object-cover"
                               />

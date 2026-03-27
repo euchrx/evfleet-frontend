@@ -25,6 +25,7 @@ export type Vehicle = {
   tankCapacity?: number;
   status?: VehicleStatus;
   currentKm?: number;
+  profilePhotoUrl?: string;
   photoUrls?: string[];
   documentUrls?: string[];
   branchId: string;

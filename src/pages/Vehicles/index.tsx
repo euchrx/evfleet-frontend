@@ -6,6 +6,7 @@ import {
   deleteVehicle,
   getVehicleHistory,
   getVehicles,
+  uploadVehicleProfilePhoto,
   uploadVehicleFiles,
   updateVehicle,
 } from "../../services/vehicles";
@@ -74,6 +75,29 @@ function getAllowedFuelByCategory(category: VehicleCategory) {
 function isFuelAllowedForCategory(category: VehicleCategory, fuelType: VehicleFormData["fuelType"]) {
   if (!category || !fuelType) return true;
   return FUEL_BY_CATEGORY[category].includes(fuelType as FuelType);
+}
+
+function isSupportedVehicleProfileImage(file: File) {
+  const type = String(file.type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  const byMime = ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(type);
+  const byExt = [".jpg", ".jpeg", ".png", ".webp"].some((ext) => name.endsWith(ext));
+  return byMime || byExt;
+}
+
+function isValidHttpUrl(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return false;
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeUrlList(values: string[] | undefined) {
+  return (values || []).map((item) => String(item || "").trim()).filter(isValidHttpUrl);
 }
 
 const initialForm: VehicleFormData = {
@@ -219,6 +243,7 @@ export function VehiclesPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
+  const [currentProfilePhotoUrl, setCurrentProfilePhotoUrl] = useState("");
   const [sortBy, setSortBy] = useState<"plate" | "vehicle" | "type" | "status">("plate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
@@ -327,6 +352,7 @@ export function VehiclesPage() {
     setForm({ ...initialForm, branchId: selectedBranchId });
     setPhotoFiles([]);
     setDocumentFiles([]);
+    setCurrentProfilePhotoUrl("");
     setIsModalOpen(true);
     setFormErrorMessage("");
     setFieldErrors({});
@@ -358,6 +384,7 @@ export function VehiclesPage() {
     });
     setPhotoFiles([]);
     setDocumentFiles([]);
+    setCurrentProfilePhotoUrl(vehicle.profilePhotoUrl || vehicle.photoUrls?.[0] || "");
     setIsModalOpen(true);
     setFormErrorMessage("");
     setFieldErrors({});
@@ -409,8 +436,10 @@ export function VehiclesPage() {
         }
       }
 
-      const uploadedPhotoUrls = await uploadVehicleFiles("photo", photoFiles);
       const uploadedDocumentUrls = await uploadVehicleFiles("document", documentFiles);
+      const safeExistingPhotoUrls = sanitizeUrlList(form.photoUrls);
+      const safeExistingDocumentUrls = sanitizeUrlList(form.documentUrls);
+      const safeUploadedDocumentUrls = sanitizeUrlList(uploadedDocumentUrls);
 
       const payload = {
         plate: normalizePlate(form.plate),
@@ -432,10 +461,8 @@ export function VehiclesPage() {
           | "CNG",
         tankCapacity: Number(form.tankCapacity),
         status: form.status,
-        photoUrls: uploadedPhotoUrls.length
-          ? [uploadedPhotoUrls[0], ...form.photoUrls.filter((url) => url !== uploadedPhotoUrls[0])]
-          : form.photoUrls,
-        documentUrls: [...form.documentUrls, ...uploadedDocumentUrls],
+        photoUrls: safeExistingPhotoUrls,
+        documentUrls: Array.from(new Set([...safeExistingDocumentUrls, ...safeUploadedDocumentUrls])),
         branchId: form.branchId,
       };
 
@@ -502,6 +529,10 @@ export function VehiclesPage() {
         ? await updateVehicle(editingVehicle.id, payload)
         : await createVehicle(payload);
 
+      if (photoFiles[0]) {
+        await uploadVehicleProfilePhoto(savedVehicle.id, photoFiles[0]);
+      }
+
       const savedVehicleId = savedVehicle.id;
       const currentRules = readConsumptionRules();
 
@@ -515,6 +546,7 @@ export function VehiclesPage() {
       setForm(initialForm);
       setPhotoFiles([]);
       setDocumentFiles([]);
+      setCurrentProfilePhotoUrl("");
       await loadData();
     } catch (e: any) {
       const msg = e?.response?.data?.message || "Não foi possível salvar o veículo.";
@@ -927,9 +959,9 @@ export function VehiclesPage() {
                     <span className="text-sm font-medium text-slate-700">Foto de perfil do veículo</span>
                     <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3">
-                        {(selectedProfilePhotoPreview || form.photoUrls[0]) ? (
+                        {(selectedProfilePhotoPreview || currentProfilePhotoUrl || form.photoUrls[0]) ? (
                           <img
-                            src={selectedProfilePhotoPreview || form.photoUrls[0]}
+                            src={selectedProfilePhotoPreview || currentProfilePhotoUrl || form.photoUrls[0]}
                             alt="Foto de perfil do veículo"
                             className="h-14 w-14 rounded-xl border border-slate-200 object-cover"
                           />
@@ -945,11 +977,23 @@ export function VehiclesPage() {
                           Selecionar foto
                           <input
                             type="file"
-                            accept="image/*"
+                            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                             className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
-                              setPhotoFiles(file ? [file] : []);
+                              if (!file) {
+                                setPhotoFiles([]);
+                                e.currentTarget.value = "";
+                                return;
+                              }
+                              if (!isSupportedVehicleProfileImage(file)) {
+                                setPhotoFiles([]);
+                                setFormErrorMessage("Formato não suportado para foto de perfil. Use JPG, PNG ou WEBP.");
+                                e.currentTarget.value = "";
+                                return;
+                              }
+                              setFormErrorMessage("");
+                              setPhotoFiles([file]);
                               e.currentTarget.value = "";
                             }}
                           />

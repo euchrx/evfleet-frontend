@@ -65,6 +65,21 @@ export async function uploadVehicleFiles(
   return response.data?.urls || [];
 }
 
+export async function uploadVehicleProfilePhoto(vehicleId: string, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await api.post<{ vehicleId: string; profilePhotoUrl: string }>(
+    `/vehicles/${vehicleId}/profile-photo`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+  return response.data;
+}
+
 export async function updateVehicle(id: string, data: UpdateVehicleInput) {
   const response = await api.patch<Vehicle>(`/vehicles/${id}`, data);
   return response.data;
