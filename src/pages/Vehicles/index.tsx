@@ -16,6 +16,7 @@ import { useBranch } from "../../contexts/BranchContext";
 import { useLocation } from "react-router-dom";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
+import { resolveApiMediaUrl } from "../../utils/mediaUrl";
 
 type VehicleFormData = {
   plate: string;
@@ -961,7 +962,7 @@ export function VehiclesPage() {
                       <div className="flex items-center gap-3">
                         {(selectedProfilePhotoPreview || currentProfilePhotoUrl || form.photoUrls[0]) ? (
                           <img
-                            src={selectedProfilePhotoPreview || currentProfilePhotoUrl || form.photoUrls[0]}
+                            src={selectedProfilePhotoPreview || resolveApiMediaUrl(currentProfilePhotoUrl || form.photoUrls[0])}
                             alt="Foto de perfil do veículo"
                             className="h-14 w-14 rounded-xl border border-slate-200 object-cover"
                           />

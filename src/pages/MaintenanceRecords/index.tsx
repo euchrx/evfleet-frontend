@@ -36,6 +36,7 @@ import type { MaintenancePlan } from "../../types/maintenance-plan";
 import type { Tire, TireAlert, TireReading, TireStatus } from "../../types/tire";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
+import { resolveApiMediaUrl } from "../../utils/mediaUrl";
 
 type Tab = "records" | "plans" | "tires";
 type SortDirection = "asc" | "desc";
@@ -1720,7 +1721,7 @@ export function MaintenanceRecordsPage() {
                           <div className="flex items-center gap-3">
                             {(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0]) ? (
                               <img
-                                src={item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0]}
+                                src={resolveApiMediaUrl(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0])}
                                 alt={formatVehicleLabel(item.vehicle)}
                                 className="h-11 w-11 rounded-xl border border-slate-200 object-cover"
                               />
@@ -1764,7 +1765,7 @@ export function MaintenanceRecordsPage() {
                           <div className="flex items-center gap-3">
                             {(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0]) ? (
                               <img
-                                src={item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0]}
+                                src={resolveApiMediaUrl(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0])}
                                 alt={formatVehicleLabel(item.vehicle)}
                                 className="h-11 w-11 rounded-xl border border-slate-200 object-cover"
                               />
