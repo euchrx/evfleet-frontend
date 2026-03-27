@@ -1964,9 +1964,10 @@ export function MaintenanceRecordsPage() {
             <button
               type="button"
               onClick={() => setPhotoPreview(null)}
-              className="absolute right-3 top-3 z-10 cursor-pointer rounded-lg bg-white/90 px-3 py-1.5 text-sm font-semibold text-slate-700 shadow transition hover:bg-white"
+              aria-label="Fechar visualização"
+              className="absolute right-4 top-4 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-slate-900/75 text-xl font-semibold leading-none text-white shadow-lg backdrop-blur-sm transition hover:scale-105 hover:bg-slate-900"
             >
-              Fechar
+              ×
             </button>
             <img
               src={photoPreview.src}
