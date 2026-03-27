@@ -1965,7 +1965,7 @@ export function MaintenanceRecordsPage() {
                 type="button"
                 onClick={() => setPhotoPreview(null)}
                 aria-label="Fechar visualização"
-                className="absolute right-4 top-4 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-xl font-semibold leading-none text-slate-700 shadow-lg transition hover:scale-105 hover:bg-slate-100"
+                className="absolute right-4 top-4 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-xl font-semibold leading-none text-slate-700 shadow-lg hover:bg-slate-200"
               >
                 ×
               </button>
