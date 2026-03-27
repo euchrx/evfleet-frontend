@@ -896,8 +896,17 @@ export function MaintenanceRecordsPage() {
 
   function generateAutoTireSerial(index: number) {
     const base = Date.now().toString(36).toUpperCase();
+    const random = Math.random().toString(36).slice(2, 7).toUpperCase();
     const suffix = String(index + 1).padStart(2, "0");
-    return `AUTO-${base}-${suffix}`;
+    return `AUTO-${base}-${random}-${suffix}`;
+  }
+
+  function getErrorMessage(error: unknown, fallback: string) {
+    if (error && typeof error === "object" && "message" in error) {
+      const message = String((error as { message?: unknown }).message || "").trim();
+      if (message) return message;
+    }
+    return fallback;
   }
 
   function normalizeSearchText(value: string) {
@@ -1351,6 +1360,7 @@ export function MaintenanceRecordsPage() {
             ? mergedPairs
             : buildPositionPairsFromSlots(mergedAxles, [], tireFormVehicleSlots);
         const failures: number[] = [];
+        let firstCreateError = "";
         for (let index = 0; index < pairs.length; index += 1) {
           const pair = pairs[index];
           try {
@@ -1360,7 +1370,10 @@ export function MaintenanceRecordsPage() {
               axlePosition: pair.axlePosition || payloadBase.axlePosition,
               wheelPosition: pair.wheelPosition || payloadBase.wheelPosition,
             });
-          } catch {
+          } catch (error) {
+            if (!firstCreateError) {
+              firstCreateError = getErrorMessage(error, "");
+            }
             failures.push(index + 1);
           }
         }
@@ -1370,7 +1383,7 @@ export function MaintenanceRecordsPage() {
             ...prev,
             brand:
               failures.length === pairs.length
-                ? "Não foi possível cadastrar os pneus nas posições selecionadas."
+                ? firstCreateError || "Não foi possível cadastrar os pneus nas posições selecionadas."
                 : `Algumas posições não foram cadastradas: ${failures.slice(0, 5).join(", ")}${failures.length > 5 ? "..." : ""}`,
           }));
           return;
@@ -1383,10 +1396,10 @@ export function MaintenanceRecordsPage() {
       setTireWheelInput("");
       await loadData();
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
-    } catch {
+    } catch (error) {
       setTireFieldErrors((prev) => ({
         ...prev,
-        serialNumber: prev.serialNumber || "Não foi possível salvar. Revise os dados.",
+        serialNumber: prev.serialNumber || getErrorMessage(error, "Não foi possível salvar. Revise os dados."),
       }));
     } finally {
       setTireSaving(false);
