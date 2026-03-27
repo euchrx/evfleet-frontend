@@ -15,8 +15,9 @@ import type { MaintenanceRecord } from "../../types/maintenance-record";
 import type { Vehicle } from "../../types/vehicle";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
-type ReportModule = "FUEL" | "MAINTENANCE" | "DEBTS";
+type ReportModule = "VEHICLES" | "FUEL" | "MAINTENANCE" | "DEBTS";
 type VehicleTypeFilter = "LIGHT" | "HEAVY";
+type VehicleStatusFilter = "ALL" | "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "SOLD";
 type SelectOption = { id: string; label: string };
 
 function toCurrency(value: number) {
@@ -224,7 +225,10 @@ export function ReportsPage() {
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
   const [selectedVehicleTypes, setSelectedVehicleTypes] = useState<VehicleTypeFilter[]>([]);
+  const [selectedVehicleStatus, setSelectedVehicleStatus] =
+    useState<VehicleStatusFilter>("ALL");
   const [selectedModules, setSelectedModules] = useState<ReportModule[]>([
+    "VEHICLES",
     "FUEL",
     "MAINTENANCE",
     "DEBTS",
@@ -317,6 +321,7 @@ export function ReportsPage() {
     { id: "HEAVY", label: "Pesado" },
   ];
   const moduleOptions: SelectOption[] = [
+    { id: "VEHICLES", label: "Veículos" },
     { id: "FUEL", label: "Abastecimentos" },
     { id: "MAINTENANCE", label: "Manutenções" },
     { id: "DEBTS", label: "Débitos e multas" },
@@ -341,7 +346,12 @@ export function ReportsPage() {
         ? selectedVehicleTypes.includes(vehicle.vehicleType as VehicleTypeFilter)
         : true
     );
-    const vehiclesFinal = byType.filter((vehicle) =>
+    const byStatus = byType.filter((vehicle) => {
+      if (selectedVehicleStatus === "ALL") return true;
+      if (selectedVehicleStatus === "INACTIVE") return String(vehicle.status || "") === "INACTIVE";
+      return String(vehicle.status || "") === selectedVehicleStatus;
+    });
+    const vehiclesFinal = byStatus.filter((vehicle) =>
       selectedVehicleIds.length > 0 ? selectedVehicleIds.includes(vehicle.id) : true
     );
     const vehicleSet = new Set(vehiclesFinal.map((item) => item.id));
@@ -360,11 +370,12 @@ export function ReportsPage() {
       (item) => vehicleSet.has(item.vehicleId) && inRange(item.debtDate)
     );
 
-    return { fuel, maintenance, debts: debtsFiltered };
+    return { vehicles: vehiclesFinal, fuel, maintenance, debts: debtsFiltered };
   }, [
     availableVehicles,
     selectedBranchIds,
     selectedVehicleTypes,
+    selectedVehicleStatus,
     selectedVehicleIds,
     selectedDriverIds,
     startDate,
@@ -381,6 +392,25 @@ export function ReportsPage() {
     return { total: fuelCost + maintenanceCost + debtsCost };
   }, [filteredData]);
 
+  const vehicleStatusMetrics = useMemo(() => {
+    const source = filteredData.vehicles;
+    return {
+      total: source.length,
+      active: source.filter((item) => item.status === "ACTIVE").length,
+      inactive: source.filter((item) => String(item.status || "") === "INACTIVE").length,
+      maintenance: source.filter((item) => item.status === "MAINTENANCE").length,
+      sold: source.filter((item) => item.status === "SOLD").length,
+    };
+  }, [filteredData.vehicles]);
+
+  function vehicleStatusLabel(value?: string) {
+    if (value === "ACTIVE") return "Ativo";
+    if (value === "INACTIVE") return "Inativo";
+    if (value === "MAINTENANCE") return "Em manutenção";
+    if (value === "SOLD") return "Vendido";
+    return value || "-";
+  }
+
   function exportReport() {
     const nextErrors: { modules?: string; vehicleTypes?: string } = {};
     if (selectedModules.length === 0) nextErrors.modules = "Selecione ao menos um módulo.";
@@ -390,6 +420,7 @@ export function ReportsPage() {
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
+    const showVehicles = selectedModules.includes("VEHICLES");
     const showFuel = selectedModules.includes("FUEL");
     const showMaintenance = selectedModules.includes("MAINTENANCE");
     const showDebts = selectedModules.includes("DEBTS");
@@ -412,6 +443,24 @@ export function ReportsPage() {
           <h1>Relatório operacional</h1>
           <div class="meta">Período: ${escapeHtml(formatDate(startDate))} até ${escapeHtml(formatDate(endDate))}</div>
           <div class="meta">Total de despesas: ${toCurrency(metrics.total)}</div>
+          <div class="meta">Status de veículos: ${escapeHtml(selectedVehicleStatus === "ALL" ? "Todos os status" : vehicleStatusLabel(selectedVehicleStatus))}</div>
+
+          ${
+            showVehicles
+              ? `<h2>Veículos (${filteredData.vehicles.length})</h2>
+                 <table><thead><tr><th>Placa</th><th>Veículo</th><th>Categoria</th><th>Tipo</th><th>Status</th></tr></thead>
+                 <tbody>${filteredData.vehicles
+                   .map(
+                     (item) =>
+                       `<tr><td>${escapeHtml(item.plate || "-")}</td><td>${escapeHtml(
+                         `${item.brand || ""} ${item.model || ""}`.trim() || "-"
+                       )}</td><td>${escapeHtml(item.category || "-")}</td><td>${escapeHtml(
+                         item.vehicleType || "-"
+                       )}</td><td>${escapeHtml(vehicleStatusLabel(item.status))}</td></tr>`
+                   )
+                   .join("")}</tbody></table>`
+              : ""
+          }
 
           ${
             showFuel
@@ -495,7 +544,45 @@ export function ReportsPage() {
       ) : null}
 
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Veículos totais</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900">{vehicleStatusMetrics.total}</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Ativos</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-900">{vehicleStatusMetrics.active}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Inativos</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900">{vehicleStatusMetrics.inactive}</p>
+          </div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Em manutenção</p>
+            <p className="mt-1 text-2xl font-bold text-amber-900">{vehicleStatusMetrics.maintenance}</p>
+          </div>
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Vendidos</p>
+            <p className="mt-1 text-2xl font-bold text-rose-900">{vehicleStatusMetrics.sold}</p>
+          </div>
+        </div>
+
         <div className="grid gap-4 lg:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-700">Status do veículo</label>
+            <select
+              value={selectedVehicleStatus}
+              onChange={(event) => setSelectedVehicleStatus(event.target.value as VehicleStatusFilter)}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            >
+              <option value="ALL">Todos os status</option>
+              <option value="ACTIVE">Ativo</option>
+              <option value="INACTIVE">Inativo</option>
+              <option value="MAINTENANCE">Em manutenção</option>
+              <option value="SOLD">Vendido</option>
+            </select>
+          </div>
+
           <div className="lg:col-span-3">
             <MultiSelectField
               label="Estabelecimento"
