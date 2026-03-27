@@ -202,7 +202,7 @@ function formatPositionLabel(axle: string, wheel: string) {
 function parsePositionLabel(label: string) {
   const [leftRaw, rightRaw] = label.split("|").map((item) => item.trim());
   if (!leftRaw || !rightRaw) return null;
-  const axle = leftRaw.replace(/^eixo\s+/i, "").trim();
+  const axle = formatAxleLabel(leftRaw);
   const wheel = normalizeWheelToMasculine(rightRaw.replace(/^lado\s+/i, "").trim());
   if (!axle || !wheel) return null;
   return { axlePosition: axle, wheelPosition: wheel };
@@ -902,6 +902,13 @@ export function MaintenanceRecordsPage() {
   }
 
   function getErrorMessage(error: unknown, fallback: string) {
+    if (error && typeof error === "object" && "response" in error) {
+      const response = (error as { response?: { data?: { message?: unknown; error?: unknown } } }).response;
+      const message = response?.data?.message;
+      if (Array.isArray(message) && message.length > 0) return String(message[0]);
+      if (typeof message === "string" && message.trim()) return message.trim();
+      if (typeof response?.data?.error === "string" && response.data.error.trim()) return response.data.error.trim();
+    }
     if (error && typeof error === "object" && "message" in error) {
       const message = String((error as { message?: unknown }).message || "").trim();
       if (message) return message;
