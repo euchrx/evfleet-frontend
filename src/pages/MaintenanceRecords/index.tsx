@@ -1716,23 +1716,41 @@ export function MaintenanceRecordsPage() {
                           key={`light-${item.vehicle.id}`}
                           type="button"
                           onClick={() => openTireVisualModal(item.vehicle)}
-                          className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-orange-300 hover:bg-orange-50/40"
+                          className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-orange-300 hover:bg-orange-50/40 hover:shadow-md"
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-start gap-3">
                             {(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0]) ? (
                               <img
                                 src={resolveApiMediaUrl(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0])}
                                 alt={formatVehicleLabel(item.vehicle)}
-                                className="h-11 w-11 rounded-xl border border-slate-200 object-cover"
+                                className="h-14 w-14 rounded-2xl border border-slate-200 object-cover"
                               />
                             ) : (
-                              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-100 text-xs font-semibold text-slate-500">
+                              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-100 text-sm font-semibold text-slate-500">
                                 {item.vehicle.plate?.slice(0, 2) || "SV"}
                               </div>
                             )}
-                            <p className="text-sm font-semibold text-slate-900">{formatVehicleLabel(item.vehicle)}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-base font-semibold text-slate-900">{formatVehicleLabel(item.vehicle)}</p>
+                              <p className="mt-1 text-xs text-slate-500">Clique para visualizar e editar os pneus</p>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                item.vehicle.status === "ACTIVE"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : item.vehicle.status === "MAINTENANCE"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-rose-100 text-rose-700"
+                              }`}
+                            >
+                              {item.vehicle.status === "ACTIVE"
+                                ? "Ativo"
+                                : item.vehicle.status === "MAINTENANCE"
+                                ? "Em manutenção"
+                                : "Vendido"}
+                            </span>
                           </div>
-                          <p className="mt-2 text-xs text-slate-500">
+                          <p className="hidden mt-2 text-xs text-slate-500">
                             {item.vehicle.status === "ACTIVE"
                               ? "Ativo"
                               : item.vehicle.status === "MAINTENANCE"
@@ -1760,23 +1778,41 @@ export function MaintenanceRecordsPage() {
                           key={`heavy-${item.vehicle.id}`}
                           type="button"
                           onClick={() => openTireVisualModal(item.vehicle)}
-                          className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-orange-300 hover:bg-orange-50/40"
+                          className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-orange-300 hover:bg-orange-50/40 hover:shadow-md"
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-start gap-3">
                             {(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0]) ? (
                               <img
                                 src={resolveApiMediaUrl(item.vehicle.profilePhotoUrl || item.vehicle.photoUrls?.[0])}
                                 alt={formatVehicleLabel(item.vehicle)}
-                                className="h-11 w-11 rounded-xl border border-slate-200 object-cover"
+                                className="h-14 w-14 rounded-2xl border border-slate-200 object-cover"
                               />
                             ) : (
-                              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-100 text-xs font-semibold text-slate-500">
+                              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-100 text-sm font-semibold text-slate-500">
                                 {item.vehicle.plate?.slice(0, 2) || "SV"}
                               </div>
                             )}
-                            <p className="text-sm font-semibold text-slate-900">{formatVehicleLabel(item.vehicle)}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-base font-semibold text-slate-900">{formatVehicleLabel(item.vehicle)}</p>
+                              <p className="mt-1 text-xs text-slate-500">Clique para visualizar e editar os pneus</p>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                item.vehicle.status === "ACTIVE"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : item.vehicle.status === "MAINTENANCE"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-rose-100 text-rose-700"
+                              }`}
+                            >
+                              {item.vehicle.status === "ACTIVE"
+                                ? "Ativo"
+                                : item.vehicle.status === "MAINTENANCE"
+                                ? "Em manutenção"
+                                : "Vendido"}
+                            </span>
                           </div>
-                          <p className="mt-2 text-xs text-slate-500">
+                          <p className="hidden mt-2 text-xs text-slate-500">
                             {item.vehicle.status === "ACTIVE"
                               ? "Ativo"
                               : item.vehicle.status === "MAINTENANCE"
