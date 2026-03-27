@@ -1961,14 +1961,14 @@ export function MaintenanceRecordsPage() {
             className="relative w-full max-w-4xl rounded-2xl bg-white p-3 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              onClick={() => setPhotoPreview(null)}
-              aria-label="Fechar visualização"
-              className="absolute right-4 top-4 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-slate-900/75 text-xl font-semibold leading-none text-white shadow-lg backdrop-blur-sm transition hover:scale-105 hover:bg-slate-900"
-            >
-              ×
-            </button>
+              <button
+                type="button"
+                onClick={() => setPhotoPreview(null)}
+                aria-label="Fechar visualização"
+                className="absolute right-4 top-4 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-xl font-semibold leading-none text-slate-700 shadow-lg transition hover:scale-105 hover:bg-slate-100"
+              >
+                ×
+              </button>
             <img
               src={photoPreview.src}
               alt={photoPreview.label}
