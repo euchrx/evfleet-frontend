@@ -8,6 +8,7 @@ import {
 } from "../../services/users";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
+import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 
 type UserFormData = {
   name: string;
@@ -27,6 +28,7 @@ const TABLE_PAGE_SIZE = 10;
 
 export function UsersPage() {
   type UserSortBy = "name" | "email" | "role" | "createdAt";
+  const { canSelectCompanyScope, selectedCompanyId } = useCompanyScope();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,9 +61,14 @@ export function UsersPage() {
 
   useEffect(() => {
     loadUsersData();
-  }, []);
+  }, [selectedCompanyId]);
 
   function openCreateModal() {
+    if (canSelectCompanyScope && !selectedCompanyId) {
+      setPageErrorMessage("Selecione uma empresa no escopo para cadastrar usuário.");
+      return;
+    }
+
     setEditingUser(null);
     setForm(initialForm);
     setFieldErrors({});
@@ -113,12 +120,16 @@ export function UsersPage() {
         name: form.name.trim(),
         email: form.email.trim(),
         role: form.role,
+        companyId: selectedCompanyId || undefined,
       };
 
       const nextErrors: UserFieldErrors = {};
       if (!basePayload.name) nextErrors.name = "Informe o nome.";
       if (!basePayload.email) nextErrors.email = "Informe o e-mail.";
       if (!basePayload.role) nextErrors.role = "Selecione o perfil.";
+      if (canSelectCompanyScope && !basePayload.companyId) {
+        nextErrors.name = "Selecione uma empresa no escopo para continuar.";
+      }
       if (!editingUser && !form.password.trim()) nextErrors.password = "Informe a senha.";
       if (Object.keys(nextErrors).length > 0) {
         setFieldErrors(nextErrors);

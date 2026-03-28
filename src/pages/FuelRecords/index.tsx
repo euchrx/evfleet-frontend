@@ -17,6 +17,7 @@ import {
 import { getVehicles } from "../../services/vehicles";
 import { getDrivers } from "../../services/drivers";
 import { useBranch } from "../../contexts/BranchContext";
+import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import { useLocation } from "react-router-dom";
 import { AlertTriangle, CarFront, Gauge } from "lucide-react";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
@@ -77,6 +78,7 @@ function formatLocalDate(dateValue: string) {
 export function FuelRecordsPage() {
   const location = useLocation();
   const { selectedBranchId, branches } = useBranch();
+  const { selectedCompanyId } = useCompanyScope();
   type FuelSortBy =
     | "branch"
     | "vehicle"
@@ -137,7 +139,7 @@ export function FuelRecordsPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [selectedCompanyId]);
 
   useEffect(() => {
     if (location.hash !== "#deteccao-anomalias") return;

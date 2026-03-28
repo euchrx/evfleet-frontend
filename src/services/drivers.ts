@@ -10,7 +10,7 @@ export type CreateDriverInput = {
   cnhExpiresAt: string;
   phone?: string;
   status: string;
-  vehicleId?: string | null;
+  vehicleId: string;
 };
 
 export type UpdateDriverInput = CreateDriverInput;

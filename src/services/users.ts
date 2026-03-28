@@ -6,6 +6,7 @@ export type CreateUserInput = {
   email: string;
   password: string;
   role: "ADMIN" | "FLEET_MANAGER";
+  companyId?: string;
 };
 
 export type UpdateUserInput = {

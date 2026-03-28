@@ -4,4 +4,5 @@ export type User = {
   email: string;
   role: "ADMIN" | "FLEET_MANAGER";
   createdAt: string;
+  companyId?: string;
 };

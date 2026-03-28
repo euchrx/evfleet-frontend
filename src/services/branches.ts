@@ -5,6 +5,7 @@ export type CreateBranchInput = {
   name: string;
   city: string;
   state: string;
+  companyId?: string;
 };
 
 export type UpdateBranchInput = CreateBranchInput;

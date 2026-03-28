@@ -13,6 +13,7 @@ import {
 import { getBranches } from "../../services/branches";
 import { readSoftwareSettings } from "../../services/adminSettings";
 import { useBranch } from "../../contexts/BranchContext";
+import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import { useLocation } from "react-router-dom";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
@@ -220,6 +221,7 @@ export function VehiclesPage() {
   type VehicleFieldErrors = Partial<Record<keyof VehicleFormData, string>>;
 
   const { selectedBranchId } = useBranch();
+  const { selectedCompanyId } = useCompanyScope();
   const { pathname } = useLocation();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -273,7 +275,7 @@ export function VehiclesPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [selectedCompanyId]);
 
   useEffect(() => {
     if (!isModalOpen) return;

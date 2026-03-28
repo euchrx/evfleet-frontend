@@ -4,6 +4,7 @@ import type { Vehicle } from "../../types/vehicle";
 import { createDriver, deleteDriver, getDrivers, updateDriver } from "../../services/drivers";
 import { getVehicles } from "../../services/vehicles";
 import { useBranch } from "../../contexts/BranchContext";
+import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
@@ -66,6 +67,7 @@ function getDriverStatusLabel(status: string) {
 
 export function DriversPage() {
   const { selectedBranchId } = useBranch();
+  const { selectedCompanyId } = useCompanyScope();
 
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -101,7 +103,7 @@ export function DriversPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [selectedCompanyId]);
 
   function openCreateModal() {
     setEditingDriver(null);
@@ -173,7 +175,7 @@ export function DriversPage() {
         cnhExpiresAt: form.cnhExpiresAt,
         phone: form.phone ? onlyDigits(form.phone) : undefined,
         status: form.status,
-        vehicleId: form.vehicleId || null,
+        vehicleId: form.vehicleId,
       };
 
       const nextErrors: DriverFieldErrors = {};
@@ -183,6 +185,7 @@ export function DriversPage() {
       if (!payload.cnhCategory) nextErrors.cnhCategory = "Informe a categoria da CNH.";
       if (!payload.cnhExpiresAt) nextErrors.cnhExpiresAt = "Informe a validade da CNH.";
       if (!payload.status) nextErrors.status = "Informe o status.";
+      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione o veículo.";
       if (Object.keys(nextErrors).length > 0) {
         setFieldErrors(nextErrors);
         return;
@@ -258,7 +261,7 @@ export function DriversPage() {
 
   const filteredDrivers = useMemo(() => {
     let filtered = selectedBranchId
-      ? drivers.filter((driver) => !driver.vehicle || driver.vehicle.branchId === selectedBranchId)
+      ? drivers.filter((driver) => driver.vehicle?.branchId === selectedBranchId)
       : drivers;
 
     if (statusFilter !== "ALL") filtered = filtered.filter((driver) => driver.status === statusFilter);
@@ -321,7 +324,7 @@ export function DriversPage() {
 
   const summary = useMemo(() => {
     const scoped = selectedBranchId
-      ? drivers.filter((driver) => !driver.vehicle || driver.vehicle.branchId === selectedBranchId)
+      ? drivers.filter((driver) => driver.vehicle?.branchId === selectedBranchId)
       : drivers;
 
     return {
@@ -402,7 +405,7 @@ export function DriversPage() {
                     <td className="px-6 py-4 text-sm text-slate-600">{driver.cnh}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{driver.cnhCategory}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">
-                      {driver.vehicle ? formatVehicleLabel(driver.vehicle) : "Sem vinculo"}
+                      {driver.vehicle ? formatVehicleLabel(driver.vehicle) : "-"}
                     </td>
                     <td className="px-6 py-4 text-sm"><span className={`status-pill ${driver.status === "ACTIVE" ? "status-active" : "status-inactive"}`}>{getDriverStatusLabel(driver.status)}</span></td>
                     <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openEditModal(driver)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => handleDelete(driver)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
@@ -445,7 +448,7 @@ export function DriversPage() {
                 <div><label className="block text-sm font-medium text-slate-700">Categoria CNH</label><input type="text" value={form.cnhCategory} onChange={(e) => handleChange("cnhCategory", e.target.value.toUpperCase())} className={`${inputClass("cnhCategory")} uppercase`} placeholder="AB" />{fieldErrors.cnhCategory ? <p className="mt-1 text-xs text-red-600">{fieldErrors.cnhCategory}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Vencimento da CNH</label><input type="date" value={form.cnhExpiresAt} onChange={(e) => handleChange("cnhExpiresAt", e.target.value)} className={inputClass("cnhExpiresAt")} />{fieldErrors.cnhExpiresAt ? <p className="mt-1 text-xs text-red-600">{fieldErrors.cnhExpiresAt}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={form.status} onChange={(e) => handleChange("status", e.target.value)} className={inputClass("status")}><option value="ACTIVE">Ativo</option><option value="INACTIVE">Inativo</option></select>{fieldErrors.status ? <p className="mt-1 text-xs text-red-600">{fieldErrors.status}</p> : null}</div>
-                <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Veículo vinculado</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className={inputClass("vehicleId")}><option value="">Sem vinculo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
+                <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Veículo vinculado</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className={inputClass("vehicleId")}><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
               </div>
 
 

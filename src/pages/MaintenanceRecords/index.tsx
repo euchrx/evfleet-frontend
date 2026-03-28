@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { LayoutGrid, Table2 } from "lucide-react";
 import { useBranch } from "../../contexts/BranchContext";
+import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import { getVehicles } from "../../services/vehicles";
 import {
   createMaintenanceRecord,
@@ -373,6 +374,7 @@ function createHeavyTireSlots(axles = 9): TireVisualSlot[] {
 export function MaintenanceRecordsPage() {
   const location = useLocation();
   const { selectedBranchId } = useBranch();
+  const { selectedCompanyId } = useCompanyScope();
 
   const [tab, setTab] = useState<Tab>("records");
   const [loading, setLoading] = useState(true);
@@ -462,7 +464,7 @@ export function MaintenanceRecordsPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [selectedCompanyId]);
 
   useEffect(() => {
     const query = new URLSearchParams(location.search);

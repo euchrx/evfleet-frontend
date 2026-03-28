@@ -8,6 +8,7 @@ import {
 } from "../../services/branches";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
+import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 
 type BranchFormData = {
   name: string;
@@ -25,6 +26,7 @@ const TABLE_PAGE_SIZE = 10;
 
 export function BranchesPage() {
   type BranchSortBy = "name" | "city" | "state" | "createdAt";
+  const { canSelectCompanyScope, selectedCompanyId } = useCompanyScope();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,9 +58,14 @@ export function BranchesPage() {
 
   useEffect(() => {
     loadBranchesData();
-  }, []);
+  }, [selectedCompanyId]);
 
   function openCreateModal() {
+    if (canSelectCompanyScope && !selectedCompanyId) {
+      setPageErrorMessage("Selecione uma empresa no escopo para cadastrar filial.");
+      return;
+    }
+
     setEditingBranch(null);
     setForm(initialForm);
     setFieldErrors({});
@@ -109,12 +116,16 @@ export function BranchesPage() {
         name: form.name.trim(),
         city: form.city.trim(),
         state: form.state.trim().toUpperCase(),
+        companyId: selectedCompanyId || undefined,
       };
 
       const nextErrors: BranchFieldErrors = {};
       if (!payload.name) nextErrors.name = "Informe o nome.";
       if (!payload.city) nextErrors.city = "Informe a cidade.";
       if (!payload.state) nextErrors.state = "Informe o estado.";
+      if (canSelectCompanyScope && !payload.companyId) {
+        nextErrors.name = "Selecione uma empresa no escopo para continuar.";
+      }
       if (Object.keys(nextErrors).length > 0) {
         setFieldErrors(nextErrors);
         return;
