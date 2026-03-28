@@ -199,8 +199,16 @@ export function DriversPage() {
       await loadData();
     } catch (error: any) {
       console.error("Erro ao salvar motorista:", error);
-      const apiMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "";
-      const apiText = typeof apiMessage === "string" ? apiMessage : "";
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "";
+      const apiText = Array.isArray(apiMessage)
+        ? apiMessage.join(" ")
+        : typeof apiMessage === "string"
+          ? apiMessage
+          : JSON.stringify(apiMessage || "");
       if (/cpf/i.test(apiText)) setFieldErrors((prev) => ({ ...prev, cpf: "CPF ja cadastrado." }));
       if (/cnh/i.test(apiText)) setFieldErrors((prev) => ({ ...prev, cnh: "CNH ja cadastrada." }));
       if (!/cpf|cnh/i.test(apiText)) {

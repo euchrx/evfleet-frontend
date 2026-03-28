@@ -92,6 +92,16 @@ export type SubscriptionPageData = {
   pendingCheckoutUrl?: string;
 };
 
+export type CreateBillingPlanInput = {
+  code: string;
+  name: string;
+  description?: string;
+  priceCents: number;
+  currency?: string;
+  interval: PlanInterval;
+  active?: boolean;
+};
+
 function decodeTokenPayload(token: string) {
   try {
     const [, payload] = token.split(".");
@@ -232,4 +242,18 @@ export async function generateSubscriptionPayment(subscriptionId: string) {
   }
 
   return data.checkoutUrl;
+}
+
+export async function createBillingPlan(input: CreateBillingPlanInput) {
+  const payload = {
+    code: input.code.trim(),
+    name: input.name.trim(),
+    description: input.description?.trim() || undefined,
+    priceCents: Number(input.priceCents),
+    currency: (input.currency || "BRL").trim().toUpperCase(),
+    interval: input.interval,
+    active: input.active ?? true,
+  };
+
+  await api.post("/billing/plans", payload);
 }

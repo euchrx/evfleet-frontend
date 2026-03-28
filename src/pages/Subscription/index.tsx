@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
 import { CreditCard, RefreshCw } from "lucide-react";
 import {
+  createBillingPlan,
   generateSubscriptionPayment,
   getSubscriptionPageData,
   selectCompanyPlan,
+  type PlanInterval,
   type PaymentStatus,
   type SubscriptionInvoice,
   type SubscriptionPageData,
   type SubscriptionStatus,
 } from "../../services/subscription";
 import { formatCurrency, formatDate } from "../../utils/formatters";
+import { useAuth } from "../../contexts/AuthContext";
 
 function subscriptionStatusLabel(status: SubscriptionStatus) {
   if (status === "ACTIVE") return "Ativa";
@@ -65,11 +68,21 @@ function getStatusAlert(status?: SubscriptionStatus) {
 }
 
 export function SubscriptionPage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [data, setData] = useState<SubscriptionPageData | null>(null);
   const [submittingPlanId, setSubmittingPlanId] = useState<string | null>(null);
   const [payingNow, setPayingNow] = useState(false);
+  const [isCreatePlanModalOpen, setIsCreatePlanModalOpen] = useState(false);
+  const [creatingPlan, setCreatingPlan] = useState(false);
+  const [newPlan, setNewPlan] = useState({
+    code: "",
+    name: "",
+    description: "",
+    priceCents: "",
+    interval: "MONTHLY" as PlanInterval,
+  });
 
   async function loadData() {
     try {
@@ -127,6 +140,38 @@ export function SubscriptionPage() {
     }
   }
 
+  async function handleCreatePlan(event: React.FormEvent) {
+    event.preventDefault();
+    try {
+      setCreatingPlan(true);
+      setErrorMessage("");
+      await createBillingPlan({
+        code: newPlan.code,
+        name: newPlan.name,
+        description: newPlan.description,
+        priceCents: Number(newPlan.priceCents),
+        interval: newPlan.interval,
+        currency: "BRL",
+        active: true,
+      });
+      setIsCreatePlanModalOpen(false);
+      setNewPlan({
+        code: "",
+        name: "",
+        description: "",
+        priceCents: "",
+        interval: "MONTHLY",
+      });
+      await loadData();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Não foi possível adicionar o plano.",
+      );
+    } finally {
+      setCreatingPlan(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -135,6 +180,15 @@ export function SubscriptionPage() {
           <p className="mt-1 text-sm text-slate-500">Status da assinatura, planos e histórico de pagamento.</p>
         </div>
         <div className="flex items-center gap-2">
+          {user?.role === "ADMIN" ? (
+            <button
+              type="button"
+              onClick={() => setIsCreatePlanModalOpen(true)}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
+            >
+              Adicionar plano
+            </button>
+          ) : null}
           {overview && data?.canPayNow ? (
             <button
               type="button"
@@ -298,6 +352,111 @@ export function SubscriptionPage() {
           </table>
         </div>
       </section>
+
+      {isCreatePlanModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-2xl rounded-2xl bg-white shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Adicionar plano</h2>
+                <p className="text-sm text-slate-500">Crie um novo plano de assinatura.</p>
+              </div>
+              <button
+                onClick={() => setIsCreatePlanModalOpen(false)}
+                className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100"
+              >
+                Fechar
+              </button>
+            </div>
+            <form onSubmit={handleCreatePlan} className="space-y-4 overflow-y-auto p-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Código</label>
+                  <input
+                    required
+                    value={newPlan.code}
+                    onChange={(event) =>
+                      setNewPlan((prev) => ({ ...prev, code: event.target.value }))
+                    }
+                    placeholder="Ex: PRO"
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Nome</label>
+                  <input
+                    required
+                    value={newPlan.name}
+                    onChange={(event) =>
+                      setNewPlan((prev) => ({ ...prev, name: event.target.value }))
+                    }
+                    placeholder="Ex: Plano Corporativo"
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700">Descrição</label>
+                  <input
+                    value={newPlan.description}
+                    onChange={(event) =>
+                      setNewPlan((prev) => ({ ...prev, description: event.target.value }))
+                    }
+                    placeholder="Descrição do plano"
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Valor (centavos)</label>
+                  <input
+                    required
+                    type="number"
+                    min={100}
+                    value={newPlan.priceCents}
+                    onChange={(event) =>
+                      setNewPlan((prev) => ({ ...prev, priceCents: event.target.value }))
+                    }
+                    placeholder="Ex: 59900"
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Intervalo</label>
+                  <select
+                    value={newPlan.interval}
+                    onChange={(event) =>
+                      setNewPlan((prev) => ({
+                        ...prev,
+                        interval: event.target.value as PlanInterval,
+                      }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  >
+                    <option value="MONTHLY">Mensal</option>
+                    <option value="YEARLY">Anual</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsCreatePlanModalOpen(false)}
+                  className="cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingPlan}
+                  className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {creatingPlan ? "Salvando..." : "Salvar plano"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
