@@ -13,6 +13,7 @@ import {
 } from "../../services/subscription";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { useAuth } from "../../contexts/AuthContext";
+import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 
 function subscriptionStatusLabel(status: SubscriptionStatus) {
   if (status === "ACTIVE") return "Ativa";
@@ -69,6 +70,7 @@ function getStatusAlert(status?: SubscriptionStatus) {
 
 export function SubscriptionPage() {
   const { user } = useAuth();
+  const { selectedCompanyId } = useCompanyScope();
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [data, setData] = useState<SubscriptionPageData | null>(null);
@@ -101,14 +103,23 @@ export function SubscriptionPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [selectedCompanyId]);
 
   const overview = data?.overview || null;
   const plans = data?.plans || [];
   const invoices = data?.invoices || [];
+  const canManagePlans = user?.role === "ADMIN";
+  const hasCompanyScope = Boolean(data?.companyId);
   const statusAlert = getStatusAlert(overview?.status);
   async function handleSelectPlan(planId: string) {
-    if (!data?.companyId) return;
+    if (!canManagePlans) {
+      setErrorMessage("Somente administrador pode alterar o plano.");
+      return;
+    }
+    if (!data?.companyId) {
+      setErrorMessage("Selecione uma empresa no escopo para continuar.");
+      return;
+    }
 
     try {
       setSubmittingPlanId(planId);
@@ -180,7 +191,7 @@ export function SubscriptionPage() {
           <p className="mt-1 text-sm text-slate-500">Status da assinatura, planos e histórico de pagamento.</p>
         </div>
         <div className="flex items-center gap-2">
-          {user?.role === "ADMIN" ? (
+          {canManagePlans ? (
             <button
               type="button"
               onClick={() => setIsCreatePlanModalOpen(true)}
@@ -227,7 +238,11 @@ export function SubscriptionPage() {
         {loading ? (
           <p className="text-sm text-slate-500">Carregando dados da assinatura...</p>
         ) : !overview ? (
-          <p className="text-sm text-slate-600">Nenhuma assinatura encontrada para esta empresa.</p>
+          <p className="text-sm text-slate-600">
+            {canManagePlans && !hasCompanyScope
+              ? "Selecione uma empresa no escopo para consultar a assinatura."
+              : "Nenhuma assinatura encontrada para esta empresa."}
+          </p>
         ) : (
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -296,14 +311,22 @@ export function SubscriptionPage() {
                 <button
                   type="button"
                   onClick={() => handleSelectPlan(plan.id)}
-                  disabled={plan.isCurrent || isSubmitting}
+                  disabled={!canManagePlans || !hasCompanyScope || plan.isCurrent || isSubmitting}
                   className={`mt-4 w-full rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                    plan.isCurrent
+                    !canManagePlans || !hasCompanyScope || plan.isCurrent
                       ? "cursor-not-allowed border border-slate-300 bg-slate-100 text-slate-500"
                       : "cursor-pointer bg-orange-500 text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                   }`}
                 >
-                  {plan.isCurrent ? "Plano atual" : isSubmitting ? "Salvando..." : "Selecionar plano"}
+                  {!canManagePlans
+                    ? "Somente admin"
+                    : !hasCompanyScope
+                      ? "Selecione empresa"
+                      : plan.isCurrent
+                        ? "Plano atual"
+                        : isSubmitting
+                          ? "Salvando..."
+                          : "Selecionar plano"}
                 </button>
               </article>
             );

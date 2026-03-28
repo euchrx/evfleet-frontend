@@ -24,6 +24,18 @@ export async function getCompanies() {
   return [];
 }
 
+export async function getMyCompany() {
+  const response = await api.get<Company>("/companies/me");
+  return response.data;
+}
+
+export async function getCompanyById(id: string) {
+  const response = await api.get<Company>(`/companies/${id}`, {
+    headers: { "x-company-scope": "__ALL__" },
+  });
+  return response.data;
+}
+
 export async function createCompany(data: CreateCompanyInput) {
   const response = await api.post<Company>("/companies", data, {
     headers: { "x-company-scope": "__ALL__" },

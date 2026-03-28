@@ -10,13 +10,18 @@ import { getBranches } from "../services/branches";
 import { readSoftwareSettings } from "../services/adminSettings";
 import type { Branch } from "../types/branch";
 import { useAuth } from "./AuthContext";
+import { useCompanyScope } from "./CompanyScopeContext";
 
 type BranchContextType = {
   branches: Branch[];
   selectedBranchId: string;
   selectedBranch: Branch | null;
+  currentBranchId: string;
+  currentBranch: Branch | null;
   isLoadingBranches: boolean;
+  branchErrorMessage: string;
   setSelectedBranchId: (branchId: string) => void;
+  setCurrentBranchId: (branchId: string) => void;
   reloadBranches: () => Promise<void>;
 };
 
@@ -28,19 +33,38 @@ type BranchProviderProps = {
 
 export function BranchProvider({ children }: BranchProviderProps) {
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
+  const { selectedCompanyId, canSelectCompanyScope } = useCompanyScope();
 
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchIdState] = useState("");
   const [isLoadingBranches, setIsLoadingBranches] = useState(true);
+  const [branchErrorMessage, setBranchErrorMessage] = useState("");
+
+  const isAdminWithoutCompanyScope =
+    canSelectCompanyScope && user?.role === "ADMIN" && !selectedCompanyId;
 
   async function loadBranches() {
+    if (isAdminWithoutCompanyScope) {
+      setBranches([]);
+      setSelectedBranchIdState("");
+      setIsLoadingBranches(false);
+      setBranchErrorMessage("Selecione uma empresa para carregar as filiais.");
+      localStorage.removeItem("selectedBranchId");
+      return;
+    }
+
     try {
       setIsLoadingBranches(true);
+      setBranchErrorMessage("");
       const data = await getBranches();
       setBranches(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Erro ao carregar filiais:", error);
+    } catch (error: any) {
       setBranches([]);
+      setBranchErrorMessage(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Não foi possível carregar as filiais.",
+      );
     } finally {
       setIsLoadingBranches(false);
     }
@@ -56,11 +80,12 @@ export function BranchProvider({ children }: BranchProviderProps) {
       setBranches([]);
       setSelectedBranchIdState("");
       setIsLoadingBranches(false);
+      setBranchErrorMessage("");
       return;
     }
 
     loadBranches();
-  }, [isAuthenticated, isLoadingAuth]);
+  }, [isAuthenticated, isLoadingAuth, isAdminWithoutCompanyScope, selectedCompanyId]);
 
   useEffect(() => {
     if (!user || branches.length === 0) return;
@@ -86,7 +111,6 @@ export function BranchProvider({ children }: BranchProviderProps) {
       return;
     }
 
-    // Default scope: whole network (no branch filter).
     setSelectedBranchIdState("");
     localStorage.removeItem("selectedBranchId");
   }, [user, branches]);
@@ -150,8 +174,12 @@ export function BranchProvider({ children }: BranchProviderProps) {
         branches,
         selectedBranchId,
         selectedBranch,
+        currentBranchId: selectedBranchId,
+        currentBranch: selectedBranch,
         isLoadingBranches,
+        branchErrorMessage,
         setSelectedBranchId,
+        setCurrentBranchId: setSelectedBranchId,
         reloadBranches: loadBranches,
       }}
     >
@@ -169,3 +197,4 @@ export function useBranch() {
 
   return context;
 }
+

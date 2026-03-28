@@ -1,6 +1,6 @@
+import { COMPANY_SCOPE_STORAGE_KEY } from "../contexts/CompanyScopeContext";
 import { api } from "./api";
 import { readSoftwareSettings } from "./adminSettings";
-import { COMPANY_SCOPE_STORAGE_KEY } from "../contexts/CompanyScopeContext";
 
 export type SubscriptionStatus = "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED";
 export type PlanInterval = "MONTHLY" | "YEARLY";
@@ -129,15 +129,15 @@ function getSelectedCompanyScopeId() {
   return localStorage.getItem(COMPANY_SCOPE_STORAGE_KEY)?.trim() || "";
 }
 
-function resolveCompanyScopeId() {
-  const selected = getSelectedCompanyScopeId();
-  if (selected) return selected;
-
+function getUserContext() {
   const token = localStorage.getItem("token");
   const payload = token ? decodeTokenPayload(token) : null;
-  if (payload?.role === "ADMIN") return "";
-
-  return payload?.companyId?.trim() || readCompanyIdFromToken();
+  const role = String(payload?.role || "").trim().toUpperCase();
+  const isAdmin = role === "ADMIN";
+  const tokenCompanyId = payload?.companyId?.trim() || readCompanyIdFromToken();
+  const selectedCompanyId = getSelectedCompanyScopeId();
+  const effectiveCompanyId = isAdmin ? selectedCompanyId : tokenCompanyId;
+  return { role, isAdmin, tokenCompanyId, selectedCompanyId, effectiveCompanyId };
 }
 
 function toPlanView(plan: BillingPlanApi, currentPlanId?: string): SubscriptionPlan {
@@ -173,14 +173,26 @@ function toInvoiceView(payment: BillingPaymentApi, planName: string): Subscripti
 }
 
 export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
-  const companyId = resolveCompanyScopeId();
+  const context = getUserContext();
+  const companyId = context.effectiveCompanyId;
+
+  const plansPromise = api.get<BillingPlanApi[]>("/billing/plans");
+  const subscriptionPromise = context.isAdmin
+    ? companyId
+      ? api.get<BillingSubscriptionApi | null>(`/billing/companies/${companyId}/subscription`)
+      : Promise.resolve({ data: null as BillingSubscriptionApi | null })
+    : api.get<BillingSubscriptionApi | null>("/billing/me/subscription");
+
+  const paymentsPromise = context.isAdmin
+    ? companyId
+      ? api.get<BillingPaymentApi[]>(`/billing/companies/${companyId}/payments`)
+      : Promise.resolve({ data: [] as BillingPaymentApi[] })
+    : api.get<BillingPaymentApi[]>("/billing/me/payments");
 
   const [subscriptionResponse, plansResponse, paymentsResponse] = await Promise.all([
-    api.get<BillingSubscriptionApi | null>("/billing/subscription"),
-    api.get<BillingPlanApi[]>("/billing/plans"),
-    companyId
-      ? api.get<BillingPaymentApi[]>(`/billing/companies/${companyId}/payments`)
-      : Promise.resolve({ data: [] as BillingPaymentApi[] }),
+    subscriptionPromise,
+    plansPromise,
+    paymentsPromise,
   ]);
 
   const subscription = subscriptionResponse.data;
@@ -225,17 +237,24 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
 }
 
 export async function selectCompanyPlan(companyId: string, planId: string) {
+  const context = getUserContext();
+  if (!context.isAdmin) {
+    throw new Error("Somente administrador pode alterar o plano da empresa.");
+  }
+
   const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
   if (!targetCompanyId) {
     throw new Error("Selecione uma empresa no escopo para continuar.");
   }
+
   await api.post(`/billing/companies/${targetCompanyId}/subscription`, { planId });
 }
 
 export async function generateSubscriptionPayment(subscriptionId: string) {
-  const { data } = await api.post<{ checkoutUrl?: string }>(
-    `/billing/subscriptions/${subscriptionId}/pay`,
-  );
+  const context = getUserContext();
+  const { data } = context.isAdmin
+    ? await api.post<{ checkoutUrl?: string }>(`/billing/subscriptions/${subscriptionId}/pay`)
+    : await api.post<{ checkoutUrl?: string }>("/billing/me/pay");
 
   if (!data?.checkoutUrl) {
     throw new Error("Não foi possível obter a URL de checkout do pagamento.");
@@ -257,3 +276,4 @@ export async function createBillingPlan(input: CreateBillingPlanInput) {
 
   await api.post("/billing/plans", payload);
 }
+

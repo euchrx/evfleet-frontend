@@ -149,8 +149,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.setItem("token", normalizedToken);
     setToken(normalizedToken);
     if (userFromLogin) {
-      setUser(userFromLogin);
-      saveAuthUser(userFromLogin);
+      const payload = decodeTokenPayload(normalizedToken);
+      const normalizedUser: AuthUser = {
+        ...userFromLogin,
+        companyId: userFromLogin.companyId ?? payload?.companyId ?? null,
+      };
+      setUser(normalizedUser);
+      saveAuthUser(normalizedUser);
     }
     const ok = await fetchMe(normalizedToken);
 
