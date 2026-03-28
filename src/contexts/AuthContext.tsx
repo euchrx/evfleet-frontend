@@ -90,11 +90,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function fetchMe(tokenOverride?: string | null) {
     const effectiveToken = normalizeToken(tokenOverride ?? token ?? readAuthToken());
     if (!effectiveToken) {
-      console.log("[auth] fetchMe sem token");
       return false;
     }
-
-    console.log("[auth] bootstrap /auth/me com token:", `${effectiveToken.slice(0, 16)}...`);
 
     try {
       const response = await api.get("/auth/me", {
@@ -166,7 +163,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     writeAuthToken(normalizedToken);
-    console.log("[auth] token salvo após login:", `${normalizedToken.slice(0, 16)}...`);
     setToken(normalizedToken);
 
     if (userFromLogin) {
