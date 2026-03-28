@@ -241,7 +241,11 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
   };
 }
 
-export async function selectCompanyPlan(companyId: string, planId: string) {
+export async function selectCompanyPlan(
+  companyId: string,
+  planId: string,
+  initialStatus: Extract<SubscriptionStatus, "ACTIVE" | "TRIALING"> = "TRIALING",
+) {
   const context = getUserContext();
   if (!context.isAdmin) {
     throw new Error("Somente administrador pode alterar o plano da empresa.");
@@ -252,7 +256,10 @@ export async function selectCompanyPlan(companyId: string, planId: string) {
     throw new Error("Selecione uma empresa no escopo para continuar.");
   }
 
-  await api.post(`/billing/companies/${targetCompanyId}/subscription`, { planId });
+  await api.post(`/billing/companies/${targetCompanyId}/subscription`, {
+    planId,
+    initialStatus,
+  });
 }
 
 export async function generateSubscriptionPayment(subscriptionId: string) {

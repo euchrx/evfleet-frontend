@@ -45,6 +45,8 @@ import {
   defaultSoftwareSettings,
   readSoftwareSettings,
 } from "../services/adminSettings";
+import { api } from "../services/api";
+import type { SubscriptionStatus } from "../services/subscription";
 
 type AppNotification = {
   id: string;
@@ -132,6 +134,8 @@ export function AppLayout() {
     const saved = readSoftwareSettings().companyName?.trim();
     return saved || defaultSoftwareSettings.companyName;
   });
+  const [subscriptionStatus, setSubscriptionStatus] =
+    useState<SubscriptionStatus | null>(null);
   const companyScopeRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -491,6 +495,44 @@ export function AppLayout() {
   }, [selectedCompanyId]);
 
   useEffect(() => {
+    let active = true;
+
+    async function loadSubscriptionStatus() {
+      try {
+        if (!user) {
+          if (active) setSubscriptionStatus(null);
+          return;
+        }
+
+        const isAdmin = user.role === "ADMIN";
+        if (isAdmin && !selectedCompanyId) {
+          if (active) setSubscriptionStatus(null);
+          return;
+        }
+
+        const endpoint =
+          isAdmin && selectedCompanyId
+            ? `/billing/companies/${selectedCompanyId}/subscription`
+            : "/billing/me/subscription";
+
+        const { data } = await api.get<{ status?: SubscriptionStatus } | null>(
+          endpoint,
+        );
+        if (!active) return;
+        setSubscriptionStatus(data?.status || null);
+      } catch {
+        if (!active) return;
+        setSubscriptionStatus(null);
+      }
+    }
+
+    loadSubscriptionStatus();
+    return () => {
+      active = false;
+    };
+  }, [selectedCompanyId, user]);
+
+  useEffect(() => {
     async function refreshMenuVisibility() {
       setIsLoadingMenuVisibility(true);
       const visibility = await fetchMenuVisibilityMap();
@@ -658,7 +700,7 @@ export function AppLayout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-6">
             <div className="flex items-center justify-between gap-3 lg:hidden">
               <button
                 type="button"
@@ -675,7 +717,7 @@ export function AppLayout() {
             <button
               type="button"
               onClick={() => setIsNotificationsModalOpen(true)}
-              className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3 text-left shadow-sm transition hover:border-orange-200 lg:max-w-[320px]"
+              className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3 text-left shadow-sm transition hover:border-orange-200 lg:max-w-[320px] lg:justify-self-start"
             >
               <div className="flex items-center gap-3">
                 <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
@@ -702,7 +744,7 @@ export function AppLayout() {
             {canSelectCompanyScope ? (
               <div
                 ref={companyScopeRef}
-                className="relative w-full lg:max-w-[320px]"
+                className="relative w-full lg:w-[320px] lg:justify-self-center"
               >
                 <button
                   type="button"
@@ -710,7 +752,7 @@ export function AppLayout() {
                     !isLoadingScopeOptions &&
                     setIsCompanyScopeOpen((prev) => !prev)
                   }
-                  className="inline-flex w-full items-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-left shadow-sm transition hover:border-orange-300 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex w-full items-center gap-3 rounded-2xl border border-orange-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-orange-300 disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isLoadingScopeOptions}
                 >
                   <BriefcaseBusiness size={14} className="text-orange-600" />
@@ -730,7 +772,7 @@ export function AppLayout() {
                 </button>
 
                 {isCompanyScopeOpen ? (
-                  <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-orange-200 bg-orange-50 shadow-2xl">
+                  <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-2xl">
                     <div className="max-h-72 overflow-auto p-2">
                       <button
                         type="button"
@@ -780,16 +822,16 @@ export function AppLayout() {
 
             <div
               ref={profileMenuRef}
-              className="relative w-full lg:flex lg:justify-end"
+              className="relative w-full lg:justify-self-end"
             >
               <button
                 type="button"
                 onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-                className="ml-auto inline-flex h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-transparent shadow-sm transition hover:border-slate-300"
+                className="ml-auto inline-flex items-center gap-2 bg-transparent p-0"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white">
                   {initial}
-                  </div>
+                </div>
 
                       {user?.name || "Usuário"}
                   <ChevronDown
@@ -799,7 +841,7 @@ export function AppLayout() {
               </button>
 
               {isProfileMenuOpen ? (
-                <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-orange-200 bg-orange-50 text-slate-900 shadow-2xl lg:max-w-[340px]">
+                <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-orange-200 bg-white text-slate-900 shadow-2xl lg:max-w-[340px]">
                   <div className="border-b border-orange-200 px-4 py-3">
                     <p className="truncate text-lg font-semibold">
                       {user?.name || "Usuário"}
@@ -810,6 +852,11 @@ export function AppLayout() {
                     <span className="mt-2 inline-flex rounded-full border border-orange-300 bg-white px-2.5 py-0.5 text-xs font-semibold text-orange-700">
                       {String(formatRole(user?.role)).toUpperCase()}
                     </span>
+                    {subscriptionStatus === "TRIALING" ? (
+                      <span className="mt-2 ml-2 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                        Período de teste
+                      </span>
+                    ) : null}
                   </div>
 
                   <div className="py-1.5">

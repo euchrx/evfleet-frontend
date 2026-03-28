@@ -30,13 +30,6 @@ function subscriptionStatusLabel(status: SubscriptionStatus) {
   return "Cancelada";
 }
 
-function subscriptionStatusClass(status: SubscriptionStatus) {
-  if (status === "ACTIVE") return "status-active";
-  if (status === "TRIALING") return "status-pending";
-  if (status === "PAST_DUE") return "status-anomaly";
-  return "status-inactive";
-}
-
 function invoiceStatusLabel(status: PaymentStatus) {
   if (status === "PAID") return "Pago";
   if (status === "PENDING") return "Pendente";
@@ -102,6 +95,8 @@ export function SubscriptionPage() {
   const [isClearPaymentsOpen, setIsClearPaymentsOpen] = useState(false);
   const [clearingPayments, setClearingPayments] = useState(false);
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<SubscriptionPlan | null>(null);
+  const [selectedPlanActivationStatus, setSelectedPlanActivationStatus] =
+    useState<Extract<SubscriptionStatus, "ACTIVE" | "TRIALING">>("TRIALING");
   const [redirectingToCheckout, setRedirectingToCheckout] = useState(false);
   const [newPlan, setNewPlan] = useState({
     code: "",
@@ -161,7 +156,10 @@ export function SubscriptionPage() {
     setIsPlanModalOpen(true);
   }
 
-  async function handleSelectPlan(planId: string) {
+  async function handleSelectPlan(
+    planId: string,
+    initialStatus: Extract<SubscriptionStatus, "ACTIVE" | "TRIALING"> = "TRIALING",
+  ) {
     if (!canManagePlans) {
       setErrorMessage("Somente administrador pode alterar o plano.");
       return;
@@ -174,7 +172,7 @@ export function SubscriptionPage() {
     try {
       setSubmittingPlanId(planId);
       setErrorMessage("");
-      await selectCompanyPlan(data.companyId, planId);
+      await selectCompanyPlan(data.companyId, planId, initialStatus);
       await loadData();
     } catch (error) {
       setErrorMessage(
@@ -215,7 +213,11 @@ export function SubscriptionPage() {
     try {
       setRedirectingToCheckout(true);
       setErrorMessage("");
-      await selectCompanyPlan(data.companyId, selectedPlanForCheckout.id);
+      await selectCompanyPlan(
+        data.companyId,
+        selectedPlanForCheckout.id,
+        selectedPlanActivationStatus,
+      );
       const refreshed = await getSubscriptionPageData();
       setData(refreshed);
 
@@ -454,10 +456,18 @@ export function SubscriptionPage() {
                     </button>
                   ) : null}
                 </div>
-                <p className="mt-2 text-lg font-bold text-slate-900">
-                  <span className={`status-pill ${subscriptionStatusClass(overview.status)}`}>
-                    {subscriptionStatusLabel(overview.status)}
-                  </span>
+                <p
+                  className={`mt-2 text-lg font-bold ${
+                    overview.status === "ACTIVE"
+                      ? "text-emerald-700"
+                      : overview.status === "TRIALING"
+                        ? "text-amber-700"
+                        : overview.status === "PAST_DUE"
+                          ? "text-orange-700"
+                          : "text-slate-700"
+                  }`}
+                >
+                  {subscriptionStatusLabel(overview.status)}
                 </p>
               </div>
               <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3">
@@ -540,7 +550,10 @@ export function SubscriptionPage() {
 
                 <button
                   type="button"
-                  onClick={() => setSelectedPlanForCheckout(plan)}
+                  onClick={() => {
+                    setSelectedPlanForCheckout(plan);
+                    setSelectedPlanActivationStatus("TRIALING");
+                  }}
                   disabled={(canManagePlans && !hasCompanyScope) || isSubmitting || redirectingToCheckout}
                   className={`mt-4 w-full rounded-xl px-4 py-2 text-sm font-semibold transition ${
                     (canManagePlans && !hasCompanyScope)
@@ -566,7 +579,10 @@ export function SubscriptionPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedPlanForCheckout(null)}
+                onClick={() => {
+                  setSelectedPlanForCheckout(null);
+                  setSelectedPlanActivationStatus("TRIALING");
+                }}
                 className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100"
               >
                 Fechar
@@ -611,6 +627,38 @@ export function SubscriptionPage() {
                 </div>
               </div>
 
+              {canManagePlans ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold text-slate-800">
+                    Tipo de ativação ao vincular o plano
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPlanActivationStatus("TRIALING")}
+                      className={`rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${
+                        selectedPlanActivationStatus === "TRIALING"
+                          ? "border-amber-300 bg-amber-50 text-amber-800"
+                          : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      Período de teste
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPlanActivationStatus("ACTIVE")}
+                      className={`rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${
+                        selectedPlanActivationStatus === "ACTIVE"
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                          : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      Assinatura ativa
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-sm font-semibold text-slate-800">O que este plano oferece</p>
                 <ul className="mt-3 space-y-2">
@@ -629,8 +677,12 @@ export function SubscriptionPage() {
                   type="button"
                   onClick={async () => {
                     if (!selectedPlanForCheckout?.id) return;
-                    await handleSelectPlan(selectedPlanForCheckout.id);
+                    await handleSelectPlan(
+                      selectedPlanForCheckout.id,
+                      selectedPlanActivationStatus,
+                    );
                     setSelectedPlanForCheckout(null);
+                    setSelectedPlanActivationStatus("TRIALING");
                   }}
                   disabled={redirectingToCheckout}
                   className="cursor-pointer rounded-xl border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -640,7 +692,10 @@ export function SubscriptionPage() {
               ) : null}
               <button
                 type="button"
-                onClick={() => setSelectedPlanForCheckout(null)}
+                onClick={() => {
+                  setSelectedPlanForCheckout(null);
+                  setSelectedPlanActivationStatus("TRIALING");
+                }}
                 disabled={redirectingToCheckout}
                 className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
