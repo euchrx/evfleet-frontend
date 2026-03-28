@@ -132,19 +132,13 @@ export function SubscriptionPage() {
   const hasCompanyScope = Boolean(data?.companyId);
   const statusAlert = getStatusAlert(overview?.status);
 
-  function openCheckoutInNewTab(checkoutUrl: string) {
+  function redirectToCheckout(checkoutUrl: string) {
     const normalizedUrl = String(checkoutUrl || "").trim();
     if (!normalizedUrl) {
       throw new Error("Checkout não disponível no momento.");
     }
 
-    const checkoutWindow = window.open(normalizedUrl, "_blank", "noopener,noreferrer");
-    if (!checkoutWindow) {
-      // Fallback para navegadores que bloqueiam popup.
-      window.location.href = normalizedUrl;
-      return;
-    }
-    checkoutWindow.focus();
+    window.location.href = normalizedUrl;
   }
 
   function openCreatePlanModal() {
@@ -238,7 +232,7 @@ export function SubscriptionPage() {
       }
 
       const checkoutUrl = await generateSubscriptionPayment(subscriptionId);
-      openCheckoutInNewTab(checkoutUrl);
+      redirectToCheckout(checkoutUrl);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -266,7 +260,7 @@ export function SubscriptionPage() {
       setPayingNow(true);
       setErrorMessage("");
       const checkoutUrl = await generateSubscriptionPayment(overview.subscriptionId);
-      openCheckoutInNewTab(checkoutUrl);
+      redirectToCheckout(checkoutUrl);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Não foi possível iniciar o pagamento agora.",

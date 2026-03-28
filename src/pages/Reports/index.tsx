@@ -585,17 +585,6 @@ export function ReportsPage() {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
-          {selectedModules.includes("VEHICLES") ? (
-            <div className="lg:col-span-3">
-              <MultiSelectField
-                label="Status dos veículos"
-                options={vehicleStatusOptions}
-                selectedIds={selectedVehicleStatuses}
-                onChange={(value) => setSelectedVehicleStatuses(value as VehicleStatusFilter[])}
-                placeholder="Selecione os status"
-              />
-            </div>
-          ) : null}
           <div className="hidden">
             <label className="mb-1 block text-sm font-semibold text-slate-700">Status do veículo</label>
             <select
@@ -688,6 +677,20 @@ export function ReportsPage() {
               error={fieldErrors.modules}
             />
           </div>
+
+          {selectedModules.includes("VEHICLES") ? (
+            <div className="lg:col-span-3">
+              <MultiSelectField
+                label="Status dos veículos"
+                options={vehicleStatusOptions}
+                selectedIds={selectedVehicleStatuses}
+                onChange={(value) =>
+                  setSelectedVehicleStatuses(value as VehicleStatusFilter[])
+                }
+                placeholder="Selecione os status"
+              />
+            </div>
+          ) : null}
 
           <div className="lg:col-span-1">
             <label className="mb-1 block text-sm font-semibold text-slate-700">Formato</label>
