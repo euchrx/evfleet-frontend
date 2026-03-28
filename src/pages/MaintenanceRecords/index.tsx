@@ -1657,6 +1657,7 @@ export function MaintenanceRecordsPage() {
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleRecordSort("date")} className="cursor-pointer">Data {sortArrow("date", recordSortBy, recordSortDirection)}</button></th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleRecordSort("vehicle")} className="cursor-pointer">Veículo {sortArrow("vehicle", recordSortBy, recordSortDirection)}</button></th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleRecordSort("type")} className="cursor-pointer">Tipo {sortArrow("type", recordSortBy, recordSortDirection)}</button></th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Peças trocadas</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleRecordSort("km")} className="cursor-pointer">KM {sortArrow("km", recordSortBy, recordSortDirection)}</button></th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleRecordSort("cost")} className="cursor-pointer">Custo {sortArrow("cost", recordSortBy, recordSortDirection)}</button></th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleRecordSort("status")} className="cursor-pointer">Status {sortArrow("status", recordSortBy, recordSortDirection)}</button></th>
@@ -1664,7 +1665,7 @@ export function MaintenanceRecordsPage() {
                 </tr>
               </thead>
               <tbody>
-                {scopedRecords.length === 0 ? <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma manutenção encontrada.</td></tr> : paginatedRecords.map((record) => {
+                {scopedRecords.length === 0 ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma manutenção encontrada.</td></tr> : paginatedRecords.map((record) => {
                   const vehicle = record.vehicle || vehicleMap.get(record.vehicleId);
                   const isHighlighted = highlightId === record.id;
                   return (
@@ -1672,6 +1673,11 @@ export function MaintenanceRecordsPage() {
                       <td className="px-6 py-4 text-sm text-slate-700">{toDateBR(record.maintenanceDate)}</td>
                       <td className="px-6 py-4 text-sm text-slate-900"><p className="font-medium">{vehicle ? formatVehicleLabel(vehicle) : "-"}</p></td>
                       <td className="px-6 py-4 text-sm text-slate-700">{maintenanceTypeLabel(record.type)}</td>
+                      <td className="px-6 py-4 text-sm text-slate-700">
+                        {Array.isArray(record.partsReplaced) && record.partsReplaced.length > 0
+                          ? record.partsReplaced.join(", ")
+                          : "-"}
+                      </td>
                       <td className="px-6 py-4 text-sm text-slate-700">{record.km?.toLocaleString("pt-BR") || "-"}</td>
                       <td className="px-6 py-4 text-sm text-slate-700">{toMoney(Number(record.cost || 0))}</td>
                       <td className="px-6 py-4 text-sm"><span className={`status-pill ${record.status === "DONE" ? "status-active" : "status-pending"}`}>{maintenanceStatusLabel(record.status)}</span></td>
