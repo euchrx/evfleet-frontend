@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FileDown } from "lucide-react";
 import { useBranch } from "../../contexts/BranchContext";
-import { getBranches } from "../../services/branches";
+import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import { getDebts } from "../../services/debts";
 import { getDrivers } from "../../services/drivers";
 import { getFuelRecords, type FuelRecord } from "../../services/fuelRecords";
 import { getMaintenanceRecords } from "../../services/maintenanceRecords";
 import { getVehicles } from "../../services/vehicles";
-import { readSoftwareSettings } from "../../services/adminSettings";
-import type { Branch } from "../../types/branch";
 import type { Debt } from "../../types/debt";
 import type { Driver } from "../../types/driver";
 import type { MaintenanceRecord } from "../../types/maintenance-record";
@@ -208,13 +206,9 @@ function MultiSelectField({
 
 export function ReportsPage() {
   const { selectedBranchId } = useBranch();
+  const { currentCompany } = useCompanyScope();
   const [errorMessage, setErrorMessage] = useState("");
-  const [isBranchLocked, setIsBranchLocked] = useState(() => {
-    const settings = readSoftwareSettings();
-    return Boolean(settings.lockDefaultBranch && settings.defaultBranchId);
-  });
 
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
@@ -247,9 +241,8 @@ export function ReportsPage() {
   async function loadData() {
     try {
       setErrorMessage("");
-      const [branchesData, vehiclesData, driversData, fuelData, maintenanceData, debtsData] =
+      const [vehiclesData, driversData, fuelData, maintenanceData, debtsData] =
         await Promise.all([
-          getBranches(),
           getVehicles(),
           getDrivers(),
           getFuelRecords(),
@@ -257,7 +250,6 @@ export function ReportsPage() {
           getDebts(),
         ]);
 
-      setBranches(Array.isArray(branchesData) ? branchesData : []);
       setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
       setDrivers(Array.isArray(driversData) ? driversData : []);
       setFuelRecords(Array.isArray(fuelData) ? fuelData : []);
@@ -280,16 +272,6 @@ export function ReportsPage() {
     );
   }, [selectedBranchId]);
 
-  useEffect(() => {
-    function refreshBranchLock() {
-      const settings = readSoftwareSettings();
-      setIsBranchLocked(Boolean(settings.lockDefaultBranch && settings.defaultBranchId));
-    }
-    window.addEventListener("evfleet-default-branch-updated", refreshBranchLock);
-    return () =>
-      window.removeEventListener("evfleet-default-branch-updated", refreshBranchLock);
-  }, []);
-
   const availableVehicles = useMemo(() => {
     const scoped = selectedBranchId
       ? vehicles.filter((item) => item.branchId === selectedBranchId)
@@ -299,10 +281,6 @@ export function ReportsPage() {
     );
   }, [vehicles, selectedBranchId]);
 
-  const branchOptions = useMemo<SelectOption[]>(
-    () => branches.map((item) => ({ id: item.id, label: item.name })),
-    [branches]
-  );
   const vehicleOptions = useMemo<SelectOption[]>(
     () =>
       availableVehicles.map((item) => ({
@@ -584,13 +562,12 @@ export function ReportsPage() {
           </div>
 
           <div className="lg:col-span-3">
-            <MultiSelectField
-              label="Estabelecimento"
-              options={branchOptions}
-              selectedIds={selectedBranchIds}
-              onChange={setSelectedBranchIds}
-              placeholder="Digite para buscar estabelecimento"
-              disabled={isBranchLocked}
+            <label className="mb-1 block text-sm font-semibold text-slate-700">Estabelecimento</label>
+            <input
+              type="text"
+              value={currentCompany?.name || "Empresa não selecionada"}
+              disabled
+              className="w-full cursor-not-allowed rounded-xl border border-slate-300 bg-slate-200 px-3 py-2 text-sm text-slate-600 outline-none"
             />
           </div>
 

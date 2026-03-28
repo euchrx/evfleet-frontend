@@ -221,7 +221,7 @@ export function VehiclesPage() {
   type VehicleFieldErrors = Partial<Record<keyof VehicleFormData, string>>;
 
   const { selectedBranchId } = useBranch();
-  const { selectedCompanyId } = useCompanyScope();
+  const { selectedCompanyId, currentCompany } = useCompanyScope();
   const { pathname } = useLocation();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -254,10 +254,6 @@ export function VehiclesPage() {
   const [maxVehiclesAllowed, setMaxVehiclesAllowed] = useState(() =>
     Number(readSoftwareSettings().maxVehiclesAllowed || 0)
   );
-  const [isBranchLocked, setIsBranchLocked] = useState(() => {
-    const settings = readSoftwareSettings();
-    return Boolean(settings.lockDefaultBranch && settings.defaultBranchId);
-  });
 
   async function loadData() {
     try {
@@ -289,13 +285,6 @@ export function VehiclesPage() {
   useEffect(() => {
     const settings = readSoftwareSettings();
     setMaxVehiclesAllowed(Number(settings.maxVehiclesAllowed || 0));
-    function refreshBranchLock() {
-      const settings = readSoftwareSettings();
-      setIsBranchLocked(Boolean(settings.lockDefaultBranch && settings.defaultBranchId));
-    }
-    window.addEventListener("evfleet-default-branch-updated", refreshBranchLock);
-    return () =>
-      window.removeEventListener("evfleet-default-branch-updated", refreshBranchLock);
   }, []);
 
   const allowedFuelOptions = useMemo(
@@ -352,7 +341,7 @@ export function VehiclesPage() {
     }
     setPageErrorMessage("");
     setEditingVehicle(null);
-    setForm({ ...initialForm, branchId: selectedBranchId });
+    setForm({ ...initialForm, branchId: selectedBranchId || branches[0]?.id || "" });
     setPhotoFiles([]);
     setDocumentFiles([]);
     setCurrentProfilePhotoUrl("");
@@ -911,7 +900,12 @@ export function VehiclesPage() {
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Filial</span>
-                    <select value={form.branchId} disabled={isBranchLocked} onChange={(e) => { setForm({ ...form, branchId: e.target.value }); clearFieldError("branchId"); }} className={`${getFieldClass("branchId")} disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500`}><option value="">Selecione uma filial</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+                    <input
+                      value={currentCompany?.name || "Empresa não selecionada"}
+                      disabled
+                      className={`${getFieldClass("branchId")} cursor-not-allowed bg-slate-200 text-slate-500`}
+                      placeholder="Empresa vinculada"
+                    />
                     {fieldErrors.branchId ? <p className="text-xs text-red-600">{fieldErrors.branchId}</p> : null}
                   </label>
                   <label className="space-y-1">
