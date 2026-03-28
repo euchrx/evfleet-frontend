@@ -564,7 +564,7 @@ export function AppLayout() {
                 <button
                   type="button"
                   onClick={() => !isLoadingScopeOptions && setIsCompanyScopeOpen((prev) => !prev)}
-                  className="inline-flex w-full items-center gap-3 rounded-2xl border border-slate-700/70 bg-gradient-to-r from-[#091b3a] to-[#08142b] px-4 py-3 text-left shadow-sm transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex w-full items-center gap-3 rounded-2xl border border-[#1f3566] bg-gradient-to-r from-[#0f1e44] to-[#0a1635] px-4 py-3 text-left shadow-sm transition hover:border-[#2a4a86] disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isLoadingScopeOptions}
                 >
                   <BriefcaseBusiness size={14} className="text-slate-300" />
