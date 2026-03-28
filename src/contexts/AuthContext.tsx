@@ -13,7 +13,7 @@ type AuthContextType = {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoadingAuth: boolean;
-  login: (token: string) => Promise<void>;
+  login: (token: string, userFromLogin?: AuthUser | null) => Promise<void>;
   logout: () => void;
   refreshMe: () => Promise<void>;
 };
@@ -31,6 +31,51 @@ function normalizeToken(value: string | null | undefined) {
   return trimmed.replace(/^Bearer\s+/i, "");
 }
 
+function decodeTokenPayload(token: string) {
+  try {
+    const [, payload] = token.split(".");
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`)
+        .join(""),
+    );
+    return JSON.parse(json) as {
+      sub?: string;
+      email?: string;
+      role?: AuthUser["role"];
+      companyId?: string;
+      name?: string;
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveAuthUser(user: AuthUser | null) {
+  if (!user) {
+    localStorage.removeItem("auth_user");
+    localStorage.removeItem("auth_user_name");
+    return;
+  }
+  localStorage.setItem("auth_user", JSON.stringify(user));
+  if (user.name) {
+    localStorage.setItem("auth_user_name", String(user.name));
+  }
+}
+
+function readStoredAuthUser() {
+  try {
+    const raw = localStorage.getItem("auth_user");
+    if (!raw) return null;
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -40,14 +85,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const response = await api.get("/auth/me");
       setUser(response.data);
-      if (response.data?.name) {
-        localStorage.setItem("auth_user_name", String(response.data.name));
-      }
+      saveAuthUser(response.data);
       return true;
-    } catch (error) {
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 404 && token) {
+        const stored = readStoredAuthUser();
+        if (stored) {
+          setUser(stored);
+          return true;
+        }
+
+        const payload = decodeTokenPayload(token);
+        if (payload?.sub && payload?.email && payload?.role) {
+          const fallbackUser: AuthUser = {
+            id: payload.sub,
+            email: payload.email,
+            role: payload.role,
+            name: payload.name || localStorage.getItem("auth_user_name") || "Usuário",
+            companyId: payload.companyId || null,
+          };
+          setUser(fallbackUser);
+          saveAuthUser(fallbackUser);
+          return true;
+        }
+      }
+
       console.error("Erro ao buscar usuario logado:", error);
       localStorage.removeItem("token");
-      localStorage.removeItem("auth_user_name");
+      saveAuthUser(null);
       setToken(null);
       setUser(null);
       return false;
@@ -72,7 +138,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initializeAuth();
   }, []);
 
-  async function login(newToken: string) {
+  async function login(newToken: string, userFromLogin?: AuthUser | null) {
     const normalizedToken = normalizeToken(newToken);
 
     if (!normalizedToken) {
@@ -81,6 +147,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     localStorage.setItem("token", normalizedToken);
     setToken(normalizedToken);
+    if (userFromLogin) {
+      setUser(userFromLogin);
+      saveAuthUser(userFromLogin);
+    }
     const ok = await fetchMe();
 
     if (!ok) {
@@ -91,7 +161,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   function logout() {
     localStorage.removeItem("token");
-    localStorage.removeItem("auth_user_name");
+    saveAuthUser(null);
     setToken(null);
     setUser(null);
   }

@@ -60,7 +60,7 @@ export function LoginPage() {
         throw new Error("Token não encontrado na resposta do login.");
       }
 
-      await login(token);
+      await login(token, response.data?.user || null);
       navigate("/dashboard");
     } catch (error) {
       console.error("Erro no login:", error);
