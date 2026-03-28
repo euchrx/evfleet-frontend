@@ -5,6 +5,7 @@ import {
   BarChart3,
   Bell,
   BookOpenCheck,
+  Building2,
   ClipboardList,
   CreditCard,
   FileText,
@@ -124,6 +125,7 @@ export function AppLayout() {
     { name: "Gestão de Documentos", path: "/vehicle-documents", icon: FileText, roles: ["ADMIN", "FLEET_MANAGER"] },
     { name: "Filiais", path: "/branches", icon: GitBranch, roles: ["ADMIN", "FLEET_MANAGER"] },
     { name: "Como usar", path: "/how-to-use", icon: BookOpenCheck, roles: ["ADMIN", "FLEET_MANAGER"] },
+    { name: "Empresas", path: "/companies", icon: Building2, roles: ["ADMIN"] },
     { name: "Usuários", path: "/users", icon: Users, roles: ["ADMIN"] },
     { name: "Administração", path: "/administration", icon: ShieldCheck, roles: ["ADMIN"] },
   ];

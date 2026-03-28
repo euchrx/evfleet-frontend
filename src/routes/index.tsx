@@ -3,6 +3,7 @@ import { AppLayout } from "../layouts/AppLayout";
 import { DashboardPage } from "../pages/Dashboard";
 import { LoginPage } from "../pages/Login";
 import { UsersPage } from "../pages/Users";
+import { CompaniesPage } from "../pages/Companies";
 import { VehiclesPage } from "../pages/Vehicles";
 import { DriversPage } from "../pages/Drivers";
 import { MaintenanceRecordsPage } from "../pages/MaintenanceRecords";
@@ -45,6 +46,7 @@ export function AppRoutes() {
             <Route path="/how-to-use" element={<HowToPage />} />
 
             <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
+              <Route path="/companies" element={<CompaniesPage />} />
               <Route path="/administration" element={<AdministrationPage />} />
               <Route path="/users" element={<UsersPage />} />
             </Route>
