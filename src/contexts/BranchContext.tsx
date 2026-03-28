@@ -90,6 +90,7 @@ export function BranchProvider({ children }: BranchProviderProps) {
   useEffect(() => {
     if (!user || branches.length === 0) return;
 
+    const isAdmin = user.role === "ADMIN";
     const settings = readSoftwareSettings();
     const fixedBranchId = settings.defaultBranchId;
     const fixedBranchExists =
@@ -111,7 +112,18 @@ export function BranchProvider({ children }: BranchProviderProps) {
       return;
     }
 
-    setSelectedBranchIdState("");
+    const firstBranchId = branches[0]?.id || "";
+    if (!isAdmin && firstBranchId) {
+      setSelectedBranchIdState(firstBranchId);
+      localStorage.setItem("selectedBranchId", firstBranchId);
+      return;
+    }
+
+    setSelectedBranchIdState(firstBranchId);
+    if (firstBranchId) {
+      localStorage.setItem("selectedBranchId", firstBranchId);
+      return;
+    }
     localStorage.removeItem("selectedBranchId");
   }, [user, branches]);
 
@@ -197,4 +209,3 @@ export function useBranch() {
 
   return context;
 }
-

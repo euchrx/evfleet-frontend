@@ -17,7 +17,6 @@ export const MENU_VISIBILITY_ITEMS: MenuVisibilityItem[] = [
   { label: "Débitos e Multas", path: "/debts" },
   { label: "Gestão de Viagens", path: "/trips" },
   { label: "Gestão de Documentos", path: "/vehicle-documents" },
-  { label: "Filiais", path: "/branches" },
   { label: "Como usar", path: "/how-to-use" },
   { label: "Empresas", path: "/companies" },
   { label: "Usuários", path: "/users" },

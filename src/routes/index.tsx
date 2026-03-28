@@ -9,7 +9,6 @@ import { DriversPage } from "../pages/Drivers";
 import { MaintenanceRecordsPage } from "../pages/MaintenanceRecords";
 import { MaintenanceRegisterPage } from "../pages/MaintenanceRegister";
 import { DebtsPage } from "../pages/Debts";
-import { BranchesPage } from "../pages/Branches";
 import { ReportsPage } from "../pages/Reports";
 import { FuelRecordsPage } from "../pages/FuelRecords";
 import { AdministrationPage } from "../pages/Administration";
@@ -39,7 +38,6 @@ export function AppRoutes() {
             <Route path="/trips" element={<TripsPage />} />
             <Route path="/vehicle-documents" element={<VehicleDocumentsPage />} />
             <Route path="/debts" element={<DebtsPage />} />
-            <Route path="/branches" element={<BranchesPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/billing/success" element={<BillingSuccessPage />} />
