@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { CreditCard, Pencil, Power, RefreshCw, Trash2 } from "lucide-react";
 import {
   activateCompanySubscription,
@@ -68,13 +69,20 @@ function getStatusAlert(status?: SubscriptionStatus) {
   if (status === "CANCELED") {
     return {
       className: "border-slate-300 bg-slate-50 text-slate-700",
-      message: "Assinatura cancelada.",
+      message: "Assinatura cancelada. Entre em contato com o administrador para reativação.",
+    };
+  }
+  if (status === "ACTIVE") {
+    return {
+      className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+      message: "Assinatura ativa e operação liberada.",
     };
   }
   return null;
 }
 
 export function SubscriptionPage() {
+  const location = useLocation();
   const { user } = useAuth();
   const { selectedCompanyId } = useCompanyScope();
   const [loading, setLoading] = useState(true);
@@ -117,7 +125,7 @@ export function SubscriptionPage() {
 
   useEffect(() => {
     loadData();
-  }, [selectedCompanyId]);
+  }, [selectedCompanyId, location.key]);
 
   const overview = data?.overview || null;
   const plans = data?.plans || [];
@@ -352,7 +360,7 @@ export function SubscriptionPage() {
               Adicionar plano
             </button>
           ) : null}
-          {overview && data?.canPayNow ? (
+          {overview && data?.canPayNow && overview.status !== "CANCELED" ? (
             <button
               type="button"
               onClick={handlePayNow}
@@ -642,12 +650,13 @@ export function SubscriptionPage() {
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-600">Referência</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-600">Status</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-600">Valor</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-600">Comprovante</th>
               </tr>
             </thead>
             <tbody>
               {invoices.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">
+                  <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-500">
                     Nenhum pagamento encontrado.
                   </td>
                 </tr>
@@ -664,6 +673,20 @@ export function SubscriptionPage() {
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-slate-900">
                       {formatCurrency(invoice.amountCents)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {invoice.invoiceUrl ? (
+                        <a
+                          href={invoice.invoiceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-semibold text-blue-600 transition hover:text-blue-700"
+                        >
+                          Abrir comprovante
+                        </a>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
                     </td>
                   </tr>
                 ))

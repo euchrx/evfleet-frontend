@@ -46,6 +46,8 @@ type BillingPaymentApi = {
   createdAt?: string | null;
   paidAt?: string | null;
   checkoutUrl?: string | null;
+  invoiceUrl?: string | null;
+  receiptUrl?: string | null;
   gatewayReference?: string | null;
 };
 
@@ -82,6 +84,7 @@ export type SubscriptionInvoice = {
   status: PaymentStatus;
   reference?: string;
   checkoutUrl?: string;
+  invoiceUrl?: string;
 };
 
 export type SubscriptionPageData = {
@@ -172,6 +175,7 @@ function toInvoiceView(payment: BillingPaymentApi, planName: string): Subscripti
     status: payment.status,
     reference: payment.gatewayReference || payment.id,
     checkoutUrl: payment.checkoutUrl || undefined,
+    invoiceUrl: payment.invoiceUrl || payment.receiptUrl || undefined,
   };
 }
 
