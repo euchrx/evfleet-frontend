@@ -87,6 +87,13 @@ function isSupportedVehicleProfileImage(file: File) {
   return byMime || byExt;
 }
 
+function isUuid(value: string | null | undefined) {
+  const raw = String(value || "").trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    raw,
+  );
+}
+
 function isValidHttpUrl(value: string) {
   const raw = String(value || "").trim();
   if (!raw) return false;
@@ -468,7 +475,10 @@ export function VehiclesPage() {
         status: form.status,
         photoUrls: safeExistingPhotoUrls,
         documentUrls: Array.from(new Set([...safeExistingDocumentUrls, ...safeUploadedDocumentUrls])),
-        branchId: form.branchId || selectedBranchId || branches[0]?.id || "",
+        branchId: (() => {
+          const candidate = form.branchId || selectedBranchId || branches[0]?.id || "";
+          return isUuid(candidate) ? candidate : undefined;
+        })(),
       };
 
       const nextFieldErrors: VehicleFieldErrors = {};

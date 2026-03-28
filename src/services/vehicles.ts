@@ -16,7 +16,7 @@ export type CreateVehicleInput = {
   status: "ACTIVE" | "MAINTENANCE" | "SOLD";
   photoUrls?: string[];
   documentUrls?: string[];
-  branchId: string;
+  branchId?: string;
 };
 
 export type UpdateVehicleInput = Partial<CreateVehicleInput>;
