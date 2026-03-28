@@ -6,6 +6,7 @@ import {
   Bell,
   BookOpenCheck,
   ClipboardList,
+  CreditCard,
   FileText,
   Fuel,
   GitBranch,
@@ -126,6 +127,13 @@ export function AppLayout() {
     { name: "Usuários", path: "/users", icon: Users, roles: ["ADMIN"] },
     { name: "Administração", path: "/administration", icon: ShieldCheck, roles: ["ADMIN"] },
   ];
+
+  menu.splice(2, 0, {
+    name: "Assinatura",
+    path: "/subscription",
+    icon: CreditCard,
+    roles: ["ADMIN", "FLEET_MANAGER"],
+  });
 
   const filteredMenu = menu.filter(
     (item) => (user ? item.roles.includes(user.role) : false) && isMenuPathVisible(item.path, menuVisibility)

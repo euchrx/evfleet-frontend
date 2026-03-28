@@ -15,6 +15,7 @@ import { AdministrationPage } from "../pages/Administration";
 import { TripsPage } from "../pages/Trips";
 import { VehicleDocumentsPage } from "../pages/VehicleDocuments";
 import { HowToPage } from "../pages/HowTo";
+import { SubscriptionPage } from "../pages/Subscription";
 import { PrivateRoute } from "./PrivateRoute";
 import { RoleRoute } from "./RoleRoute";
 
@@ -38,6 +39,7 @@ export function AppRoutes() {
             <Route path="/debts" element={<DebtsPage />} />
             <Route path="/branches" element={<BranchesPage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/how-to-use" element={<HowToPage />} />
 
             <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
