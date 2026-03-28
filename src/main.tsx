@@ -4,13 +4,16 @@ import "./index.css";
 import App from "./App.tsx";
 import { AuthProvider } from "./contexts/AuthContext";
 import { BranchProvider } from "./contexts/BranchContext";
+import { CompanyScopeProvider } from "./contexts/CompanyScopeContext";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
-      <BranchProvider>
-        <App />
-      </BranchProvider>
+      <CompanyScopeProvider>
+        <BranchProvider>
+          <App />
+        </BranchProvider>
+      </CompanyScopeProvider>
     </AuthProvider>
   </StrictMode>
 );

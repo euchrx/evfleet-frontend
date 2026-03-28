@@ -1,5 +1,6 @@
 import axios from "axios";
 import { localizeAxiosError } from "../utils/errorTranslator";
+import { COMPANY_SCOPE_STORAGE_KEY } from "../contexts/CompanyScopeContext";
 
 const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 
@@ -21,6 +22,14 @@ api.interceptors.request.use((config) => {
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  const companyScopeId = localStorage.getItem(COMPANY_SCOPE_STORAGE_KEY)?.trim();
+  const hasExplicitCompanyScopeHeader =
+    typeof (config.headers as any)?.["x-company-scope"] !== "undefined";
+
+  if (companyScopeId && !hasExplicitCompanyScopeHeader) {
+    config.headers["x-company-scope"] = companyScopeId;
   }
 
   return config;

@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useCompanyScope } from "../contexts/CompanyScopeContext";
 import { getSystemLogs, type SystemLogEntry } from "../services/systemLogs";
 import { getFuelRecords } from "../services/fuelRecords";
 import { getVehicles } from "../services/vehicles";
@@ -101,6 +102,7 @@ export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuth();
+  const { selectedCompanyId, setSelectedCompanyId, options, isLoadingScopeOptions } = useCompanyScope();
   const [isSystemLogsModalOpen, setIsSystemLogsModalOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -332,7 +334,7 @@ export function AppLayout() {
       window.removeEventListener("evfleet-fuel-anomalies-updated", refreshNotifications);
       window.removeEventListener("evfleet-notifications-updated", refreshNotifications);
     };
-  }, []);
+  }, [selectedCompanyId]);
 
   useEffect(() => {
     async function refreshMenuVisibility() {
@@ -498,6 +500,25 @@ export function AppLayout() {
                 </div>
               </div>
             </button>
+
+            <div className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:max-w-[320px]">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Escopo da empresa
+              </p>
+              <select
+                value={selectedCompanyId}
+                onChange={(event) => setSelectedCompanyId(event.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                disabled={isLoadingScopeOptions}
+              >
+                <option value="">Selecionar empresa (vazio)</option>
+                {options.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <div className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm lg:max-w-[340px]">
               <div className="flex items-center gap-2.5">

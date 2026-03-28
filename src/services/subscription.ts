@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { readSoftwareSettings } from "./adminSettings";
+import { COMPANY_SCOPE_STORAGE_KEY } from "../contexts/CompanyScopeContext";
 
 export type SubscriptionStatus = "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED";
 export type PlanInterval = "MONTHLY" | "YEARLY";
@@ -102,7 +103,7 @@ function decodeTokenPayload(token: string) {
         .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`)
         .join(""),
     );
-    return JSON.parse(json) as { companyId?: string; sub?: string };
+    return JSON.parse(json) as { companyId?: string; role?: string; sub?: string };
   } catch {
     return null;
   }
@@ -112,6 +113,21 @@ function readCompanyIdFromToken() {
   const token = localStorage.getItem("token");
   if (!token) return "";
   return decodeTokenPayload(token)?.companyId?.trim() || "";
+}
+
+function getSelectedCompanyScopeId() {
+  return localStorage.getItem(COMPANY_SCOPE_STORAGE_KEY)?.trim() || "";
+}
+
+function resolveCompanyScopeId() {
+  const selected = getSelectedCompanyScopeId();
+  if (selected) return selected;
+
+  const token = localStorage.getItem("token");
+  const payload = token ? decodeTokenPayload(token) : null;
+  if (payload?.role === "ADMIN") return "";
+
+  return payload?.companyId?.trim() || readCompanyIdFromToken();
 }
 
 function toPlanView(plan: BillingPlanApi, currentPlanId?: string): SubscriptionPlan {
@@ -147,15 +163,14 @@ function toInvoiceView(payment: BillingPaymentApi, planName: string): Subscripti
 }
 
 export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
-  const companyId = readCompanyIdFromToken();
-  if (!companyId) {
-    throw new Error("Não foi possível identificar a empresa do usuário logado.");
-  }
+  const companyId = resolveCompanyScopeId();
 
   const [subscriptionResponse, plansResponse, paymentsResponse] = await Promise.all([
     api.get<BillingSubscriptionApi | null>("/billing/subscription"),
     api.get<BillingPlanApi[]>("/billing/plans"),
-    api.get<BillingPaymentApi[]>(`/billing/companies/${companyId}/payments`),
+    companyId
+      ? api.get<BillingPaymentApi[]>(`/billing/companies/${companyId}/payments`)
+      : Promise.resolve({ data: [] as BillingPaymentApi[] }),
   ]);
 
   const subscription = subscriptionResponse.data;
@@ -200,7 +215,11 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
 }
 
 export async function selectCompanyPlan(companyId: string, planId: string) {
-  await api.post(`/billing/companies/${companyId}/subscription`, { planId });
+  const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
+  if (!targetCompanyId) {
+    throw new Error("Selecione uma empresa no escopo para continuar.");
+  }
+  await api.post(`/billing/companies/${targetCompanyId}/subscription`, { planId });
 }
 
 export async function generateSubscriptionPayment(subscriptionId: string) {
