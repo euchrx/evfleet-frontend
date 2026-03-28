@@ -878,6 +878,15 @@ export function SubscriptionPage() {
         onCancel={() => setIsCancelSubscriptionOpen(false)}
         onConfirm={overview?.status === "CANCELED" ? handleActivateSubscription : handleCancelSubscription}
       />
+      <ConfirmDeleteModal
+        isOpen={isClearPaymentsOpen}
+        title="Limpar histórico de pagamentos"
+        description="Deseja remover todos os pagamentos desta empresa? Esta ação não poderá ser desfeita."
+        confirmText="Limpar histórico"
+        loading={clearingPayments}
+        onCancel={() => setIsClearPaymentsOpen(false)}
+        onConfirm={handleClearPayments}
+      />
     </div>
   );
 }
