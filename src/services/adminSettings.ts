@@ -3,7 +3,6 @@ export type SoftwareSettings = {
   timezone: string;
   language: string;
   currency: string;
-  maxVehiclesAllowed: number;
   alertDaysBeforeCnh: number;
   alertDaysBeforeDocument: number;
   alertKmBeforeMaintenance: number;
@@ -15,8 +14,6 @@ export type SoftwareSettings = {
   sessionTimeoutMinutes: number;
   defaultReportFormat: "PDF";
   defaultDashboardPeriod: "CURRENT_MONTH" | "CURRENT_YEAR" | "LAST_30_DAYS" | "ALL";
-  lockDefaultBranch: boolean;
-  defaultBranchId: string;
 };
 
 export const ADMIN_SETTINGS_STORAGE_KEY = "evfleet_admin_settings_v1";
@@ -26,7 +23,6 @@ export const defaultSoftwareSettings: SoftwareSettings = {
   timezone: "America/Sao_Paulo",
   language: "pt-BR",
   currency: "BRL",
-  maxVehiclesAllowed: 500,
   alertDaysBeforeCnh: 30,
   alertDaysBeforeDocument: 15,
   alertKmBeforeMaintenance: 500,
@@ -38,8 +34,6 @@ export const defaultSoftwareSettings: SoftwareSettings = {
   sessionTimeoutMinutes: 60,
   defaultReportFormat: "PDF",
   defaultDashboardPeriod: "CURRENT_YEAR",
-  lockDefaultBranch: false,
-  defaultBranchId: "",
 };
 
 export function readSoftwareSettings() {

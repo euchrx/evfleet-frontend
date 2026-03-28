@@ -11,7 +11,6 @@ import {
   updateVehicle,
 } from "../../services/vehicles";
 import { getBranches } from "../../services/branches";
-import { readSoftwareSettings } from "../../services/adminSettings";
 import { useBranch } from "../../contexts/BranchContext";
 import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import { useLocation } from "react-router-dom";
@@ -258,9 +257,6 @@ export function VehiclesPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
   const [deletingVehicle, setDeletingVehicle] = useState(false);
-  const [maxVehiclesAllowed, setMaxVehiclesAllowed] = useState(() =>
-    Number(readSoftwareSettings().maxVehiclesAllowed || 0)
-  );
 
   async function loadData() {
     try {
@@ -302,11 +298,6 @@ export function VehiclesPage() {
     clearFieldError("branchId");
   }, [isModalOpen, editingVehicle, form.branchId, branches, selectedBranchId]);
 
-  useEffect(() => {
-    const settings = readSoftwareSettings();
-    setMaxVehiclesAllowed(Number(settings.maxVehiclesAllowed || 0));
-  }, []);
-
   const allowedFuelOptions = useMemo(
     () => getAllowedFuelByCategory(form.category),
     [form.category]
@@ -322,15 +313,6 @@ export function VehiclesPage() {
       if (selectedProfilePhotoPreview) URL.revokeObjectURL(selectedProfilePhotoPreview);
     };
   }, [selectedProfilePhotoPreview]);
-
-  useEffect(() => {
-    function refreshMaxVehiclesAllowed() {
-      const settings = readSoftwareSettings();
-      setMaxVehiclesAllowed(Number(settings.maxVehiclesAllowed || 0));
-    }
-    window.addEventListener("evfleet-settings-updated", refreshMaxVehiclesAllowed);
-    return () => window.removeEventListener("evfleet-settings-updated", refreshMaxVehiclesAllowed);
-  }, []);
 
   function clearFieldError(field: keyof VehicleFormData) {
     setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -353,12 +335,6 @@ export function VehiclesPage() {
   }, [pathname]);
 
   function openCreate() {
-    const settings = readSoftwareSettings();
-    const maxVehiclesAllowed = Number(settings.maxVehiclesAllowed || 0);
-    if (maxVehiclesAllowed >= 0 && vehicles.length >= maxVehiclesAllowed) {
-      setPageErrorMessage("Limite máximo atingido para cadastro de veículos. Entre em contato com o suporte.");
-      return;
-    }
     setPageErrorMessage("");
     setEditingVehicle(null);
     setForm({ ...initialForm, branchId: selectedBranchId || branches[0]?.id || "" });
@@ -438,15 +414,6 @@ export function VehiclesPage() {
       setSaving(true);
       setFormErrorMessage("");
       setFieldErrors({});
-
-      if (!editingVehicle) {
-        const settings = readSoftwareSettings();
-        const maxVehiclesAllowed = Number(settings.maxVehiclesAllowed || 0);
-        if (maxVehiclesAllowed >= 0 && vehicles.length >= maxVehiclesAllowed) {
-          setFormErrorMessage("Limite máximo atingido para cadastro de veículos. Entre em contato com o suporte.");
-          return;
-        }
-      }
 
       const uploadedDocumentUrls = await uploadVehicleFiles("document", documentFiles);
       const safeExistingPhotoUrls = sanitizeUrlList(form.photoUrls);
@@ -714,11 +681,7 @@ export function VehiclesPage() {
     };
   }, [vehicles, selectedBranchId]);
 
-  const isVehicleLimitReached = useMemo(
-    () => maxVehiclesAllowed >= 0 && vehicles.length >= maxVehiclesAllowed,
-    [maxVehiclesAllowed, vehicles.length]
-  );
-  const isCreateButtonBlockedVisual = loading || isVehicleLimitReached;
+  const isCreateButtonBlockedVisual = loading;
 
   return (
     <div className="min-w-0 space-y-6">

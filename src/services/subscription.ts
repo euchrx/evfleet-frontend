@@ -201,9 +201,9 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
   const paymentsData = Array.isArray(paymentsResponse.data) ? paymentsResponse.data : [];
 
   const activePlans = plansData.filter((plan) => plan.isActive !== false && plan.active !== false);
-  const plans = activePlans.map((plan) => toPlanView(plan, subscription?.plan.id));
+  const plans = activePlans.map((plan) => toPlanView(plan, subscription?.plan?.id));
 
-  const overview: SubscriptionOverview | null = subscription
+  const overview: SubscriptionOverview | null = subscription && subscription.plan
     ? {
         companyId,
         companyName: readSoftwareSettings().companyName || "Empresa",
@@ -219,9 +219,7 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
       }
     : null;
 
-  const invoices = paymentsData.map((payment) =>
-    toInvoiceView(payment, subscription?.plan.name || "Plano"),
-  );
+  const invoices = paymentsData.map((payment) => toInvoiceView(payment, subscription?.plan?.name || "Plano"));
 
   const hasPendingPayment = paymentsData.some((payment) => payment.status === "PENDING");
   const pendingPayment = paymentsData.find((payment) => payment.status === "PENDING");

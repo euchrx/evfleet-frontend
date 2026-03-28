@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { Building2, Settings2, ShieldCheck } from "lucide-react";
 import { addSystemLog } from "../../services/systemLogs";
-import { getBranches } from "../../services/branches";
-import type { Branch } from "../../types/branch";
 import {
   defaultSoftwareSettings,
   readSoftwareSettings,
@@ -20,7 +18,6 @@ import {
 
 export function AdministrationPage() {
   const [settings, setSettings] = useState<SoftwareSettings>(defaultSoftwareSettings);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(getDefaultMenuVisibilityMap());
   const [savedAt, setSavedAt] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
@@ -35,7 +32,6 @@ export function AdministrationPage() {
   useEffect(() => {
     setSettings(readSoftwareSettings());
     fetchMenuVisibilityMap().then(setMenuVisibility);
-    getBranches().then((items) => setBranches(Array.isArray(items) ? items : []));
   }, []);
 
   function handleChange<K extends keyof SoftwareSettings>(field: K, value: SoftwareSettings[K]) {
@@ -45,7 +41,6 @@ export function AdministrationPage() {
   function saveSettings() {
     saveSoftwareSettings(settings);
     window.dispatchEvent(new CustomEvent("evfleet-settings-updated"));
-    window.dispatchEvent(new CustomEvent("evfleet-default-branch-updated"));
     const now = new Date().toLocaleString("pt-BR");
     setSavedAt(now);
     setSaveMessage("Configurações salvas com sucesso.");
@@ -56,7 +51,6 @@ export function AdministrationPage() {
     setSettings(defaultSoftwareSettings);
     saveSoftwareSettings(defaultSoftwareSettings);
     window.dispatchEvent(new CustomEvent("evfleet-settings-updated"));
-    window.dispatchEvent(new CustomEvent("evfleet-default-branch-updated"));
     const now = new Date().toLocaleString("pt-BR");
     setSavedAt(now);
     setSaveMessage("Configurações padrão restauradas.");
@@ -121,7 +115,6 @@ export function AdministrationPage() {
       await resetAllDatabaseWithToken(resetJwtToken.trim());
 
       window.dispatchEvent(new CustomEvent("evfleet-settings-updated"));
-      window.dispatchEvent(new CustomEvent("evfleet-default-branch-updated"));
       window.dispatchEvent(new CustomEvent("evfleet-menu-visibility-updated"));
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
 
@@ -130,7 +123,6 @@ export function AdministrationPage() {
       setSettings(readSoftwareSettings());
       setSaveMessage("Reset all do banco concluído com sucesso.");
       window.setTimeout(() => setSaveMessage(""), 3000);
-      getBranches().then((items) => setBranches(Array.isArray(items) ? items : []));
       setIsResetModalOpen(false);
       setResetJwtToken("");
     } catch (error: any) {
@@ -215,51 +207,7 @@ export function AdministrationPage() {
               <option value="BRL">Real (BRL)</option>
             </select>
           </label>
-          <label className="space-y-1 lg:col-span-3">
-            <span className="text-sm font-medium text-slate-700">Limite máximo de veículos permitidos no sistema</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={String(settings.maxVehiclesAllowed)}
-              onChange={(e) => {
-                const onlyDigits = e.target.value.replace(/\D/g, "");
-                handleChange("maxVehiclesAllowed", Number(onlyDigits || "0"));
-              }}
-              placeholder="Ex: 500"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            />
-          </label>
-          <div className="space-y-3 lg:col-span-12 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <span className="block text-sm font-medium text-slate-700">
-              Estabelecimento padrão do sistema
-            </span>
-            <label className="mt-1 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-              <input
-                type="checkbox"
-                checked={settings.lockDefaultBranch}
-                onChange={(e) => handleChange("lockDefaultBranch", e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
-              />
-              Ativar e bloquear estabelecimento em todo o sistema
-            </label>
-            <select
-              value={settings.defaultBranchId}
-              onChange={(e) => handleChange("defaultBranchId", e.target.value)}
-              disabled={!settings.lockDefaultBranch}
-              className="w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 disabled:cursor-not-allowed disabled:bg-slate-100"
-            >
-              <option value="">Nenhum (rede inteira)</option>
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs font-medium text-slate-500">
-              Quando ativado e definido, os campos de estabelecimento serão preenchidos automaticamente e desabilitados.
-            </span>
-          </div>
+          
         </div>
 
         <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 md:flex-row md:items-center md:justify-between">
