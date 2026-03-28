@@ -468,14 +468,17 @@ export function VehiclesPage() {
         status: form.status,
         photoUrls: safeExistingPhotoUrls,
         documentUrls: Array.from(new Set([...safeExistingDocumentUrls, ...safeUploadedDocumentUrls])),
-        branchId: form.branchId,
+        branchId: form.branchId || selectedBranchId || branches[0]?.id || "",
       };
 
       const nextFieldErrors: VehicleFieldErrors = {};
       if (!payload.plate) nextFieldErrors.plate = "Informe a placa.";
       if (!payload.model) nextFieldErrors.model = "Informe o modelo.";
       if (!payload.brand) nextFieldErrors.brand = "Informe a marca.";
-      if (!payload.branchId) nextFieldErrors.branchId = "Selecione a filial.";
+      if (!payload.branchId) {
+        nextFieldErrors.branchId =
+          "Empresa sem estabelecimento operacional. Cadastre uma empresa com unidade ativa.";
+      }
       if (!form.vehicleType) nextFieldErrors.vehicleType = "Selecione o tipo de peso.";
       if (!form.category) nextFieldErrors.category = "Selecione o tipo de veículo.";
       if (!form.fuelType) nextFieldErrors.fuelType = "Selecione o combustível.";
