@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CreditCard, RefreshCw } from "lucide-react";
+import { CreditCard, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import {
   createBillingPlan,
   deleteBillingPlan,
@@ -355,7 +355,31 @@ export function SubscriptionPage() {
                     <h3 className="text-base font-bold text-slate-900">{plan.name}</h3>
                     <p className="text-sm text-slate-500">{plan.description}</p>
                   </div>
-                  {plan.isCurrent ? <span className="status-pill status-pending">Plano atual</span> : null}
+                  <div className="flex items-center gap-2">
+                    {plan.isCurrent ? <span className="status-pill status-pending">Plano atual</span> : null}
+                    {canManagePlans ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openEditPlanModal(plan)}
+                          disabled={isSubmitting}
+                          title="Editar plano"
+                          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPlanToDelete(plan)}
+                          disabled={isSubmitting}
+                          title="Remover plano"
+                          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
 
                 <p className="mt-3 text-2xl font-bold text-slate-900">
@@ -385,26 +409,6 @@ export function SubscriptionPage() {
                           ? "Salvando..."
                           : "Selecionar plano"}
                 </button>
-                {canManagePlans ? (
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEditPlanModal(plan)}
-                      disabled={isSubmitting}
-                      className="cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPlanToDelete(plan)}
-                      disabled={isSubmitting}
-                      className="cursor-pointer rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Remover
-                    </button>
-                  </div>
-                ) : null}
               </article>
             );
           })}
