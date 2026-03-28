@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, RefreshCw } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { getSubscriptionPageData } from "../../services/subscription";
+import { checkSubscriptionPayment, getSubscriptionPageData } from "../../services/subscription";
 
 function useQueryParams() {
   const location = useLocation();
@@ -13,46 +13,50 @@ export function BillingSuccessPage() {
   const orderNsu = query.get("order_nsu");
   const transactionNsu = query.get("transaction_nsu");
   const receiptUrl = query.get("receipt_url");
+  const slug = query.get("slug");
   const [isChecking, setIsChecking] = useState(true);
+  const [isConfirmed, setIsConfirmed] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Validando atualização da assinatura...");
 
-  useEffect(() => {
-    let cancelled = false;
+  async function confirmPayment() {
+    try {
+      setIsChecking(true);
 
-    async function revalidateSubscription() {
-      try {
-        const first = await getSubscriptionPageData();
-        if (cancelled) return;
+      if (orderNsu) {
+        const checkResult = await checkSubscriptionPayment({
+          orderNsu,
+          ...(transactionNsu ? { transactionNsu } : {}),
+          ...(slug ? { slug } : {}),
+        });
 
-        if (first.overview?.status === "ACTIVE") {
+        if (checkResult.confirmed) {
+          setIsConfirmed(true);
           setStatusMessage("Pagamento confirmado. Assinatura ativa.");
+          await getSubscriptionPageData();
           return;
         }
-
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        const second = await getSubscriptionPageData();
-        if (cancelled) return;
-
-        if (second.overview?.status === "ACTIVE") {
-          setStatusMessage("Pagamento confirmado. Assinatura ativa.");
-          return;
-        }
-
-        setStatusMessage("Retorno recebido. O status pode levar alguns instantes para atualizar.");
-      } catch {
-        if (!cancelled) {
-          setStatusMessage("Retorno recebido. Não foi possível confirmar o status agora.");
-        }
-      } finally {
-        if (!cancelled) setIsChecking(false);
       }
+
+      const subscription = await getSubscriptionPageData();
+      if (subscription.overview?.status === "ACTIVE") {
+        setIsConfirmed(true);
+        setStatusMessage("Pagamento confirmado. Assinatura ativa.");
+        return;
+      }
+
+      setIsConfirmed(false);
+      setStatusMessage("Pagamento em processamento. Clique em Atualizar status.");
+    } catch {
+      setIsConfirmed(false);
+      setStatusMessage("Não foi possível confirmar agora. Tente novamente em alguns instantes.");
+    } finally {
+      setIsChecking(false);
     }
+  }
 
-    revalidateSubscription();
-
-    return () => {
-      cancelled = true;
-    };
+  useEffect(() => {
+    confirmPayment();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -69,6 +73,20 @@ export function BillingSuccessPage() {
       <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
         {isChecking ? "Conferindo status..." : statusMessage}
       </div>
+
+      {!isConfirmed ? (
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={confirmPayment}
+            disabled={isChecking}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw size={16} />
+            Atualizar status
+          </button>
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
         <div>
@@ -107,3 +125,4 @@ export function BillingSuccessPage() {
     </div>
   );
 }
+

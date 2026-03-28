@@ -717,7 +717,7 @@ export function AppLayout() {
             <button
               type="button"
               onClick={() => setIsNotificationsModalOpen(true)}
-              className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3 text-left shadow-sm transition hover:border-orange-200 lg:max-w-[320px] lg:justify-self-start"
+              className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3 text-left shadow-sm transition hover:border-orange-200 lg:col-start-1 lg:max-w-[320px] lg:justify-self-start"
             >
               <div className="flex items-center gap-3">
                 <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
@@ -744,7 +744,7 @@ export function AppLayout() {
             {canSelectCompanyScope ? (
               <div
                 ref={companyScopeRef}
-                className="relative w-full lg:w-[320px] lg:justify-self-center"
+                className="relative w-full lg:col-start-2 lg:w-[320px] lg:justify-self-center"
               >
                 <button
                   type="button"
@@ -822,7 +822,7 @@ export function AppLayout() {
 
             <div
               ref={profileMenuRef}
-              className="relative flex w-full justify-end lg:justify-self-end"
+              className="relative flex w-full justify-end lg:col-start-3 lg:justify-self-end"
             >
               <button
                 type="button"

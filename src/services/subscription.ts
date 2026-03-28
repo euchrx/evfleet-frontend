@@ -96,6 +96,16 @@ export type SubscriptionPageData = {
   pendingCheckoutUrl?: string;
 };
 
+export type CheckPaymentResult = {
+  confirmed: boolean;
+  paymentStatus?: string;
+  message?: string;
+  paymentId?: string;
+  orderNsu?: string;
+  transactionNsu?: string;
+  receiptUrl?: string;
+};
+
 export type CreateBillingPlanInput = {
   code: string;
   name: string;
@@ -341,4 +351,18 @@ export async function clearCompanyPayments(companyId: string) {
     throw new Error("Selecione uma empresa no escopo para continuar.");
   }
   await api.delete(`/billing/companies/${targetCompanyId}/payments`);
+}
+
+export async function checkSubscriptionPayment(input: {
+  orderNsu: string;
+  transactionNsu?: string;
+  slug?: string;
+}) {
+  const payload = {
+    order_nsu: input.orderNsu,
+    ...(input.transactionNsu ? { transaction_nsu: input.transactionNsu } : {}),
+    ...(input.slug ? { slug: input.slug } : {}),
+  };
+  const { data } = await api.post<CheckPaymentResult>('/billing/check-payment', payload);
+  return data;
 }
