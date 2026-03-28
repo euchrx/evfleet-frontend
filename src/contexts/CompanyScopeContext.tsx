@@ -32,6 +32,12 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
   const [isLoadingCurrentCompany, setIsLoadingCurrentCompany] = useState(false);
   const [companyErrorMessage, setCompanyErrorMessage] = useState("");
 
+  function clearSelectedCompanyScope() {
+    setSelectedCompanyIdState("");
+    localStorage.removeItem(COMPANY_SCOPE_STORAGE_KEY);
+    window.dispatchEvent(new Event("evfleet-company-scope-updated"));
+  }
+
   useEffect(() => {
     const saved = localStorage.getItem(COMPANY_SCOPE_STORAGE_KEY) || "";
     setSelectedCompanyIdState(saved);
@@ -68,6 +74,15 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
             return;
           }
 
+          const companyExistsInScopeList = companies.some(
+            (company: Company) => String(company.id) === scopedCompanyId,
+          );
+          if (!companyExistsInScopeList) {
+            clearSelectedCompanyScope();
+            setCurrentCompany(null);
+            return;
+          }
+
           const scopedCompany = await getCompanyById(scopedCompanyId);
           setCurrentCompany(scopedCompany || null);
           return;
@@ -89,6 +104,14 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
           window.dispatchEvent(new Event("evfleet-company-scope-updated"));
         }
       } catch (error: any) {
+        if (user.role === "ADMIN" && error?.response?.status === 404) {
+          clearSelectedCompanyScope();
+          setCurrentCompany(null);
+          setOptions([]);
+          setCompanyErrorMessage("");
+          return;
+        }
+
         setCurrentCompany(null);
         setOptions([]);
         setCompanyErrorMessage(
