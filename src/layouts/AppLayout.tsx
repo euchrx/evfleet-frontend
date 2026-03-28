@@ -20,6 +20,7 @@ import {
   Route,
   ShieldCheck,
   Truck,
+  User,
   Users,
   Wrench,
   X,
@@ -40,7 +41,10 @@ import {
   isMenuPathVisible,
   type MenuVisibilityMap,
 } from "../services/menuVisibility";
-import { defaultSoftwareSettings, readSoftwareSettings } from "../services/adminSettings";
+import {
+  defaultSoftwareSettings,
+  readSoftwareSettings,
+} from "../services/adminSettings";
 
 type AppNotification = {
   id: string;
@@ -97,7 +101,15 @@ function parseLocalDate(value: string) {
 function getDaysUntil(dateValue: string) {
   const target = parseLocalDate(dateValue);
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    0,
+    0,
+    0,
+    0,
+  );
   const diff = target.getTime() - today.getTime();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
@@ -116,53 +128,124 @@ export function AppLayout() {
     companyErrorMessage,
   } = useCompanyScope();
   const [isSystemLogsModalOpen, setIsSystemLogsModalOpen] = useState(false);
-  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] =
+    useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCompanyScopeOpen, setIsCompanyScopeOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(() => getCachedMenuVisibilityMap());
+  const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(() =>
+    getCachedMenuVisibilityMap(),
+  );
   const [isLoadingMenuVisibility, setIsLoadingMenuVisibility] = useState(true);
   const [companyName, setCompanyName] = useState(() => {
     const saved = readSoftwareSettings().companyName?.trim();
     return saved || defaultSoftwareSettings.companyName;
   });
   const companyScopeRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   const menu = [
-    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN", "FLEET_MANAGER"] },
-    { name: "Relatórios", path: "/reports", icon: BarChart3, roles: ["ADMIN", "FLEET_MANAGER"] },
-    { name: "Veículos", path: "/vehicles", icon: Truck, roles: ["ADMIN", "FLEET_MANAGER"] },
-    { name: "Motoristas", path: "/drivers", icon: Users, roles: ["ADMIN", "FLEET_MANAGER"] },
-    { name: "Manutenções", path: "/maintenance-records", icon: Wrench, roles: ["ADMIN", "FLEET_MANAGER"] },
-    { name: "Abastecimentos", path: "/fuel-records", icon: Fuel, roles: ["ADMIN", "FLEET_MANAGER"] },
-    { name: "Débitos e Multas", path: "/debts", icon: BadgeAlert, roles: ["ADMIN", "FLEET_MANAGER"] },
-    { name: "Gestão de Viagens", path: "/trips", icon: Route, roles: ["ADMIN", "FLEET_MANAGER"] },
-    { name: "Gestão de Documentos", path: "/vehicle-documents", icon: FileText, roles: ["ADMIN", "FLEET_MANAGER"] },
-    { name: "Como usar", path: "/how-to-use", icon: BookOpenCheck, roles: ["ADMIN", "FLEET_MANAGER"] },
+    {
+      name: "Dashboard",
+      path: "/dashboard",
+      icon: LayoutDashboard,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Relatórios",
+      path: "/reports",
+      icon: BarChart3,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Veículos",
+      path: "/vehicles",
+      icon: Truck,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Motoristas",
+      path: "/drivers",
+      icon: Users,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Manutenções",
+      path: "/maintenance-records",
+      icon: Wrench,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Abastecimentos",
+      path: "/fuel-records",
+      icon: Fuel,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Débitos e Multas",
+      path: "/debts",
+      icon: BadgeAlert,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Gestão de Viagens",
+      path: "/trips",
+      icon: Route,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Gestão de Documentos",
+      path: "/vehicle-documents",
+      icon: FileText,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Como usar",
+      path: "/how-to-use",
+      icon: BookOpenCheck,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
     { name: "Empresas", path: "/companies", icon: Building2, roles: ["ADMIN"] },
     { name: "Usuários", path: "/users", icon: Users, roles: ["ADMIN"] },
-    { name: "Administração", path: "/administration", icon: ShieldCheck, roles: ["ADMIN"] },
+    {
+      name: "Administração",
+      path: "/administration",
+      icon: ShieldCheck,
+      roles: ["ADMIN"],
+    },
   ];
 
-  menu.splice(2, 0, {
-    name: "Assinatura",
-    path: "/subscription",
-    icon: CreditCard,
-    roles: ["ADMIN", "FLEET_MANAGER"],
-  });
-
-  const administrativePaths = new Set(["/companies", "/users", "/administration"]);
-  const isAdminWithoutCompanyScope = user?.role === "ADMIN" && !selectedCompanyId;
-  const selectedCompanyOption = options.find((company) => company.id === selectedCompanyId) || null;
-  const companyScopeTitle = selectedCompanyOption?.name || "Sem empresa selecionada";
-  const companyScopeSubtitle = selectedCompanyOption ? "Empresa selecionada" : "Escopo administrativo";
+  const administrativePaths = new Set([
+    "/companies",
+    "/users",
+    "/administration",
+  ]);
+  const isAdminWithoutCompanyScope =
+    user?.role === "ADMIN" && !selectedCompanyId;
+  const selectedCompanyOption =
+    options.find((company) => company.id === selectedCompanyId) || null;
+  const companyScopeTitle =
+    selectedCompanyOption?.name || "Sem empresa selecionada";
+  const companyScopeSubtitle = selectedCompanyOption
+    ? "Empresa selecionada"
+    : "Escopo administrativo";
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (!companyScopeRef.current) return;
-      if (companyScopeRef.current.contains(event.target as Node)) return;
-      setIsCompanyScopeOpen(false);
+      if (
+        companyScopeRef.current &&
+        !companyScopeRef.current.contains(event.target as Node)
+      ) {
+        setIsCompanyScopeOpen(false);
+      }
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileMenuOpen(false);
+      }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -184,11 +267,24 @@ export function AppLayout() {
     () =>
       [...systemLogs]
         .filter((log) => String(log.method || "").toUpperCase() === "MANUAL")
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .sort(
+          (a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+        )
         .slice(0, 20),
-    [systemLogs]
+    [systemLogs],
   );
   const initial = user?.name?.charAt(0).toUpperCase() || "U";
+
+  function handleCompanyScopeChange(nextCompanyId: string) {
+    const current = selectedCompanyId || "";
+    setSelectedCompanyId(nextCompanyId);
+    setIsCompanyScopeOpen(false);
+
+    if (current !== nextCompanyId) {
+      window.location.reload();
+    }
+  }
 
   function handleLogout() {
     logout();
@@ -215,12 +311,19 @@ export function AppLayout() {
       getVehicleDocuments(),
     ]);
 
-    const fuelRecords = fuelRecordsResult.status === "fulfilled" ? fuelRecordsResult.value : [];
-    const vehicles = vehiclesResult.status === "fulfilled" ? vehiclesResult.value : [];
-    const maintenanceRecords = maintenanceRecordsResult.status === "fulfilled" ? maintenanceRecordsResult.value : [];
+    const fuelRecords =
+      fuelRecordsResult.status === "fulfilled" ? fuelRecordsResult.value : [];
+    const vehicles =
+      vehiclesResult.status === "fulfilled" ? vehiclesResult.value : [];
+    const maintenanceRecords =
+      maintenanceRecordsResult.status === "fulfilled"
+        ? maintenanceRecordsResult.value
+        : [];
     const debts = debtsResult.status === "fulfilled" ? debtsResult.value : [];
     const vehicleDocuments =
-      vehicleDocumentsResult.status === "fulfilled" ? vehicleDocumentsResult.value : [];
+      vehicleDocumentsResult.status === "fulfilled"
+        ? vehicleDocumentsResult.value
+        : [];
 
     const anomalyNotifications: AppNotification[] =
       fuelRecords.length > 0 && vehicles.length > 0
@@ -241,7 +344,9 @@ export function AppLayout() {
       })
       .map((record) => {
         const daysUntil = getDaysUntil(record.maintenanceDate);
-        const vehicleLabel = record.vehicle ? `${record.vehicle.brand} ${record.vehicle.model}` : "Veículo";
+        const vehicleLabel = record.vehicle
+          ? `${record.vehicle.brand} ${record.vehicle.model}`
+          : "Veículo";
 
         return {
           id: `maintenance-schedule-${record.id}`,
@@ -263,7 +368,9 @@ export function AppLayout() {
       })
       .map((debt) => {
         const daysUntil = getDaysUntil(debt.dueDate || debt.debtDate);
-        const vehicleLabel = debt.vehicle ? `${debt.vehicle.brand} ${debt.vehicle.model}` : "Veículo";
+        const vehicleLabel = debt.vehicle
+          ? `${debt.vehicle.brand} ${debt.vehicle.model}`
+          : "Veículo";
 
         return {
           id: `debt-due-${debt.id}`,
@@ -284,8 +391,12 @@ export function AppLayout() {
         return daysUntil < 0;
       })
       .map((debt) => {
-        const vehicleLabel = debt.vehicle ? `${debt.vehicle.brand} ${debt.vehicle.model}` : "Veículo";
-        const overdueDays = Math.abs(getDaysUntil(debt.dueDate || debt.debtDate));
+        const vehicleLabel = debt.vehicle
+          ? `${debt.vehicle.brand} ${debt.vehicle.model}`
+          : "Veículo";
+        const overdueDays = Math.abs(
+          getDaysUntil(debt.dueDate || debt.debtDate),
+        );
 
         return {
           id: `debt-overdue-${debt.id}`,
@@ -303,7 +414,9 @@ export function AppLayout() {
         return daysUntil >= 0 && daysUntil <= 30;
       })
       .map((document) => {
-        const daysUntil = getDaysUntil(document.expiryDate || document.updatedAt || document.createdAt);
+        const daysUntil = getDaysUntil(
+          document.expiryDate || document.updatedAt || document.createdAt,
+        );
         const vehicleLabel = document.vehicle
           ? `${document.vehicle.brand} ${document.vehicle.model}`
           : "Veículo";
@@ -322,9 +435,13 @@ export function AppLayout() {
 
     const expiredDocumentNotifications: AppNotification[] = vehicleDocuments
       .filter((document) => {
-        if (!document.expiryDate) return String(document.status || "").toUpperCase() === "EXPIRED";
+        if (!document.expiryDate)
+          return String(document.status || "").toUpperCase() === "EXPIRED";
         const daysUntil = getDaysUntil(document.expiryDate);
-        return daysUntil < 0 || String(document.status || "").toUpperCase() === "EXPIRED";
+        return (
+          daysUntil < 0 ||
+          String(document.status || "").toUpperCase() === "EXPIRED"
+        );
       })
       .map((document) => {
         const vehicleLabel = document.vehicle
@@ -353,9 +470,7 @@ export function AppLayout() {
         ...debtNotifications,
         ...expiringDocumentNotifications,
         ...anomalyNotifications,
-      ].sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      )
+      ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
     );
   }
 
@@ -366,11 +481,23 @@ export function AppLayout() {
       loadNotifications();
     }
 
-    window.addEventListener("evfleet-fuel-anomalies-updated", refreshNotifications);
-    window.addEventListener("evfleet-notifications-updated", refreshNotifications);
+    window.addEventListener(
+      "evfleet-fuel-anomalies-updated",
+      refreshNotifications,
+    );
+    window.addEventListener(
+      "evfleet-notifications-updated",
+      refreshNotifications,
+    );
     return () => {
-      window.removeEventListener("evfleet-fuel-anomalies-updated", refreshNotifications);
-      window.removeEventListener("evfleet-notifications-updated", refreshNotifications);
+      window.removeEventListener(
+        "evfleet-fuel-anomalies-updated",
+        refreshNotifications,
+      );
+      window.removeEventListener(
+        "evfleet-notifications-updated",
+        refreshNotifications,
+      );
     };
   }, [selectedCompanyId]);
 
@@ -382,9 +509,15 @@ export function AppLayout() {
       setIsLoadingMenuVisibility(false);
     }
     refreshMenuVisibility();
-    window.addEventListener("evfleet-menu-visibility-updated", refreshMenuVisibility);
+    window.addEventListener(
+      "evfleet-menu-visibility-updated",
+      refreshMenuVisibility,
+    );
     return () => {
-      window.removeEventListener("evfleet-menu-visibility-updated", refreshMenuVisibility);
+      window.removeEventListener(
+        "evfleet-menu-visibility-updated",
+        refreshMenuVisibility,
+      );
     };
   }, []);
 
@@ -394,9 +527,15 @@ export function AppLayout() {
       setCompanyName(saved || defaultSoftwareSettings.companyName);
     }
 
-    window.addEventListener("evfleet-settings-updated", refreshSoftwareSettings);
+    window.addEventListener(
+      "evfleet-settings-updated",
+      refreshSoftwareSettings,
+    );
     return () => {
-      window.removeEventListener("evfleet-settings-updated", refreshSoftwareSettings);
+      window.removeEventListener(
+        "evfleet-settings-updated",
+        refreshSoftwareSettings,
+      );
     };
   }, []);
 
@@ -439,7 +578,9 @@ export function AppLayout() {
   if (isLoadingMenuVisibility) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <p className="text-sm text-slate-500">Carregando permissões do sistema...</p>
+        <p className="text-sm text-slate-500">
+          Carregando permissões do sistema...
+        </p>
       </div>
     );
   }
@@ -474,7 +615,9 @@ export function AppLayout() {
       >
         <div className="border-b border-slate-800 px-6 py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold tracking-tight text-orange-500">{companyName}</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-orange-500">
+              {companyName}
+            </h1>
             <button
               type="button"
               aria-label="Fechar menu"
@@ -514,8 +657,12 @@ export function AppLayout() {
             onClick={handleOpenSystemLogsModal}
             className="block w-full cursor-pointer rounded-2xl bg-slate-800/70 px-4 py-3 text-left transition hover:bg-slate-700/80"
           >
-            <p className="text-xs uppercase tracking-wide text-slate-400">Ambiente</p>
-            <p className="mt-1 text-sm font-medium text-slate-200">{companyName} v1.0</p>
+            <p className="text-xs uppercase tracking-wide text-slate-400">
+              Ambiente
+            </p>
+            <p className="mt-1 text-sm font-medium text-slate-200">
+              {companyName} v1.0
+            </p>
           </button>
         </div>
       </aside>
@@ -532,7 +679,9 @@ export function AppLayout() {
               >
                 <Menu size={18} />
               </button>
-              <p className="text-sm font-semibold text-slate-700">Painel {companyName}</p>
+              <p className="text-sm font-semibold text-slate-700">
+                Painel {companyName}
+              </p>
             </div>
             <button
               type="button"
@@ -549,7 +698,9 @@ export function AppLayout() {
                   ) : null}
                 </div>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Notificações</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Notificações
+                  </p>
                   <p className="mt-1 text-sm font-medium text-slate-700">
                     {notifications.length > 0
                       ? `${notifications.length} notificação(ões) pendente(s)`
@@ -560,10 +711,16 @@ export function AppLayout() {
             </button>
 
             {canSelectCompanyScope ? (
-              <div ref={companyScopeRef} className="relative w-full lg:max-w-[320px]">
+              <div
+                ref={companyScopeRef}
+                className="relative w-full lg:max-w-[320px]"
+              >
                 <button
                   type="button"
-                  onClick={() => !isLoadingScopeOptions && setIsCompanyScopeOpen((prev) => !prev)}
+                  onClick={() =>
+                    !isLoadingScopeOptions &&
+                    setIsCompanyScopeOpen((prev) => !prev)
+                  }
                   className="inline-flex w-full items-center gap-3 rounded-2xl border border-[#1f3566] bg-gradient-to-r from-[#0f1e44] to-[#0a1635] px-4 py-3 text-left shadow-sm transition hover:border-[#2a4a86] disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isLoadingScopeOptions}
                 >
@@ -573,7 +730,9 @@ export function AppLayout() {
                     <strong className="block truncate text-sm font-semibold text-white">
                       {companyScopeTitle}
                     </strong>
-                    <small className="block text-[13px] text-slate-300">{companyScopeSubtitle}</small>
+                    <small className="block text-[13px] text-slate-300">
+                      {companyScopeSubtitle}
+                    </small>
                   </span>
                   <ChevronDown
                     size={14}
@@ -586,18 +745,21 @@ export function AppLayout() {
                     <div className="max-h-72 overflow-auto p-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedCompanyId("");
-                          setIsCompanyScopeOpen(false);
-                        }}
+                        onClick={() => handleCompanyScopeChange("")}
                         className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold ${
                           !selectedCompanyId
                             ? "border-blue-700 bg-blue-600 text-white"
                             : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
                         }`}
                       >
-                        {!selectedCompanyId ? <Check size={15} /> : <span className="w-[15px]" />}
-                        <span className="truncate">Sem empresa selecionada</span>
+                        {!selectedCompanyId ? (
+                          <Check size={15} />
+                        ) : (
+                          <span className="w-[15px]" />
+                        )}
+                        <span className="truncate">
+                          Sem empresa selecionada
+                        </span>
                       </button>
                       {options.map((company) => {
                         const active = company.id === selectedCompanyId;
@@ -605,17 +767,18 @@ export function AppLayout() {
                           <button
                             key={company.id}
                             type="button"
-                            onClick={() => {
-                              setSelectedCompanyId(company.id);
-                              setIsCompanyScopeOpen(false);
-                            }}
+                            onClick={() => handleCompanyScopeChange(company.id)}
                             className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold ${
                               active
                                 ? "border-blue-700 bg-blue-600 text-white"
                                 : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
                             }`}
                           >
-                            {active ? <Check size={15} /> : <span className="w-[15px]" />}
+                            {active ? (
+                              <Check size={15} />
+                            ) : (
+                              <span className="w-[15px]" />
+                            )}
                             <span className="truncate">{company.name}</span>
                           </button>
                         );
@@ -626,31 +789,93 @@ export function AppLayout() {
               </div>
             ) : null}
 
-            <div className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm lg:max-w-[340px]">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white">
-                  {initial}
-                </div>
+            <div
+              ref={profileMenuRef}
+              className="relative w-full lg:max-w-[340px]"
+            >
+              <button
+                type="button"
+                onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-left shadow-sm transition hover:border-slate-300"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white">
+                    {initial}
+                  </div>
 
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-semibold text-slate-900">{user?.name || "Usuário"}</p>
-                  <span
-                    className={`mt-1 inline-flex rounded-full border px-2 py-[1px] text-[10px] font-semibold ${getRoleBadgeClasses(
-                      user?.role
-                    )}`}
-                  >
-                    {formatRole(user?.role)}
-                  </span>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-semibold text-slate-900">
+                      {user?.name || "Usuário"}
+                    </p>
+                    <span
+                      className={`mt-1 inline-flex rounded-full border px-2 py-[1px] text-[10px] font-semibold ${getRoleBadgeClasses(
+                        user?.role,
+                      )}`}
+                    >
+                      {formatRole(user?.role)}
+                    </span>
+                  </div>
 
-                <button
-                  onClick={handleLogout}
-                  className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 sm:px-3"
-                >
-                  <LogOut size={14} />
-                  <span className="hidden sm:inline">Sair</span>
-                </button>
-              </div>
+                  <ChevronDown
+                    size={16}
+                    className={`shrink-0 text-slate-500 transition ${isProfileMenuOpen ? "rotate-180" : ""}`}
+                  />
+                </div>
+              </button>
+
+              {isProfileMenuOpen ? (
+                <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-[#1f3566] bg-gradient-to-r from-[#0f1e44] to-[#0a1635] text-white shadow-2xl">
+                  <div className="border-b border-[#1f3566] px-4 py-3">
+                    <p className="truncate text-lg font-semibold">
+                      {user?.name || "Usuário"}
+                    </p>
+                    <p className="text-sm text-slate-200">
+                      {selectedCompanyOption?.name || "Empresa selecionada"}
+                    </p>
+                    <span className="mt-2 inline-flex rounded-full border border-blue-400 px-2.5 py-0.5 text-xs font-semibold text-blue-100">
+                      {String(formatRole(user?.role)).toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="py-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        navigate(
+                          user?.role === "ADMIN" ? "/users" : "/dashboard",
+                        );
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-lg text-white transition hover:bg-white/10"
+                    >
+                      <User size={18} />
+                      <span>Perfil</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        navigate("/subscription");
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-lg text-white transition hover:bg-white/10"
+                    >
+                      <CreditCard size={18} />
+                      <span>Assinatura</span>
+                    </button>
+                  </div>
+
+                  <div className="border-t border-[#1f3566] py-1.5">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-lg font-semibold text-rose-300 transition hover:bg-rose-500/10 hover:text-rose-200"
+                    >
+                      <LogOut size={18} />
+                      <span>Sair</span>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
           {companyErrorMessage || branchErrorMessage ? (
@@ -670,21 +895,32 @@ export function AppLayout() {
           <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm text-slate-600">Nome do sistema: {companyName}</p>
+                <p className="text-sm text-slate-600">
+                  Nome do sistema: {companyName}
+                </p>
                 <p className="text-sm text-slate-600">Versão atual: v1.0</p>
               </div>
               <ClipboardList size={22} className="text-orange-600" />
             </div>
 
             <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tópicos com as atualizações</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Tópicos com as atualizações
+              </p>
               <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
                 {latestTopics.length === 0 ? (
-                  <p className="text-sm text-slate-500">Nenhuma atualização registrada até o momento.</p>
+                  <p className="text-sm text-slate-500">
+                    Nenhuma atualização registrada até o momento.
+                  </p>
                 ) : (
                   latestTopics.map((log) => (
-                    <div key={log.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                      <p className="text-sm font-semibold text-slate-800">{log.action}</p>
+                    <div
+                      key={log.id}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+                    >
+                      <p className="text-sm font-semibold text-slate-800">
+                        {log.action}
+                      </p>
                       <p className="text-xs text-slate-500">
                         {formatDateTime(log.timestamp)} - {log.actor}
                       </p>
@@ -728,8 +964,12 @@ export function AppLayout() {
           <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Notificações</p>
-                <p className="mt-1 text-sm text-slate-700">{notifications.length} item(ns) pendente(s)</p>
+                <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  Notificações
+                </p>
+                <p className="mt-1 text-sm text-slate-700">
+                  {notifications.length} item(ns) pendente(s)
+                </p>
               </div>
               <button
                 type="button"
@@ -757,11 +997,19 @@ export function AppLayout() {
                         : "cursor-default border-slate-200 bg-slate-50"
                     }`}
                   >
-                    <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
-                    <p className="mt-1 text-sm text-slate-600">{notification.description}</p>
-                    <p className="mt-1 text-xs text-slate-500">{formatDateOnly(notification.date)}</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {notification.title}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {notification.description}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formatDateOnly(notification.date)}
+                    </p>
                     {notification.link ? (
-                      <p className="mt-2 text-xs font-semibold text-orange-600">Abrir notificação</p>
+                      <p className="mt-2 text-xs font-semibold text-orange-600">
+                        Abrir notificação
+                      </p>
                     ) : null}
                   </button>
                 ))

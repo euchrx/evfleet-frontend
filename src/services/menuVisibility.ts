@@ -23,8 +23,6 @@ export const MENU_VISIBILITY_ITEMS: MenuVisibilityItem[] = [
   { label: "Administração", path: "/administration" },
 ];
 
-MENU_VISIBILITY_ITEMS.splice(2, 0, { label: "Assinatura", path: "/subscription" });
-
 const CACHE_KEY = "evfleet_menu_visibility_cache_v2";
 
 export function getDefaultMenuVisibilityMap() {

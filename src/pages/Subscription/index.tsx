@@ -90,6 +90,8 @@ export function SubscriptionPage() {
   const [isCancelSubscriptionOpen, setIsCancelSubscriptionOpen] = useState(false);
   const [cancelingSubscription, setCancelingSubscription] = useState(false);
   const [activatingSubscription, setActivatingSubscription] = useState(false);
+  const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<SubscriptionPlan | null>(null);
+  const [redirectingToCheckout, setRedirectingToCheckout] = useState(false);
   const [newPlan, setNewPlan] = useState({
     code: "",
     name: "",
@@ -169,6 +171,58 @@ export function SubscriptionPage() {
       );
     } finally {
       setSubmittingPlanId(null);
+    }
+  }
+
+  function getPlanHighlights(plan: SubscriptionPlan) {
+    const descriptionParts = String(plan.description || "")
+      .split(/\n|,|;|\|/g)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const normalized = descriptionParts.slice(0, 6);
+
+    if (normalized.length === 0) {
+      normalized.push("Acesso completo ao módulo de gestão de frota.");
+      normalized.push("Suporte para operação multiempresa.");
+      normalized.push("Relatórios e acompanhamento financeiro.");
+    }
+
+    return normalized;
+  }
+
+  async function handleSelectPlanAndPay() {
+    if (!selectedPlanForCheckout?.id) return;
+    if (!canManagePlans) {
+      setErrorMessage("Somente administrador pode alterar o plano.");
+      return;
+    }
+    if (!data?.companyId) {
+      setErrorMessage("Selecione uma empresa no escopo para continuar.");
+      return;
+    }
+
+    try {
+      setRedirectingToCheckout(true);
+      setErrorMessage("");
+      await selectCompanyPlan(data.companyId, selectedPlanForCheckout.id);
+      const refreshed = await getSubscriptionPageData();
+      setData(refreshed);
+
+      const subscriptionId = refreshed.overview?.subscriptionId;
+      if (!subscriptionId) {
+        throw new Error("Assinatura não encontrada para gerar o checkout.");
+      }
+
+      const checkoutUrl = await generateSubscriptionPayment(subscriptionId);
+      window.location.href = checkoutUrl;
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível selecionar o plano e redirecionar para pagamento.",
+      );
+    } finally {
+      setRedirectingToCheckout(false);
     }
   }
 
@@ -452,7 +506,7 @@ export function SubscriptionPage() {
 
                 <button
                   type="button"
-                  onClick={() => handleSelectPlan(plan.id)}
+                  onClick={() => setSelectedPlanForCheckout(plan)}
                   disabled={!canManagePlans || !hasCompanyScope || plan.isCurrent || isSubmitting}
                   className={`mt-4 w-full rounded-xl px-4 py-2 text-sm font-semibold transition ${
                     !canManagePlans || !hasCompanyScope || plan.isCurrent
@@ -462,8 +516,8 @@ export function SubscriptionPage() {
                 >
                   {!canManagePlans
                     ? "Somente admin"
-                    : !hasCompanyScope
-                      ? "Selecione empresa"
+                      : !hasCompanyScope
+                        ? "Selecione empresa"
                       : plan.isCurrent
                         ? "Plano atual"
                         : isSubmitting
@@ -475,6 +529,107 @@ export function SubscriptionPage() {
           })}
         </div>
       </section>
+
+      {selectedPlanForCheckout ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
+          <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Detalhes do plano</h2>
+                <p className="mt-1 text-sm text-slate-500">Revise as informações antes de ir para o pagamento.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPlanForCheckout(null)}
+                className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-5 overflow-y-auto px-6 py-5">
+              <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">Plano selecionado</p>
+                    <h3 className="mt-1 text-2xl font-bold text-slate-900">{selectedPlanForCheckout.name}</h3>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {selectedPlanForCheckout.description || "Plano corporativo para gestão completa da operação."}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-orange-700">
+                      {formatCurrency(selectedPlanForCheckout.priceCents, selectedPlanForCheckout.currency)}
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      Cobrança {selectedPlanForCheckout.billingCycle === "MONTHLY" ? "mensal" : "anual"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Código</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{selectedPlanForCheckout.code}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ciclo</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {selectedPlanForCheckout.billingCycle === "MONTHLY" ? "Mensal" : "Anual"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">Disponível</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-sm font-semibold text-slate-800">O que este plano oferece</p>
+                <ul className="mt-3 space-y-2">
+                  {getPlanHighlights(selectedPlanForCheckout).map((item, index) => (
+                    <li key={`${selectedPlanForCheckout.id}-feature-${index}`} className="text-sm text-slate-700">
+                      • {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!selectedPlanForCheckout?.id) return;
+                  await handleSelectPlan(selectedPlanForCheckout.id);
+                  setSelectedPlanForCheckout(null);
+                }}
+                disabled={redirectingToCheckout}
+                className="cursor-pointer rounded-xl border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Selecionar sem pagar
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPlanForCheckout(null)}
+                disabled={redirectingToCheckout}
+                className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSelectPlanAndPay}
+                disabled={redirectingToCheckout}
+                className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {redirectingToCheckout ? "Redirecionando..." : "Ir para pagamento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-bold text-slate-900">Histórico de pagamentos</h2>
