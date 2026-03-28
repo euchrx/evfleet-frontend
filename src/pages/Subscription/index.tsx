@@ -89,7 +89,6 @@ export function SubscriptionPage() {
   const [deletingPlan, setDeletingPlan] = useState(false);
   const [isCancelSubscriptionOpen, setIsCancelSubscriptionOpen] = useState(false);
   const [cancelingSubscription, setCancelingSubscription] = useState(false);
-  const [isActivateSubscriptionOpen, setIsActivateSubscriptionOpen] = useState(false);
   const [activatingSubscription, setActivatingSubscription] = useState(false);
   const [newPlan, setNewPlan] = useState({
     code: "",
@@ -270,7 +269,7 @@ export function SubscriptionPage() {
       setActivatingSubscription(true);
       setErrorMessage("");
       await activateCompanySubscription(data.companyId);
-      setIsActivateSubscriptionOpen(false);
+      setIsCancelSubscriptionOpen(false);
       await loadData();
       window.location.reload();
     } catch (error) {
@@ -349,26 +348,22 @@ export function SubscriptionPage() {
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
                   {canManagePlans && hasCompanyScope ? (
-                    <div className="flex flex-col gap-2">
-                      {overview.status !== "CANCELED" ? (
-                        <button
-                          type="button"
-                          onClick={() => setIsCancelSubscriptionOpen(true)}
-                          title="Desabilitar assinatura da empresa"
-                          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition hover:bg-red-100"
-                        >
-                          <Power size={15} />
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => setIsActivateSubscriptionOpen(true)}
-                        title="Ligar assinatura da empresa"
-                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
-                      >
-                        <Power size={15} />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsCancelSubscriptionOpen(true)}
+                      title={
+                        overview.status === "CANCELED"
+                          ? "Ativar assinatura da empresa"
+                          : "Desabilitar assinatura da empresa"
+                      }
+                      className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition ${
+                        overview.status === "CANCELED"
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          : "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                      }`}
+                    >
+                      <Power size={15} />
+                    </button>
                   ) : null}
                 </div>
                 <p className="mt-2 text-lg font-bold text-slate-900">
@@ -641,21 +636,16 @@ export function SubscriptionPage() {
       />
       <ConfirmDeleteModal
         isOpen={isCancelSubscriptionOpen}
-        title="Desabilitar assinatura"
-        description="Deseja desabilitar a assinatura da empresa selecionada?"
-        confirmText="Desabilitar"
-        loading={cancelingSubscription}
+        title={overview?.status === "CANCELED" ? "Ativar assinatura" : "Desabilitar assinatura"}
+        description={
+          overview?.status === "CANCELED"
+            ? "Deseja ligar novamente a assinatura da empresa selecionada?"
+            : "Deseja desabilitar a assinatura da empresa selecionada?"
+        }
+        confirmText={overview?.status === "CANCELED" ? "Ativar" : "Desabilitar"}
+        loading={overview?.status === "CANCELED" ? activatingSubscription : cancelingSubscription}
         onCancel={() => setIsCancelSubscriptionOpen(false)}
-        onConfirm={handleCancelSubscription}
-      />
-      <ConfirmDeleteModal
-        isOpen={isActivateSubscriptionOpen}
-        title="Ativar assinatura"
-        description="Deseja ligar novamente a assinatura da empresa selecionada?"
-        confirmText="Ativar"
-        loading={activatingSubscription}
-        onCancel={() => setIsActivateSubscriptionOpen(false)}
-        onConfirm={handleActivateSubscription}
+        onConfirm={overview?.status === "CANCELED" ? handleActivateSubscription : handleCancelSubscription}
       />
     </div>
   );

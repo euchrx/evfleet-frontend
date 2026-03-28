@@ -1,13 +1,17 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgeAlert,
   BarChart3,
   Bell,
+  BriefcaseBusiness,
+  Check,
+  ChevronDown,
   BookOpenCheck,
   Building2,
   ClipboardList,
   CreditCard,
+  Crown,
   FileText,
   Fuel,
   LayoutDashboard,
@@ -114,6 +118,7 @@ export function AppLayout() {
   const [isSystemLogsModalOpen, setIsSystemLogsModalOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCompanyScopeOpen, setIsCompanyScopeOpen] = useState(false);
   const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(() => getCachedMenuVisibilityMap());
@@ -122,6 +127,7 @@ export function AppLayout() {
     const saved = readSoftwareSettings().companyName?.trim();
     return saved || defaultSoftwareSettings.companyName;
   });
+  const companyScopeRef = useRef<HTMLDivElement | null>(null);
 
   const menu = [
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN", "FLEET_MANAGER"] },
@@ -148,6 +154,20 @@ export function AppLayout() {
 
   const administrativePaths = new Set(["/companies", "/users", "/administration"]);
   const isAdminWithoutCompanyScope = user?.role === "ADMIN" && !selectedCompanyId;
+  const selectedCompanyOption = options.find((company) => company.id === selectedCompanyId) || null;
+  const companyScopeTitle = selectedCompanyOption?.name || "Sem empresa selecionada";
+  const companyScopeSubtitle = selectedCompanyOption ? "Empresa selecionada" : "Escopo administrativo";
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (!companyScopeRef.current) return;
+      if (companyScopeRef.current.contains(event.target as Node)) return;
+      setIsCompanyScopeOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const filteredMenu = menu.filter((item) => {
     const hasRole = user ? item.roles.includes(user.role) : false;
@@ -540,23 +560,69 @@ export function AppLayout() {
             </button>
 
             {canSelectCompanyScope ? (
-              <div className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:max-w-[320px]">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Escopo da empresa
-                </p>
-                <select
-                  value={selectedCompanyId}
-                  onChange={(event) => setSelectedCompanyId(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              <div ref={companyScopeRef} className="relative w-full lg:max-w-[320px]">
+                <button
+                  type="button"
+                  onClick={() => !isLoadingScopeOptions && setIsCompanyScopeOpen((prev) => !prev)}
+                  className="inline-flex w-full items-center gap-3 rounded-2xl border border-slate-700/70 bg-gradient-to-r from-[#091b3a] to-[#08142b] px-4 py-3 text-left shadow-sm transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isLoadingScopeOptions}
                 >
-                  <option value="">Selecionar empresa (vazio)</option>
-                  {options.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
+                  <BriefcaseBusiness size={14} className="text-slate-300" />
+                  <Crown size={12} className="text-blue-300" />
+                  <span className="min-w-0 leading-tight">
+                    <strong className="block truncate text-sm font-semibold text-white">
+                      {companyScopeTitle}
+                    </strong>
+                    <small className="block text-[13px] text-slate-300">{companyScopeSubtitle}</small>
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={`ml-auto shrink-0 text-slate-300 transition ${isCompanyScopeOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {isCompanyScopeOpen ? (
+                  <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                    <div className="max-h-72 overflow-auto p-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCompanyId("");
+                          setIsCompanyScopeOpen(false);
+                        }}
+                        className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold ${
+                          !selectedCompanyId
+                            ? "border-blue-700 bg-blue-600 text-white"
+                            : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        {!selectedCompanyId ? <Check size={15} /> : <span className="w-[15px]" />}
+                        <span className="truncate">Sem empresa selecionada</span>
+                      </button>
+                      {options.map((company) => {
+                        const active = company.id === selectedCompanyId;
+                        return (
+                          <button
+                            key={company.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCompanyId(company.id);
+                              setIsCompanyScopeOpen(false);
+                            }}
+                            className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold ${
+                              active
+                                ? "border-blue-700 bg-blue-600 text-white"
+                                : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                            }`}
+                          >
+                            {active ? <Check size={15} /> : <span className="w-[15px]" />}
+                            <span className="truncate">{company.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
