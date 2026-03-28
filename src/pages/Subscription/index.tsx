@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CreditCard, Pencil, Power, RefreshCw, Trash2 } from "lucide-react";
 import {
+  activateCompanySubscription,
   cancelCompanySubscription,
   createBillingPlan,
   deleteBillingPlan,
@@ -88,6 +89,8 @@ export function SubscriptionPage() {
   const [deletingPlan, setDeletingPlan] = useState(false);
   const [isCancelSubscriptionOpen, setIsCancelSubscriptionOpen] = useState(false);
   const [cancelingSubscription, setCancelingSubscription] = useState(false);
+  const [isActivateSubscriptionOpen, setIsActivateSubscriptionOpen] = useState(false);
+  const [activatingSubscription, setActivatingSubscription] = useState(false);
   const [newPlan, setNewPlan] = useState({
     code: "",
     name: "",
@@ -251,12 +254,31 @@ export function SubscriptionPage() {
       await cancelCompanySubscription(data.companyId);
       setIsCancelSubscriptionOpen(false);
       await loadData();
+      window.location.reload();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Não foi possível desabilitar a assinatura.",
       );
     } finally {
       setCancelingSubscription(false);
+    }
+  }
+
+  async function handleActivateSubscription() {
+    if (!data?.companyId) return;
+    try {
+      setActivatingSubscription(true);
+      setErrorMessage("");
+      await activateCompanySubscription(data.companyId);
+      setIsActivateSubscriptionOpen(false);
+      await loadData();
+      window.location.reload();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Não foi possível ativar a assinatura.",
+      );
+    } finally {
+      setActivatingSubscription(false);
     }
   }
 
@@ -326,15 +348,27 @@ export function SubscriptionPage() {
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
-                  {canManagePlans && hasCompanyScope && overview.status !== "CANCELED" ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsCancelSubscriptionOpen(true)}
-                      title="Desabilitar assinatura da empresa"
-                      className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition hover:bg-red-100"
-                    >
-                      <Power size={15} />
-                    </button>
+                  {canManagePlans && hasCompanyScope ? (
+                    <div className="flex flex-col gap-2">
+                      {overview.status !== "CANCELED" ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsCancelSubscriptionOpen(true)}
+                          title="Desabilitar assinatura da empresa"
+                          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition hover:bg-red-100"
+                        >
+                          <Power size={15} />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setIsActivateSubscriptionOpen(true)}
+                        title="Ligar assinatura da empresa"
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                      >
+                        <Power size={15} />
+                      </button>
+                    </div>
                   ) : null}
                 </div>
                 <p className="mt-2 text-lg font-bold text-slate-900">
@@ -613,6 +647,15 @@ export function SubscriptionPage() {
         loading={cancelingSubscription}
         onCancel={() => setIsCancelSubscriptionOpen(false)}
         onConfirm={handleCancelSubscription}
+      />
+      <ConfirmDeleteModal
+        isOpen={isActivateSubscriptionOpen}
+        title="Ativar assinatura"
+        description="Deseja ligar novamente a assinatura da empresa selecionada?"
+        confirmText="Ativar"
+        loading={activatingSubscription}
+        onCancel={() => setIsActivateSubscriptionOpen(false)}
+        onConfirm={handleActivateSubscription}
       />
     </div>
   );

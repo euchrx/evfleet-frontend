@@ -307,3 +307,15 @@ export async function cancelCompanySubscription(companyId: string) {
   }
   await api.post(`/billing/companies/${targetCompanyId}/subscription/cancel`);
 }
+
+export async function activateCompanySubscription(companyId: string) {
+  const context = getUserContext();
+  if (!context.isAdmin) {
+    throw new Error("Somente administrador pode ativar assinatura.");
+  }
+  const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
+  if (!targetCompanyId) {
+    throw new Error("Selecione uma empresa no escopo para continuar.");
+  }
+  await api.post(`/billing/companies/${targetCompanyId}/subscription/activate`);
+}
