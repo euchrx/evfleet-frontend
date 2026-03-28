@@ -822,22 +822,16 @@ export function AppLayout() {
 
             <div
               ref={profileMenuRef}
-              className="relative w-full lg:justify-self-end"
+              className="relative flex w-full justify-end lg:justify-self-end"
             >
               <button
                 type="button"
                 onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-                className="ml-auto inline-flex items-center gap-2 bg-transparent p-0"
+                className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-orange-500 text-[0px] font-bold text-white shadow-sm transition hover:brightness-95"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white">
-                  {initial}
-                </div>
+                <span className="text-sm leading-none">{initial}</span>
 
                       {user?.name || "Usuário"}
-                  <ChevronDown
-                    size={16}
-                    className={`shrink-0 text-slate-500 transition ${isProfileMenuOpen ? "rotate-180" : ""}`}
-                  />
               </button>
 
               {isProfileMenuOpen ? (
