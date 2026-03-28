@@ -323,3 +323,15 @@ export async function activateCompanySubscription(companyId: string) {
   }
   await api.post(`/billing/companies/${targetCompanyId}/subscription/activate`);
 }
+
+export async function clearCompanyPayments(companyId: string) {
+  const context = getUserContext();
+  if (!context.isAdmin) {
+    throw new Error("Somente administrador pode limpar o histórico de pagamentos.");
+  }
+  const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
+  if (!targetCompanyId) {
+    throw new Error("Selecione uma empresa no escopo para continuar.");
+  }
+  await api.delete(`/billing/companies/${targetCompanyId}/payments`);
+}

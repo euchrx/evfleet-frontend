@@ -4,6 +4,7 @@ import { CreditCard, Pencil, Power, RefreshCw, Trash2 } from "lucide-react";
 import {
   activateCompanySubscription,
   cancelCompanySubscription,
+  clearCompanyPayments,
   createBillingPlan,
   deleteBillingPlan,
   generateSubscriptionPayment,
@@ -98,6 +99,8 @@ export function SubscriptionPage() {
   const [isCancelSubscriptionOpen, setIsCancelSubscriptionOpen] = useState(false);
   const [cancelingSubscription, setCancelingSubscription] = useState(false);
   const [activatingSubscription, setActivatingSubscription] = useState(false);
+  const [isClearPaymentsOpen, setIsClearPaymentsOpen] = useState(false);
+  const [clearingPayments, setClearingPayments] = useState(false);
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<SubscriptionPlan | null>(null);
   const [redirectingToCheckout, setRedirectingToCheckout] = useState(false);
   const [newPlan, setNewPlan] = useState({
@@ -234,6 +237,12 @@ export function SubscriptionPage() {
     }
   }
 
+  function getPlanActionLabel(plan: SubscriptionPlan) {
+    if (canManagePlans && !hasCompanyScope) return "Selecione empresa";
+    if (plan.isCurrent && overview) return "Ver assinatura";
+    return "Selecionar plano";
+  }
+
   async function handlePayNow() {
     if (!overview?.subscriptionId) return;
     try {
@@ -340,6 +349,23 @@ export function SubscriptionPage() {
       );
     } finally {
       setActivatingSubscription(false);
+    }
+  }
+
+  async function handleClearPayments() {
+    if (!data?.companyId) return;
+    try {
+      setClearingPayments(true);
+      setErrorMessage("");
+      await clearCompanyPayments(data.companyId);
+      setIsClearPaymentsOpen(false);
+      await loadData();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Não foi possível limpar o histórico de pagamentos.",
+      );
+    } finally {
+      setClearingPayments(false);
     }
   }
 
@@ -515,22 +541,14 @@ export function SubscriptionPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedPlanForCheckout(plan)}
-                  disabled={!canManagePlans || !hasCompanyScope || plan.isCurrent || isSubmitting}
+                  disabled={(canManagePlans && !hasCompanyScope) || isSubmitting || redirectingToCheckout}
                   className={`mt-4 w-full rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                    !canManagePlans || !hasCompanyScope || plan.isCurrent
+                    (canManagePlans && !hasCompanyScope)
                       ? "cursor-not-allowed border border-slate-300 bg-slate-100 text-slate-500"
                       : "cursor-pointer bg-orange-500 text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                   }`}
                 >
-                  {!canManagePlans
-                    ? "Somente admin"
-                      : !hasCompanyScope
-                        ? "Selecione empresa"
-                      : plan.isCurrent
-                        ? "Plano atual"
-                        : isSubmitting
-                          ? "Salvando..."
-                          : "Selecionar plano"}
+                  {isSubmitting || redirectingToCheckout ? "Carregando..." : getPlanActionLabel(plan)}
                 </button>
               </article>
             );
@@ -606,18 +624,20 @@ export function SubscriptionPage() {
             </div>
 
             <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 px-6 py-4">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!selectedPlanForCheckout?.id) return;
-                  await handleSelectPlan(selectedPlanForCheckout.id);
-                  setSelectedPlanForCheckout(null);
-                }}
-                disabled={redirectingToCheckout}
-                className="cursor-pointer rounded-xl border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Selecionar sem pagar
-              </button>
+              {canManagePlans ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!selectedPlanForCheckout?.id) return;
+                    await handleSelectPlan(selectedPlanForCheckout.id);
+                    setSelectedPlanForCheckout(null);
+                  }}
+                  disabled={redirectingToCheckout}
+                  className="cursor-pointer rounded-xl border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Selecionar sem pagar
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setSelectedPlanForCheckout(null)}
@@ -626,14 +646,35 @@ export function SubscriptionPage() {
               >
                 Cancelar
               </button>
-              <button
-                type="button"
-                onClick={handleSelectPlanAndPay}
-                disabled={redirectingToCheckout}
-                className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {redirectingToCheckout ? "Redirecionando..." : "Ir para pagamento"}
-              </button>
+              {canManagePlans ? (
+                <button
+                  type="button"
+                  onClick={handleSelectPlanAndPay}
+                  disabled={redirectingToCheckout}
+                  className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {redirectingToCheckout ? "Redirecionando..." : "Ir para pagamento"}
+                </button>
+              ) : selectedPlanForCheckout.isCurrent ? (
+                <button
+                  type="button"
+                  onClick={handlePayNow}
+                  disabled={payingNow || !data?.canPayNow}
+                  className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {payingNow ? "Redirecionando..." : "Pagar agora"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setErrorMessage("Troca de plano disponível para o administrador da empresa.")
+                  }
+                  className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
+                >
+                  Selecionar plano
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -641,6 +682,18 @@ export function SubscriptionPage() {
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-bold text-slate-900">Histórico de pagamentos</h2>
+        {canManagePlans ? (
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setIsClearPaymentsOpen(true)}
+              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition hover:bg-red-100"
+              title="Limpar histórico de pagamentos"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ) : null}
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50">

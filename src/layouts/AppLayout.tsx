@@ -65,17 +65,6 @@ function formatRole(role?: string) {
   }
 }
 
-function getRoleBadgeClasses(role?: string) {
-  switch (role) {
-    case "ADMIN":
-      return "bg-orange-100 text-orange-700 border-orange-200";
-    case "FLEET_MANAGER":
-      return "bg-blue-100 text-blue-700 border-blue-200";
-    default:
-      return "bg-slate-100 text-slate-600 border-slate-200";
-  }
-}
-
 function formatDateTime(iso: string) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "-";
@@ -721,35 +710,35 @@ export function AppLayout() {
                     !isLoadingScopeOptions &&
                     setIsCompanyScopeOpen((prev) => !prev)
                   }
-                  className="inline-flex w-full items-center gap-3 rounded-2xl border border-[#1f3566] bg-gradient-to-r from-[#0f1e44] to-[#0a1635] px-4 py-3 text-left shadow-sm transition hover:border-[#2a4a86] disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex w-full items-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-left shadow-sm transition hover:border-orange-300 disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isLoadingScopeOptions}
                 >
-                  <BriefcaseBusiness size={14} className="text-slate-300" />
-                  <Crown size={12} className="text-blue-300" />
+                  <BriefcaseBusiness size={14} className="text-orange-600" />
+                  <Crown size={12} className="text-orange-500" />
                   <span className="min-w-0 leading-tight">
-                    <strong className="block truncate text-sm font-semibold text-white">
+                    <strong className="block truncate text-sm font-semibold text-slate-900">
                       {companyScopeTitle}
                     </strong>
-                    <small className="block text-[13px] text-slate-300">
+                    <small className="block text-[13px] text-slate-600">
                       {companyScopeSubtitle}
                     </small>
                   </span>
                   <ChevronDown
                     size={14}
-                    className={`ml-auto shrink-0 text-slate-300 transition ${isCompanyScopeOpen ? "rotate-180" : ""}`}
+                    className={`ml-auto shrink-0 text-orange-500 transition ${isCompanyScopeOpen ? "rotate-180" : ""}`}
                   />
                 </button>
 
                 {isCompanyScopeOpen ? (
-                  <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                  <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-orange-200 bg-orange-50 shadow-2xl">
                     <div className="max-h-72 overflow-auto p-2">
                       <button
                         type="button"
                         onClick={() => handleCompanyScopeChange("")}
                         className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold ${
                           !selectedCompanyId
-                            ? "border-blue-700 bg-blue-600 text-white"
-                            : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                            ? "border-orange-600 bg-orange-500 text-white"
+                            : "border-orange-200 bg-white text-slate-700 hover:bg-orange-100"
                         }`}
                       >
                         {!selectedCompanyId ? (
@@ -770,8 +759,8 @@ export function AppLayout() {
                             onClick={() => handleCompanyScopeChange(company.id)}
                             className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold ${
                               active
-                                ? "border-blue-700 bg-blue-600 text-white"
-                                : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                                ? "border-orange-600 bg-orange-500 text-white"
+                                : "border-orange-200 bg-white text-slate-700 hover:bg-orange-100"
                             }`}
                           >
                             {active ? (
@@ -791,48 +780,34 @@ export function AppLayout() {
 
             <div
               ref={profileMenuRef}
-              className="relative w-full lg:max-w-[340px]"
+              className="relative w-full lg:flex lg:justify-end"
             >
               <button
                 type="button"
                 onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-left shadow-sm transition hover:border-slate-300"
+                className="ml-auto inline-flex h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-transparent shadow-sm transition hover:border-slate-300"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white">
-                    {initial}
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white">
+                  {initial}
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-semibold text-slate-900">
                       {user?.name || "Usuário"}
-                    </p>
-                    <span
-                      className={`mt-1 inline-flex rounded-full border px-2 py-[1px] text-[10px] font-semibold ${getRoleBadgeClasses(
-                        user?.role,
-                      )}`}
-                    >
-                      {formatRole(user?.role)}
-                    </span>
-                  </div>
-
                   <ChevronDown
                     size={16}
                     className={`shrink-0 text-slate-500 transition ${isProfileMenuOpen ? "rotate-180" : ""}`}
                   />
-                </div>
               </button>
 
               {isProfileMenuOpen ? (
-                <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-[#1f3566] bg-gradient-to-r from-[#0f1e44] to-[#0a1635] text-white shadow-2xl">
-                  <div className="border-b border-[#1f3566] px-4 py-3">
+                <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-orange-200 bg-orange-50 text-slate-900 shadow-2xl lg:max-w-[340px]">
+                  <div className="border-b border-orange-200 px-4 py-3">
                     <p className="truncate text-lg font-semibold">
                       {user?.name || "Usuário"}
                     </p>
-                    <p className="text-sm text-slate-200">
+                    <p className="text-sm text-slate-600">
                       {selectedCompanyOption?.name || "Empresa selecionada"}
                     </p>
-                    <span className="mt-2 inline-flex rounded-full border border-blue-400 px-2.5 py-0.5 text-xs font-semibold text-blue-100">
+                    <span className="mt-2 inline-flex rounded-full border border-orange-300 bg-white px-2.5 py-0.5 text-xs font-semibold text-orange-700">
                       {String(formatRole(user?.role)).toUpperCase()}
                     </span>
                   </div>
@@ -846,7 +821,7 @@ export function AppLayout() {
                           user?.role === "ADMIN" ? "/users" : "/dashboard",
                         );
                       }}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-lg text-white transition hover:bg-white/10"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-lg text-slate-800 transition hover:bg-orange-100"
                     >
                       <User size={18} />
                       <span>Perfil</span>
@@ -857,14 +832,14 @@ export function AppLayout() {
                         setIsProfileMenuOpen(false);
                         navigate("/subscription");
                       }}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-lg text-white transition hover:bg-white/10"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-lg text-slate-800 transition hover:bg-orange-100"
                     >
                       <CreditCard size={18} />
                       <span>Assinatura</span>
                     </button>
                   </div>
 
-                  <div className="border-t border-[#1f3566] py-1.5">
+                  <div className="border-t border-orange-200 py-1.5">
                     <button
                       type="button"
                       onClick={handleLogout}
