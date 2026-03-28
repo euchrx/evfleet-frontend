@@ -15,6 +15,7 @@ type CompanyScopeContextType = {
   setSelectedCompanyId: (companyId: string) => void;
   options: ScopeOption[];
   isLoadingScopeOptions: boolean;
+  canSelectCompanyScope: boolean;
 };
 
 const CompanyScopeContext = createContext<CompanyScopeContextType | undefined>(undefined);
@@ -70,6 +71,19 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
     loadOptions();
   }, [isAuthenticated, user]);
 
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    if (user.role !== "ADMIN") {
+      const fixedCompanyId = String(user.companyId || "").trim();
+      if (!fixedCompanyId) return;
+      if (selectedCompanyId !== fixedCompanyId) {
+        setSelectedCompanyIdState(fixedCompanyId);
+        localStorage.setItem(COMPANY_SCOPE_STORAGE_KEY, fixedCompanyId);
+      }
+    }
+  }, [isAuthenticated, selectedCompanyId, user]);
+
   function setSelectedCompanyId(companyId: string) {
     const normalized = String(companyId || "").trim();
     setSelectedCompanyIdState(normalized);
@@ -89,8 +103,9 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
       setSelectedCompanyId,
       options,
       isLoadingScopeOptions,
+      canSelectCompanyScope: user?.role === "ADMIN",
     }),
-    [isLoadingScopeOptions, options, selectedCompanyId],
+    [isLoadingScopeOptions, options, selectedCompanyId, user?.role],
   );
 
   return <CompanyScopeContext.Provider value={value}>{children}</CompanyScopeContext.Provider>;

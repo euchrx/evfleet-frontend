@@ -102,7 +102,13 @@ export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuth();
-  const { selectedCompanyId, setSelectedCompanyId, options, isLoadingScopeOptions } = useCompanyScope();
+  const {
+    selectedCompanyId,
+    setSelectedCompanyId,
+    options,
+    isLoadingScopeOptions,
+    canSelectCompanyScope,
+  } = useCompanyScope();
   const [isSystemLogsModalOpen, setIsSystemLogsModalOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -139,9 +145,20 @@ export function AppLayout() {
     roles: ["ADMIN", "FLEET_MANAGER"],
   });
 
-  const filteredMenu = menu.filter(
-    (item) => (user ? item.roles.includes(user.role) : false) && isMenuPathVisible(item.path, menuVisibility)
-  );
+  const administrativePaths = new Set(["/companies", "/users", "/administration"]);
+  const isAdminWithoutCompanyScope = user?.role === "ADMIN" && !selectedCompanyId;
+
+  const filteredMenu = menu.filter((item) => {
+    const hasRole = user ? item.roles.includes(user.role) : false;
+    if (!hasRole) return false;
+    if (!isMenuPathVisible(item.path, menuVisibility)) return false;
+
+    if (isAdminWithoutCompanyScope) {
+      return administrativePaths.has(item.path);
+    }
+
+    return true;
+  });
   const latestTopics = useMemo(
     () =>
       [...systemLogs]
@@ -366,13 +383,33 @@ export function AppLayout() {
     if (isLoadingMenuVisibility) return;
     if (!user) return;
     if (location.pathname === "/login") return;
+
+    if (isAdminWithoutCompanyScope) {
+      const isAllowedPath =
+        location.pathname === "/companies" ||
+        location.pathname === "/users" ||
+        location.pathname === "/administration";
+      if (!isAllowedPath) {
+        navigate("/administration", { replace: true });
+        return;
+      }
+    }
+
     if (isMenuPathVisible(location.pathname, menuVisibility)) return;
 
     const fallbackPath = filteredMenu[0]?.path || "/dashboard";
     if (location.pathname !== fallbackPath) {
       navigate(fallbackPath, { replace: true });
     }
-  }, [filteredMenu, isLoadingMenuVisibility, location.pathname, menuVisibility, navigate, user]);
+  }, [
+    filteredMenu,
+    isAdminWithoutCompanyScope,
+    isLoadingMenuVisibility,
+    location.pathname,
+    menuVisibility,
+    navigate,
+    user,
+  ]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -501,24 +538,26 @@ export function AppLayout() {
               </div>
             </button>
 
-            <div className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:max-w-[320px]">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Escopo da empresa
-              </p>
-              <select
-                value={selectedCompanyId}
-                onChange={(event) => setSelectedCompanyId(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                disabled={isLoadingScopeOptions}
-              >
-                <option value="">Selecionar empresa (vazio)</option>
-                {options.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {canSelectCompanyScope ? (
+              <div className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:max-w-[320px]">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Escopo da empresa
+                </p>
+                <select
+                  value={selectedCompanyId}
+                  onChange={(event) => setSelectedCompanyId(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  disabled={isLoadingScopeOptions}
+                >
+                  <option value="">Selecionar empresa (vazio)</option>
+                  {options.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
             <div className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm lg:max-w-[340px]">
               <div className="flex items-center gap-2.5">
