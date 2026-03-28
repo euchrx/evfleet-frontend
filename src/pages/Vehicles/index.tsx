@@ -475,10 +475,6 @@ export function VehiclesPage() {
       if (!payload.plate) nextFieldErrors.plate = "Informe a placa.";
       if (!payload.model) nextFieldErrors.model = "Informe o modelo.";
       if (!payload.brand) nextFieldErrors.brand = "Informe a marca.";
-      if (!payload.branchId) {
-        nextFieldErrors.branchId =
-          "Empresa sem estabelecimento operacional. Cadastre uma empresa com unidade ativa.";
-      }
       if (!form.vehicleType) nextFieldErrors.vehicleType = "Selecione o tipo de peso.";
       if (!form.category) nextFieldErrors.category = "Selecione o tipo de veículo.";
       if (!form.fuelType) nextFieldErrors.fuelType = "Selecione o combustível.";
@@ -570,9 +566,6 @@ export function VehiclesPage() {
       }
       if (isDuplicateMessage && /renavam/i.test(message)) {
         duplicatedFieldErrors.renavam = "Renavam ja cadastrado.";
-      }
-      if (/branch|filial/i.test(message)) {
-        duplicatedFieldErrors.branchId = "Filial invalida.";
       }
       if (
         /chassi.+mínimo|mínimo.+chassi|chassi.+minimo|minimo.+chassi|chassis.+longer than or equal to/i.test(
@@ -915,14 +908,13 @@ export function VehiclesPage() {
                     {fieldErrors.plate ? <p className="text-xs text-red-600">{fieldErrors.plate}</p> : null}
                   </label>
                   <label className="space-y-1">
-                    <span className="text-sm font-medium text-slate-700">Filial</span>
+                    <span className="text-sm font-medium text-slate-700">Empresa</span>
                     <input
                       value={currentCompany?.name || "Empresa não selecionada"}
                       disabled
                       className={`${getFieldClass("branchId")} cursor-not-allowed bg-slate-200 text-slate-500`}
                       placeholder="Empresa vinculada"
                     />
-                    {fieldErrors.branchId ? <p className="text-xs text-red-600">{fieldErrors.branchId}</p> : null}
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Marca</span>
