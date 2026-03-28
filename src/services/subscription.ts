@@ -295,3 +295,15 @@ export async function updateBillingPlan(planId: string, input: UpdateBillingPlan
 export async function deleteBillingPlan(planId: string) {
   await api.delete(`/billing/plans/${planId}`);
 }
+
+export async function cancelCompanySubscription(companyId: string) {
+  const context = getUserContext();
+  if (!context.isAdmin) {
+    throw new Error("Somente administrador pode desabilitar assinatura.");
+  }
+  const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
+  if (!targetCompanyId) {
+    throw new Error("Selecione uma empresa no escopo para continuar.");
+  }
+  await api.post(`/billing/companies/${targetCompanyId}/subscription/cancel`);
+}

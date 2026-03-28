@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { CreditCard, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { CreditCard, Pencil, Power, RefreshCw, Trash2 } from "lucide-react";
 import {
+  cancelCompanySubscription,
   createBillingPlan,
   deleteBillingPlan,
   generateSubscriptionPayment,
@@ -85,6 +86,8 @@ export function SubscriptionPage() {
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
   const [planToDelete, setPlanToDelete] = useState<SubscriptionPlan | null>(null);
   const [deletingPlan, setDeletingPlan] = useState(false);
+  const [isCancelSubscriptionOpen, setIsCancelSubscriptionOpen] = useState(false);
+  const [cancelingSubscription, setCancelingSubscription] = useState(false);
   const [newPlan, setNewPlan] = useState({
     code: "",
     name: "",
@@ -240,6 +243,23 @@ export function SubscriptionPage() {
     }
   }
 
+  async function handleCancelSubscription() {
+    if (!data?.companyId) return;
+    try {
+      setCancelingSubscription(true);
+      setErrorMessage("");
+      await cancelCompanySubscription(data.companyId);
+      setIsCancelSubscriptionOpen(false);
+      await loadData();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Não foi possível desabilitar a assinatura.",
+      );
+    } finally {
+      setCancelingSubscription(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -304,7 +324,19 @@ export function SubscriptionPage() {
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
+                  {canManagePlans && hasCompanyScope && overview.status !== "CANCELED" ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsCancelSubscriptionOpen(true)}
+                      title="Desabilitar assinatura da empresa"
+                      className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition hover:bg-red-100"
+                    >
+                      <Power size={15} />
+                    </button>
+                  ) : null}
+                </div>
                 <p className="mt-2 text-lg font-bold text-slate-900">
                   <span className={`status-pill ${subscriptionStatusClass(overview.status)}`}>
                     {subscriptionStatusLabel(overview.status)}
@@ -572,6 +604,15 @@ export function SubscriptionPage() {
         loading={deletingPlan}
         onCancel={() => setPlanToDelete(null)}
         onConfirm={handleDeletePlan}
+      />
+      <ConfirmDeleteModal
+        isOpen={isCancelSubscriptionOpen}
+        title="Desabilitar assinatura"
+        description="Deseja desabilitar a assinatura da empresa selecionada?"
+        confirmText="Desabilitar"
+        loading={cancelingSubscription}
+        onCancel={() => setIsCancelSubscriptionOpen(false)}
+        onConfirm={handleCancelSubscription}
       />
     </div>
   );
