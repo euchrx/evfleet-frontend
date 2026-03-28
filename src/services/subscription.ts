@@ -257,16 +257,20 @@ export async function selectCompanyPlan(
   initialStatus: Extract<SubscriptionStatus, "ACTIVE" | "TRIALING"> = "TRIALING",
 ) {
   const context = getUserContext();
-  if (!context.isAdmin) {
-    throw new Error("Somente administrador pode alterar o plano da empresa.");
+  if (context.isAdmin) {
+    const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
+    if (!targetCompanyId) {
+      throw new Error("Selecione uma empresa no escopo para continuar.");
+    }
+
+    await api.post(`/billing/companies/${targetCompanyId}/subscription`, {
+      planId,
+      initialStatus,
+    });
+    return;
   }
 
-  const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
-  if (!targetCompanyId) {
-    throw new Error("Selecione uma empresa no escopo para continuar.");
-  }
-
-  await api.post(`/billing/companies/${targetCompanyId}/subscription`, {
+  await api.post("/billing/me/subscription", {
     planId,
     initialStatus,
   });

@@ -175,10 +175,6 @@ export function SubscriptionPage() {
     planId: string,
     initialStatus: Extract<SubscriptionStatus, "ACTIVE" | "TRIALING"> = "TRIALING",
   ) {
-    if (!canManagePlans) {
-      setErrorMessage("Somente administrador pode alterar o plano.");
-      return;
-    }
     if (!data?.companyId) {
       setErrorMessage("Selecione uma empresa no escopo para continuar.");
       return;
@@ -258,6 +254,10 @@ export function SubscriptionPage() {
     if (canManagePlans && !hasCompanyScope) return "Selecione empresa";
     if (plan.isCurrent && overview) return "Ver assinatura";
     return "Selecionar plano";
+  }
+
+  function getSelfServicePlanStatus(): Extract<SubscriptionStatus, "ACTIVE" | "TRIALING"> {
+    return overview?.status === "TRIALING" ? "TRIALING" : "ACTIVE";
   }
 
   async function handlePayNow() {
@@ -737,9 +737,15 @@ export function SubscriptionPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={() =>
-                    setErrorMessage("Troca de plano disponível para o administrador da empresa.")
-                  }
+                  onClick={async () => {
+                    if (!selectedPlanForCheckout?.id) return;
+                    await handleSelectPlan(
+                      selectedPlanForCheckout.id,
+                      getSelfServicePlanStatus(),
+                    );
+                    setSelectedPlanForCheckout(null);
+                    setSelectedPlanActivationStatus("TRIALING");
+                  }}
                   className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
                 >
                   Selecionar plano
