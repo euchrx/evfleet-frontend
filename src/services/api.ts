@@ -1,27 +1,33 @@
 import axios from "axios";
 import { localizeAxiosError } from "../utils/errorTranslator";
 import { COMPANY_SCOPE_STORAGE_KEY } from "../contexts/CompanyScopeContext";
+import { readAuthToken } from "./authToken";
 
 const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 
 const baseURL = envBaseUrl || "/api";
-
-function normalizeToken(value: string | null | undefined) {
-  if (!value || typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.replace(/^Bearer\s+/i, "");
-}
 
 export const api = axios.create({
   baseURL,
 });
 
 api.interceptors.request.use((config) => {
-  const token = normalizeToken(localStorage.getItem("token"));
+  const token = readAuthToken();
+  const requestUrl = String(config.url || "");
+  const isAuthBootstrapRequest =
+    requestUrl.includes("/auth/me") || requestUrl.includes("/companies/me");
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  if (isAuthBootstrapRequest) {
+    console.log("[api] request", {
+      method: config.method,
+      url: `${config.baseURL || ""}${requestUrl}`,
+      hasAuthorization: Boolean(config.headers?.Authorization),
+      authorizationPreview: token ? `${token.slice(0, 16)}...` : null,
+    });
   }
 
   const companyScopeId = localStorage.getItem(COMPANY_SCOPE_STORAGE_KEY)?.trim();

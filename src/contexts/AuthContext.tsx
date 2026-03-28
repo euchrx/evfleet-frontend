@@ -6,6 +6,11 @@ import {
   type ReactNode,
 } from "react";
 import { api } from "../services/api";
+import {
+  clearAuthToken,
+  readAuthToken,
+  writeAuthToken,
+} from "../services/authToken";
 import type { AuthUser } from "../types/auth-user";
 
 type AuthContextType = {
@@ -44,6 +49,7 @@ function decodeTokenPayload(token: string) {
     );
     return JSON.parse(json) as {
       sub?: string;
+      userId?: string;
       email?: string;
       role?: AuthUser["role"];
       companyId?: string;
@@ -82,14 +88,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   async function fetchMe(tokenOverride?: string | null) {
-    const effectiveToken = normalizeToken(tokenOverride ?? token);
+    const effectiveToken = normalizeToken(tokenOverride ?? token ?? readAuthToken());
+    if (!effectiveToken) {
+      console.log("[auth] fetchMe sem token");
+      return false;
+    }
+
+    console.log("[auth] bootstrap /auth/me com token:", `${effectiveToken.slice(0, 16)}...`);
+
     try {
-      const response = await api.get("/auth/me");
+      const response = await api.get("/auth/me", {
+        headers: {
+          Authorization: `Bearer ${effectiveToken}`,
+        },
+      });
+
       setUser(response.data);
       saveAuthUser(response.data);
       return true;
     } catch (error: any) {
       const status = error?.response?.status;
+
       if (status === 404 && effectiveToken) {
         const stored = readStoredAuthUser();
         if (stored) {
@@ -98,9 +117,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         const payload = decodeTokenPayload(effectiveToken);
-        if (payload?.sub && payload?.email && payload?.role) {
+        if ((payload?.sub || payload?.userId) && payload?.email && payload?.role) {
           const fallbackUser: AuthUser = {
-            id: payload.sub,
+            id: payload.sub || payload.userId || "",
             email: payload.email,
             role: payload.role,
             name: payload.name || localStorage.getItem("auth_user_name") || "Usuário",
@@ -113,7 +132,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       console.error("Erro ao buscar usuario logado:", error);
-      localStorage.removeItem("token");
+      clearAuthToken();
       saveAuthUser(null);
       setToken(null);
       setUser(null);
@@ -123,14 +142,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     async function initializeAuth() {
-      const storedToken = normalizeToken(localStorage.getItem("token"));
+      const storedToken = normalizeToken(readAuthToken());
 
       if (!storedToken) {
         setIsLoadingAuth(false);
         return;
       }
 
-      localStorage.setItem("token", storedToken);
+      writeAuthToken(storedToken);
       setToken(storedToken);
       await fetchMe(storedToken);
       setIsLoadingAuth(false);
@@ -146,8 +165,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       throw new Error("Token inválido recebido no login.");
     }
 
-    localStorage.setItem("token", normalizedToken);
+    writeAuthToken(normalizedToken);
+    console.log("[auth] token salvo após login:", `${normalizedToken.slice(0, 16)}...`);
     setToken(normalizedToken);
+
     if (userFromLogin) {
       const payload = decodeTokenPayload(normalizedToken);
       const normalizedUser: AuthUser = {
@@ -157,16 +178,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(normalizedUser);
       saveAuthUser(normalizedUser);
     }
-    const ok = await fetchMe(normalizedToken);
 
+    const ok = await fetchMe(normalizedToken);
     if (!ok) {
       throw new Error("Não foi possível validar sua sessão.");
     }
-
   }
 
   function logout() {
-    localStorage.removeItem("token");
+    clearAuthToken();
     saveAuthUser(null);
     setToken(null);
     setUser(null);

@@ -1,4 +1,5 @@
 import { COMPANY_SCOPE_STORAGE_KEY } from "../contexts/CompanyScopeContext";
+import { readAuthToken } from "./authToken";
 import { api } from "./api";
 import { readSoftwareSettings } from "./adminSettings";
 
@@ -120,7 +121,7 @@ function decodeTokenPayload(token: string) {
 }
 
 function readCompanyIdFromToken() {
-  const token = localStorage.getItem("token");
+  const token = readAuthToken();
   if (!token) return "";
   return decodeTokenPayload(token)?.companyId?.trim() || "";
 }
@@ -130,7 +131,7 @@ function getSelectedCompanyScopeId() {
 }
 
 function getUserContext() {
-  const token = localStorage.getItem("token");
+  const token = readAuthToken();
   const payload = token ? decodeTokenPayload(token) : null;
   const role = String(payload?.role || "").trim().toUpperCase();
   const isAdmin = role === "ADMIN";
@@ -276,4 +277,3 @@ export async function createBillingPlan(input: CreateBillingPlanInput) {
 
   await api.post("/billing/plans", payload);
 }
-
