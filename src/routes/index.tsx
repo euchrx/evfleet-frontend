@@ -4,6 +4,7 @@ import { DashboardPage } from "../pages/Dashboard";
 import { LoginPage } from "../pages/Login";
 import { UsersPage } from "../pages/Users";
 import { CompaniesPage } from "../pages/Companies";
+import { FinancePage } from "../pages/Finance";
 import { VehiclesPage } from "../pages/Vehicles";
 import { DriversPage } from "../pages/Drivers";
 import { MaintenanceRecordsPage } from "../pages/MaintenanceRecords";
@@ -45,6 +46,7 @@ export function AppRoutes() {
 
             <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
               <Route path="/companies" element={<CompaniesPage />} />
+              <Route path="/finance" element={<FinancePage />} />
               <Route path="/administration" element={<AdministrationPage />} />
               <Route path="/users" element={<UsersPage />} />
             </Route>

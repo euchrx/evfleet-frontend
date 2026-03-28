@@ -15,7 +15,7 @@ import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
 type ReportModule = "VEHICLES" | "FUEL" | "MAINTENANCE" | "DEBTS";
 type VehicleTypeFilter = "LIGHT" | "HEAVY";
-type VehicleStatusFilter = "ALL" | "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "SOLD";
+type VehicleStatusFilter = "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "SOLD";
 type SelectOption = { id: string; label: string };
 
 function toCurrency(value: number) {
@@ -67,6 +67,29 @@ function labelDebtCategory(value?: string) {
   if (value === "TOLL") return "Pedágio";
   if (value === "TAX") return "Imposto";
   if (value === "OTHER") return "Outros";
+  return value || "-";
+}
+
+function labelVehicleType(value?: string) {
+  if (value === "LIGHT") return "Leve";
+  if (value === "HEAVY") return "Pesado";
+  return value || "-";
+}
+
+function labelMaintenanceStatus(value?: string) {
+  if (value === "OPEN") return "Aberta";
+  if (value === "PENDING") return "Pendente";
+  if (value === "IN_PROGRESS") return "Em andamento";
+  if (value === "COMPLETED") return "Concluída";
+  if (value === "CANCELED") return "Cancelada";
+  return value || "-";
+}
+
+function labelDebtStatus(value?: string) {
+  if (value === "PENDING") return "Pendente";
+  if (value === "PAID") return "Paga";
+  if (value === "OVERDUE") return "Vencida";
+  if (value === "APPEALED") return "Recorrida";
   return value || "-";
 }
 
@@ -219,8 +242,12 @@ export function ReportsPage() {
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
   const [selectedVehicleTypes, setSelectedVehicleTypes] = useState<VehicleTypeFilter[]>([]);
-  const [selectedVehicleStatus, setSelectedVehicleStatus] =
-    useState<VehicleStatusFilter>("ALL");
+  const [selectedVehicleStatuses, setSelectedVehicleStatuses] = useState<VehicleStatusFilter[]>([
+    "ACTIVE",
+    "INACTIVE",
+    "MAINTENANCE",
+    "SOLD",
+  ]);
   const [selectedModules, setSelectedModules] = useState<ReportModule[]>([
     "VEHICLES",
     "FUEL",
@@ -304,6 +331,12 @@ export function ReportsPage() {
     { id: "MAINTENANCE", label: "Manutenções" },
     { id: "DEBTS", label: "Débitos e multas" },
   ];
+  const vehicleStatusOptions: SelectOption[] = [
+    { id: "ACTIVE", label: "Ativos" },
+    { id: "INACTIVE", label: "Inativos" },
+    { id: "MAINTENANCE", label: "Em manutenção" },
+    { id: "SOLD", label: "Vendidos" },
+  ];
 
   const filteredData = useMemo(() => {
     const start = parseDateSafe(startDate);
@@ -324,11 +357,11 @@ export function ReportsPage() {
         ? selectedVehicleTypes.includes(vehicle.vehicleType as VehicleTypeFilter)
         : true
     );
-    const byStatus = byType.filter((vehicle) => {
-      if (selectedVehicleStatus === "ALL") return true;
-      if (selectedVehicleStatus === "INACTIVE") return String(vehicle.status || "") === "INACTIVE";
-      return String(vehicle.status || "") === selectedVehicleStatus;
-    });
+    const byStatus = byType.filter((vehicle) =>
+      selectedVehicleStatuses.length > 0
+        ? selectedVehicleStatuses.includes(String(vehicle.status || "") as VehicleStatusFilter)
+        : true
+    );
     const vehiclesFinal = byStatus.filter((vehicle) =>
       selectedVehicleIds.length > 0 ? selectedVehicleIds.includes(vehicle.id) : true
     );
@@ -353,7 +386,7 @@ export function ReportsPage() {
     availableVehicles,
     selectedBranchIds,
     selectedVehicleTypes,
-    selectedVehicleStatus,
+    selectedVehicleStatuses,
     selectedVehicleIds,
     selectedDriverIds,
     startDate,
@@ -369,17 +402,6 @@ export function ReportsPage() {
     const debtsCost = filteredData.debts.reduce((sum, item) => sum + (item.amount || 0), 0);
     return { total: fuelCost + maintenanceCost + debtsCost };
   }, [filteredData]);
-
-  const vehicleStatusMetrics = useMemo(() => {
-    const source = filteredData.vehicles;
-    return {
-      total: source.length,
-      active: source.filter((item) => item.status === "ACTIVE").length,
-      inactive: source.filter((item) => String(item.status || "") === "INACTIVE").length,
-      maintenance: source.filter((item) => item.status === "MAINTENANCE").length,
-      sold: source.filter((item) => item.status === "SOLD").length,
-    };
-  }, [filteredData.vehicles]);
 
   function vehicleStatusLabel(value?: string) {
     if (value === "ACTIVE") return "Ativo";
@@ -402,6 +424,92 @@ export function ReportsPage() {
     const showFuel = selectedModules.includes("FUEL");
     const showMaintenance = selectedModules.includes("MAINTENANCE");
     const showDebts = selectedModules.includes("DEBTS");
+    const selectedVehicleStatusesLabel =
+      selectedVehicleStatuses.length > 0
+        ? selectedVehicleStatuses.map((status) => vehicleStatusLabel(status)).join(", ")
+        : "Todos os status";
+
+    const sections = [
+      {
+        enabled: showVehicles,
+        count: filteredData.vehicles.length,
+        html: `<h2>Veículos (${filteredData.vehicles.length})</h2>
+                 <table><thead><tr><th>Placa</th><th>Veículo</th><th>Categoria</th><th>Tipo</th><th>Status</th></tr></thead>
+                 <tbody>${filteredData.vehicles
+                   .map(
+                     (item) =>
+                       `<tr><td>${escapeHtml(item.plate || "-")}</td><td>${escapeHtml(
+                         `${item.brand || ""} ${item.model || ""}`.trim() || "-"
+                       )}</td><td>${escapeHtml(item.category || "-")}</td><td>${escapeHtml(
+                         labelVehicleType(item.vehicleType)
+                       )}</td><td>${escapeHtml(vehicleStatusLabel(item.status))}</td></tr>`
+                   )
+                   .join("")}</tbody></table>`,
+      },
+      {
+        enabled: showFuel,
+        count: filteredData.fuel.length,
+        html: `<h2>Abastecimentos (${filteredData.fuel.length})</h2>
+                 <table><thead><tr><th>Data</th><th>Veículo</th><th>Motorista</th><th>Litros</th><th>Valor</th><th>KM</th></tr></thead>
+                 <tbody>${filteredData.fuel
+                   .map(
+                     (item) =>
+                       `<tr><td>${escapeHtml(formatDate(item.fuelDate))}</td><td>${escapeHtml(
+                         `${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`
+                       )}</td><td>${escapeHtml(item.driver?.name || "-")}</td><td>${(item.liters || 0).toFixed(
+                         2
+                       )}</td><td>${toCurrency(item.totalValue || 0)}</td><td>${(item.km || 0).toLocaleString(
+                         "pt-BR"
+                       )}</td></tr>`
+                   )
+                   .join("")}</tbody></table>`,
+      },
+      {
+        enabled: showMaintenance,
+        count: filteredData.maintenance.length,
+        html: `<h2>Manutenções (${filteredData.maintenance.length})</h2>
+                 <table><thead><tr><th>Data</th><th>Veículo</th><th>Tipo</th><th>Status</th><th>Custo</th><th>KM</th></tr></thead>
+                 <tbody>${filteredData.maintenance
+                   .map(
+                     (item) =>
+                       `<tr><td>${escapeHtml(formatDate(item.maintenanceDate))}</td><td>${escapeHtml(
+                         `${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`
+                       )}</td><td>${escapeHtml(labelMaintenanceType(item.type))}</td><td>${escapeHtml(
+                         labelMaintenanceStatus(item.status)
+                       )}</td><td>${toCurrency(item.cost || 0)}</td><td>${(item.km || 0).toLocaleString(
+                         "pt-BR"
+                       )}</td></tr>`
+                   )
+                   .join("")}</tbody></table>`,
+      },
+      {
+        enabled: showDebts,
+        count: filteredData.debts.length,
+        html: `<h2>Débitos e multas (${filteredData.debts.length})</h2>
+                 <table><thead><tr><th>Data</th><th>Veículo</th><th>Categoria</th><th>Descrição</th><th>Status</th><th>Valor</th></tr></thead>
+                 <tbody>${filteredData.debts
+                   .map(
+                     (item) =>
+                       `<tr><td>${escapeHtml(formatDate(item.debtDate))}</td><td>${escapeHtml(
+                         `${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`
+                       )}</td><td>${escapeHtml(labelDebtCategory(item.category))}</td><td>${escapeHtml(
+                         item.description || "-"
+                       )}</td><td>${escapeHtml(labelDebtStatus(item.status))}</td><td>${toCurrency(item.amount || 0)}</td></tr>`
+                   )
+                   .join("")}</tbody></table>`,
+      },
+    ];
+
+    const moduleSections = sections
+      .filter((section) => section.enabled)
+      .sort((a, b) => {
+        const aZero = a.count === 0 ? 1 : 0;
+        const bZero = b.count === 0 ? 1 : 0;
+        if (aZero !== bZero) return aZero - bZero;
+        return b.count - a.count;
+      })
+      .map((section) => section.html)
+      .join("");
 
     const html = `
       <html>
@@ -420,78 +528,9 @@ export function ReportsPage() {
         <body>
           <h1>Relatório operacional</h1>
           <div class="meta">Período: ${escapeHtml(formatDate(startDate))} até ${escapeHtml(formatDate(endDate))}</div>
-          <div class="meta">Total de despesas: ${toCurrency(metrics.total)}</div>
-          <div class="meta">Status de veículos: ${escapeHtml(selectedVehicleStatus === "ALL" ? "Todos os status" : vehicleStatusLabel(selectedVehicleStatus))}</div>
-
-          ${
-            showVehicles
-              ? `<h2>Veículos (${filteredData.vehicles.length})</h2>
-                 <table><thead><tr><th>Placa</th><th>Veículo</th><th>Categoria</th><th>Tipo</th><th>Status</th></tr></thead>
-                 <tbody>${filteredData.vehicles
-                   .map(
-                     (item) =>
-                       `<tr><td>${escapeHtml(item.plate || "-")}</td><td>${escapeHtml(
-                         `${item.brand || ""} ${item.model || ""}`.trim() || "-"
-                       )}</td><td>${escapeHtml(item.category || "-")}</td><td>${escapeHtml(
-                         item.vehicleType || "-"
-                       )}</td><td>${escapeHtml(vehicleStatusLabel(item.status))}</td></tr>`
-                   )
-                   .join("")}</tbody></table>`
-              : ""
-          }
-
-          ${
-            showFuel
-              ? `<h2>Abastecimentos (${filteredData.fuel.length})</h2>
-                 <table><thead><tr><th>Data</th><th>Veículo</th><th>Motorista</th><th>Litros</th><th>Valor</th><th>KM</th></tr></thead>
-                 <tbody>${filteredData.fuel
-                   .map(
-                     (item) =>
-                       `<tr><td>${escapeHtml(formatDate(item.fuelDate))}</td><td>${escapeHtml(
-                         `${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`
-                       )}</td><td>${escapeHtml(item.driver?.name || "-")}</td><td>${(item.liters || 0).toFixed(
-                         2
-                       )}</td><td>${toCurrency(item.totalValue || 0)}</td><td>${(item.km || 0).toLocaleString(
-                         "pt-BR"
-                       )}</td></tr>`
-                   )
-                   .join("")}</tbody></table>`
-              : ""
-          }
-          ${
-            showMaintenance
-              ? `<h2>Manutenções (${filteredData.maintenance.length})</h2>
-                 <table><thead><tr><th>Data</th><th>Veículo</th><th>Tipo</th><th>Status</th><th>Custo</th><th>KM</th></tr></thead>
-                 <tbody>${filteredData.maintenance
-                   .map(
-                     (item) =>
-                       `<tr><td>${escapeHtml(formatDate(item.maintenanceDate))}</td><td>${escapeHtml(
-                         `${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`
-                       )}</td><td>${escapeHtml(labelMaintenanceType(item.type))}</td><td>${escapeHtml(
-                         item.status || "-"
-                       )}</td><td>${toCurrency(item.cost || 0)}</td><td>${(item.km || 0).toLocaleString(
-                         "pt-BR"
-                       )}</td></tr>`
-                   )
-                   .join("")}</tbody></table>`
-              : ""
-          }
-          ${
-            showDebts
-              ? `<h2>Débitos e multas (${filteredData.debts.length})</h2>
-                 <table><thead><tr><th>Data</th><th>Veículo</th><th>Categoria</th><th>Descrição</th><th>Status</th><th>Valor</th></tr></thead>
-                 <tbody>${filteredData.debts
-                   .map(
-                     (item) =>
-                       `<tr><td>${escapeHtml(formatDate(item.debtDate))}</td><td>${escapeHtml(
-                         `${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`
-                       )}</td><td>${escapeHtml(labelDebtCategory(item.category))}</td><td>${escapeHtml(
-                         item.description || "-"
-                       )}</td><td>${escapeHtml(item.status || "-")}</td><td>${toCurrency(item.amount || 0)}</td></tr>`
-                   )
-                   .join("")}</tbody></table>`
-              : ""
-          }
+          ${metrics.total > 0 ? `<div class="meta">Total de despesas: ${toCurrency(metrics.total)}</div>` : ""}
+          ${showVehicles ? `<div class="meta">Status de veículos: ${escapeHtml(selectedVehicleStatusesLabel)}</div>` : ""}
+          ${moduleSections}
         </body>
       </html>
     `;
@@ -522,35 +561,46 @@ export function ReportsPage() {
       ) : null}
 
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="hidden">
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Veículos totais</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{vehicleStatusMetrics.total}</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900">0</p>
           </div>
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Ativos</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-900">{vehicleStatusMetrics.active}</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-900">0</p>
           </div>
           <div className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Inativos</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{vehicleStatusMetrics.inactive}</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900">0</p>
           </div>
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Em manutenção</p>
-            <p className="mt-1 text-2xl font-bold text-amber-900">{vehicleStatusMetrics.maintenance}</p>
+            <p className="mt-1 text-2xl font-bold text-amber-900">0</p>
           </div>
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Vendidos</p>
-            <p className="mt-1 text-2xl font-bold text-rose-900">{vehicleStatusMetrics.sold}</p>
+            <p className="mt-1 text-2xl font-bold text-rose-900">0</p>
           </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
-          <div>
+          {selectedModules.includes("VEHICLES") ? (
+            <div className="lg:col-span-3">
+              <MultiSelectField
+                label="Status dos veículos"
+                options={vehicleStatusOptions}
+                selectedIds={selectedVehicleStatuses}
+                onChange={(value) => setSelectedVehicleStatuses(value as VehicleStatusFilter[])}
+                placeholder="Selecione os status"
+              />
+            </div>
+          ) : null}
+          <div className="hidden">
             <label className="mb-1 block text-sm font-semibold text-slate-700">Status do veículo</label>
             <select
-              value={selectedVehicleStatus}
-              onChange={(event) => setSelectedVehicleStatus(event.target.value as VehicleStatusFilter)}
+              value={selectedVehicleStatuses.join(",")}
+              onChange={() => undefined}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             >
               <option value="ALL">Todos os status</option>
