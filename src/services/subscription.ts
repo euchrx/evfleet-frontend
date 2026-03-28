@@ -103,6 +103,8 @@ export type CreateBillingPlanInput = {
   active?: boolean;
 };
 
+export type UpdateBillingPlanInput = CreateBillingPlanInput;
+
 function decodeTokenPayload(token: string) {
   try {
     const [, payload] = token.split(".");
@@ -274,4 +276,22 @@ export async function createBillingPlan(input: CreateBillingPlanInput) {
   };
 
   await api.post("/billing/plans", payload);
+}
+
+export async function updateBillingPlan(planId: string, input: UpdateBillingPlanInput) {
+  const payload = {
+    code: input.code.trim(),
+    name: input.name.trim(),
+    description: input.description?.trim() || undefined,
+    priceCents: Number(input.priceCents),
+    currency: (input.currency || "BRL").trim().toUpperCase(),
+    interval: input.interval,
+    active: input.active ?? true,
+  };
+
+  await api.patch(`/billing/plans/${planId}`, payload);
+}
+
+export async function deleteBillingPlan(planId: string) {
+  await api.delete(`/billing/plans/${planId}`);
 }

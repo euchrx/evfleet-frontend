@@ -2,18 +2,22 @@ import { useEffect, useState } from "react";
 import { CreditCard, RefreshCw } from "lucide-react";
 import {
   createBillingPlan,
+  deleteBillingPlan,
   generateSubscriptionPayment,
   getSubscriptionPageData,
   selectCompanyPlan,
+  updateBillingPlan,
   type PlanInterval,
   type PaymentStatus,
   type SubscriptionInvoice,
   type SubscriptionPageData,
+  type SubscriptionPlan,
   type SubscriptionStatus,
 } from "../../services/subscription";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCompanyScope } from "../../contexts/CompanyScopeContext";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
 function subscriptionStatusLabel(status: SubscriptionStatus) {
   if (status === "ACTIVE") return "Ativa";
@@ -76,8 +80,11 @@ export function SubscriptionPage() {
   const [data, setData] = useState<SubscriptionPageData | null>(null);
   const [submittingPlanId, setSubmittingPlanId] = useState<string | null>(null);
   const [payingNow, setPayingNow] = useState(false);
-  const [isCreatePlanModalOpen, setIsCreatePlanModalOpen] = useState(false);
-  const [creatingPlan, setCreatingPlan] = useState(false);
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
+  const [planToDelete, setPlanToDelete] = useState<SubscriptionPlan | null>(null);
+  const [deletingPlan, setDeletingPlan] = useState(false);
   const [newPlan, setNewPlan] = useState({
     code: "",
     name: "",
@@ -111,6 +118,31 @@ export function SubscriptionPage() {
   const canManagePlans = user?.role === "ADMIN";
   const hasCompanyScope = Boolean(data?.companyId);
   const statusAlert = getStatusAlert(overview?.status);
+
+  function openCreatePlanModal() {
+    setEditingPlan(null);
+    setNewPlan({
+      code: "",
+      name: "",
+      description: "",
+      priceCents: "",
+      interval: "MONTHLY",
+    });
+    setIsPlanModalOpen(true);
+  }
+
+  function openEditPlanModal(plan: SubscriptionPlan) {
+    setEditingPlan(plan);
+    setNewPlan({
+      code: plan.code,
+      name: plan.name,
+      description: plan.description || "",
+      priceCents: String(plan.priceCents),
+      interval: plan.billingCycle,
+    });
+    setIsPlanModalOpen(true);
+  }
+
   async function handleSelectPlan(planId: string) {
     if (!canManagePlans) {
       setErrorMessage("Somente administrador pode alterar o plano.");
@@ -154,9 +186,9 @@ export function SubscriptionPage() {
   async function handleCreatePlan(event: React.FormEvent) {
     event.preventDefault();
     try {
-      setCreatingPlan(true);
+      setSavingPlan(true);
       setErrorMessage("");
-      await createBillingPlan({
+      const payload = {
         code: newPlan.code,
         name: newPlan.name,
         description: newPlan.description,
@@ -164,8 +196,14 @@ export function SubscriptionPage() {
         interval: newPlan.interval,
         currency: "BRL",
         active: true,
-      });
-      setIsCreatePlanModalOpen(false);
+      };
+      if (editingPlan?.id) {
+        await updateBillingPlan(editingPlan.id, payload);
+      } else {
+        await createBillingPlan(payload);
+      }
+      setIsPlanModalOpen(false);
+      setEditingPlan(null);
       setNewPlan({
         code: "",
         name: "",
@@ -176,10 +214,29 @@ export function SubscriptionPage() {
       await loadData();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Não foi possível adicionar o plano.",
+        error instanceof Error
+          ? error.message
+          : editingPlan
+            ? "Não foi possível atualizar o plano."
+            : "Não foi possível adicionar o plano.",
       );
     } finally {
-      setCreatingPlan(false);
+      setSavingPlan(false);
+    }
+  }
+
+  async function handleDeletePlan() {
+    if (!planToDelete?.id) return;
+    try {
+      setDeletingPlan(true);
+      setErrorMessage("");
+      await deleteBillingPlan(planToDelete.id);
+      setPlanToDelete(null);
+      await loadData();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Não foi possível remover o plano.");
+    } finally {
+      setDeletingPlan(false);
     }
   }
 
@@ -194,7 +251,7 @@ export function SubscriptionPage() {
           {canManagePlans ? (
             <button
               type="button"
-              onClick={() => setIsCreatePlanModalOpen(true)}
+              onClick={openCreatePlanModal}
               className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
             >
               Adicionar plano
@@ -328,6 +385,26 @@ export function SubscriptionPage() {
                           ? "Salvando..."
                           : "Selecionar plano"}
                 </button>
+                {canManagePlans ? (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditPlanModal(plan)}
+                      disabled={isSubmitting}
+                      className="cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPlanToDelete(plan)}
+                      disabled={isSubmitting}
+                      className="cursor-pointer rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ) : null}
               </article>
             );
           })}
@@ -376,16 +453,20 @@ export function SubscriptionPage() {
         </div>
       </section>
 
-      {isCreatePlanModalOpen ? (
+      {isPlanModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
           <div className="max-h-[calc(100dvh-2rem)] w-full max-w-2xl rounded-2xl bg-white shadow-2xl flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Adicionar plano</h2>
-                <p className="text-sm text-slate-500">Crie um novo plano de assinatura.</p>
+                <h2 className="text-xl font-bold text-slate-900">
+                  {editingPlan ? "Editar plano" : "Adicionar plano"}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {editingPlan ? "Atualize os dados do plano." : "Crie um novo plano de assinatura."}
+                </p>
               </div>
               <button
-                onClick={() => setIsCreatePlanModalOpen(false)}
+                onClick={() => setIsPlanModalOpen(false)}
                 className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100"
               >
                 Fechar
@@ -463,23 +544,31 @@ export function SubscriptionPage() {
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button
                   type="button"
-                  onClick={() => setIsCreatePlanModalOpen(false)}
+                  onClick={() => setIsPlanModalOpen(false)}
                   className="cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={creatingPlan}
+                  disabled={savingPlan}
                   className="cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {creatingPlan ? "Salvando..." : "Salvar plano"}
+                  {savingPlan ? "Salvando..." : editingPlan ? "Atualizar plano" : "Salvar plano"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       ) : null}
+      <ConfirmDeleteModal
+        isOpen={Boolean(planToDelete)}
+        title="Remover plano"
+        description={planToDelete ? `Deseja remover o plano ${planToDelete.name}?` : "Deseja remover este plano?"}
+        loading={deletingPlan}
+        onCancel={() => setPlanToDelete(null)}
+        onConfirm={handleDeletePlan}
+      />
     </div>
   );
 }
