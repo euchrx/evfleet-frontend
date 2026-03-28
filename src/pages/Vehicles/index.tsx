@@ -283,6 +283,19 @@ export function VehiclesPage() {
   }, [isModalOpen]);
 
   useEffect(() => {
+    if (!isModalOpen) return;
+    if (editingVehicle) return;
+    if (form.branchId) return;
+    if (branches.length === 0) return;
+
+    const fallbackBranchId = selectedBranchId || branches[0]?.id || "";
+    if (!fallbackBranchId) return;
+
+    setForm((prev) => ({ ...prev, branchId: fallbackBranchId }));
+    clearFieldError("branchId");
+  }, [isModalOpen, editingVehicle, form.branchId, branches, selectedBranchId]);
+
+  useEffect(() => {
     const settings = readSoftwareSettings();
     setMaxVehiclesAllowed(Number(settings.maxVehiclesAllowed || 0));
   }, []);
