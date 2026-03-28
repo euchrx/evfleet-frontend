@@ -15,6 +15,7 @@ type UserFormData = {
   email: string;
   password: string;
   role: "ADMIN" | "FLEET_MANAGER";
+  companyId: string;
 };
 type UserFieldErrors = Partial<Record<keyof UserFormData, string>>;
 
@@ -23,12 +24,13 @@ const initialForm: UserFormData = {
   email: "",
   password: "",
   role: "FLEET_MANAGER",
+  companyId: "",
 };
 const TABLE_PAGE_SIZE = 10;
 
 export function UsersPage() {
   type UserSortBy = "name" | "email" | "role" | "createdAt";
-  const { canSelectCompanyScope, selectedCompanyId } = useCompanyScope();
+  const { canSelectCompanyScope, selectedCompanyId, options } = useCompanyScope();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,13 +66,16 @@ export function UsersPage() {
   }, [selectedCompanyId]);
 
   function openCreateModal() {
-    if (canSelectCompanyScope && !selectedCompanyId) {
+    if (canSelectCompanyScope && !selectedCompanyId && options.length === 0) {
       setPageErrorMessage("Selecione uma empresa no escopo para cadastrar usuário.");
       return;
     }
 
     setEditingUser(null);
-    setForm(initialForm);
+    setForm({
+      ...initialForm,
+      companyId: selectedCompanyId || "",
+    });
     setFieldErrors({});
     setIsModalOpen(true);
   }
@@ -82,6 +87,7 @@ export function UsersPage() {
       email: user.email,
       password: "",
       role: user.role,
+      companyId: user.companyId || selectedCompanyId || "",
     });
     setFieldErrors({});
     setIsModalOpen(true);
@@ -120,16 +126,14 @@ export function UsersPage() {
         name: form.name.trim(),
         email: form.email.trim(),
         role: form.role,
-        companyId: selectedCompanyId || undefined,
+        companyId: form.companyId.trim() || undefined,
       };
 
       const nextErrors: UserFieldErrors = {};
       if (!basePayload.name) nextErrors.name = "Informe o nome.";
       if (!basePayload.email) nextErrors.email = "Informe o e-mail.";
       if (!basePayload.role) nextErrors.role = "Selecione o perfil.";
-      if (canSelectCompanyScope && !basePayload.companyId) {
-        nextErrors.name = "Selecione uma empresa no escopo para continuar.";
-      }
+      if (!basePayload.companyId) nextErrors.companyId = "Selecione uma empresa.";
       if (!editingUser && !form.password.trim()) nextErrors.password = "Informe a senha.";
       if (Object.keys(nextErrors).length > 0) {
         setFieldErrors(nextErrors);
@@ -418,6 +422,24 @@ export function UsersPage() {
 
             <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto p-6">
               <div className="grid gap-4 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700">Empresa</label>
+                  <select
+                    value={form.companyId}
+                    onChange={(e) => handleChange("companyId", e.target.value)}
+                    className={inputClass("companyId")}
+                    disabled={!canSelectCompanyScope}
+                  >
+                    <option value="">Selecione uma empresa</option>
+                    {options.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.companyId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.companyId}</p> : null}
+                </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">Nome</label>
                   <input
