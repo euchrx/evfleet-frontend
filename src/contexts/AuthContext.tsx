@@ -81,7 +81,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
-  async function fetchMe() {
+  async function fetchMe(tokenOverride?: string | null) {
+    const effectiveToken = normalizeToken(tokenOverride ?? token);
     try {
       const response = await api.get("/auth/me");
       setUser(response.data);
@@ -89,14 +90,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return true;
     } catch (error: any) {
       const status = error?.response?.status;
-      if (status === 404 && token) {
+      if (status === 404 && effectiveToken) {
         const stored = readStoredAuthUser();
         if (stored) {
           setUser(stored);
           return true;
         }
 
-        const payload = decodeTokenPayload(token);
+        const payload = decodeTokenPayload(effectiveToken);
         if (payload?.sub && payload?.email && payload?.role) {
           const fallbackUser: AuthUser = {
             id: payload.sub,
@@ -131,7 +132,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       localStorage.setItem("token", storedToken);
       setToken(storedToken);
-      await fetchMe();
+      await fetchMe(storedToken);
       setIsLoadingAuth(false);
     }
 
@@ -151,7 +152,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(userFromLogin);
       saveAuthUser(userFromLogin);
     }
-    const ok = await fetchMe();
+    const ok = await fetchMe(normalizedToken);
 
     if (!ok) {
       throw new Error("Não foi possível validar sua sessão.");
