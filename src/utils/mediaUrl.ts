@@ -1,4 +1,5 @@
 import { api } from "../services/api";
+import { normalizeApiBaseUrl } from "../services/url";
 
 export function resolveApiMediaUrl(url?: string | null) {
   const raw = String(url || "").trim();
@@ -8,7 +9,7 @@ export function resolveApiMediaUrl(url?: string | null) {
     return raw;
   }
 
-  const base = String(api.defaults.baseURL || "").trim().replace(/\/+$/, "");
+  const base = normalizeApiBaseUrl(String(api.defaults.baseURL || "").trim());
   const normalizedPath = raw.startsWith("/") ? raw : `/${raw}`;
 
   if (!base) return normalizedPath;

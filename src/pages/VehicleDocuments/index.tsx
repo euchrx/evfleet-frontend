@@ -5,6 +5,7 @@ import { useBranch } from "../../contexts/BranchContext";
 import type { Vehicle } from "../../types/vehicle";
 import type { VehicleDocument, VehicleDocumentStatus, VehicleDocumentType } from "../../types/vehicle-document";
 import { api } from "../../services/api";
+import { normalizeApiBaseUrl } from "../../services/url";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { useLocation } from "react-router-dom";
 import { TablePagination } from "../../components/TablePagination";
@@ -303,7 +304,7 @@ export function VehicleDocumentsPage() {
   function resolveFileUrl(fileUrl?: string | null) {
     if (!fileUrl) return "";
     if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
-    const base = String(api.defaults.baseURL || "").replace(/\/+$/, "");
+    const base = normalizeApiBaseUrl(String(api.defaults.baseURL || "").trim());
     return `${base}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
   }
 

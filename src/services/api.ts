@@ -2,10 +2,10 @@ import axios from "axios";
 import { localizeAxiosError } from "../utils/errorTranslator";
 import { COMPANY_SCOPE_STORAGE_KEY } from "../contexts/CompanyScopeContext";
 import { readAuthToken } from "./authToken";
+import { joinApiUrl, normalizeApiBaseUrl } from "./url";
 
 const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-
-const baseURL = envBaseUrl || "/api";
+const baseURL = normalizeApiBaseUrl(envBaseUrl);
 
 export const api = axios.create({
   baseURL,
@@ -24,7 +24,7 @@ api.interceptors.request.use((config) => {
   if (isAuthBootstrapRequest) {
     console.log("[api] request", {
       method: config.method,
-      url: `${config.baseURL || ""}${requestUrl}`,
+      url: joinApiUrl(String(config.baseURL || baseURL), requestUrl),
       hasAuthorization: Boolean(config.headers?.Authorization),
       authorizationPreview: token ? `${token.slice(0, 16)}...` : null,
     });
