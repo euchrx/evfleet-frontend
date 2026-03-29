@@ -131,6 +131,21 @@ function extractPlateCandidate(value: unknown) {
   return compact;
 }
 
+function findVehicleByPlateCandidate(vehicles: Vehicle[], candidate: string) {
+  const normalizedCandidate = normalizePlate(candidate);
+  if (!normalizedCandidate) return undefined;
+
+  return vehicles.find((item) => {
+    const normalizedVehiclePlate = normalizePlate(item.plate);
+    if (!normalizedVehiclePlate) return false;
+    return (
+      normalizedVehiclePlate === normalizedCandidate ||
+      normalizedVehiclePlate.includes(normalizedCandidate) ||
+      normalizedCandidate.includes(normalizedVehiclePlate)
+    );
+  });
+}
+
 function parseNumberValue(value: unknown) {
   if (typeof value === "number") return value;
   const normalized = String(value || "")
@@ -637,6 +652,7 @@ export function FuelRecordsPage() {
 
       let createdCount = 0;
       const failures: string[] = [];
+      const missingPlates = new Set<string>();
       const vehiclesByPlate = new Map(
         vehicles.map((item) => [normalizePlate(item.plate), item]),
       );
@@ -671,12 +687,15 @@ export function FuelRecordsPage() {
 
         const vehicle =
           vehiclesByPlate.get(normalizedPlate) ||
-          vehicles.find((item) => normalizePlate(item.plate) === normalizedPlate) ||
+          findVehicleByPlateCandidate(vehicles, normalizedPlate) ||
           vehicles.find((item) =>
-            formatVehicleLabel(item).toUpperCase().includes((plate || fallbackDetectedPlate).toUpperCase()),
+            formatVehicleLabel(item)
+              .toUpperCase()
+              .includes((plate || fallbackDetectedPlate).toUpperCase()),
           );
 
         if (!vehicle) {
+          if (normalizedPlate) missingPlates.add(normalizedPlate);
           failures.push(`Linha ${lineNumber}: veículo/placa não encontrado.`);
           continue;
         }
@@ -775,6 +794,15 @@ export function FuelRecordsPage() {
           `Importação parcial. Sucesso: ${createdCount}. Falhas: ${failures.length}. ${failures
             .slice(0, 3)
             .join(" | ")}`,
+        );
+        return;
+      }
+
+      if (createdCount === 0 && missingPlates.size > 0) {
+        setPageErrorMessage(
+          `Nenhum abastecimento importado. Placas não encontradas no cadastro da empresa atual: ${[...missingPlates]
+            .slice(0, 5)
+            .join(", ")}.`,
         );
         return;
       }
