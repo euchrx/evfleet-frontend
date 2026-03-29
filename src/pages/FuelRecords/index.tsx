@@ -146,6 +146,13 @@ function findVehicleByPlateCandidate(vehicles: Vehicle[], candidate: string) {
   });
 }
 
+function isSummaryRow(rowMap: Map<string, unknown>) {
+  const values = [...rowMap.values()].map((value) =>
+    String(value || "").trim().toLowerCase(),
+  );
+  return values.some((value) => value === "total" || value.startsWith("total "));
+}
+
 function parseNumberValue(value: unknown) {
   if (typeof value === "number") return value;
   const normalized = String(value || "")
@@ -651,6 +658,7 @@ export function FuelRecordsPage() {
       }
 
       let createdCount = 0;
+      let ignoredCount = 0;
       const failures: string[] = [];
       const missingPlates = new Set<string>();
       const vehiclesByPlate = new Map(
@@ -663,6 +671,11 @@ export function FuelRecordsPage() {
         const rowMap = new Map<string, unknown>();
         for (const [key, value] of Object.entries(row)) {
           rowMap.set(normalizeHeader(key), value);
+        }
+
+        if (isSummaryRow(rowMap)) {
+          ignoredCount += 1;
+          continue;
         }
 
         const plateRaw =
@@ -740,8 +753,12 @@ export function FuelRecordsPage() {
           failures.push(`Linha ${lineNumber}: data inválida.`);
           continue;
         }
-        if (Number.isNaN(liters) || liters <= 0) {
+        if (Number.isNaN(liters) || liters < 0) {
           failures.push(`Linha ${lineNumber}: litros inválidos.`);
+          continue;
+        }
+        if (liters === 0) {
+          ignoredCount += 1;
           continue;
         }
         if (Number.isNaN(totalValue) || totalValue <= 0) {
@@ -784,7 +801,9 @@ export function FuelRecordsPage() {
 
       if (createdCount > 0 && failures.length === 0) {
         setPageErrorMessage(
-          `Importação concluída com sucesso. ${createdCount} abastecimento(s) cadastrado(s).`,
+          `Importação concluída com sucesso. ${createdCount} abastecimento(s) cadastrado(s).${
+            ignoredCount > 0 ? ` ${ignoredCount} linha(s) ignorada(s).` : ""
+          }`,
         );
         return;
       }
@@ -793,7 +812,7 @@ export function FuelRecordsPage() {
         setPageErrorMessage(
           `Importação parcial. Sucesso: ${createdCount}. Falhas: ${failures.length}. ${failures
             .slice(0, 3)
-            .join(" | ")}`,
+            .join(" | ")}${ignoredCount > 0 ? ` ${ignoredCount} linha(s) ignorada(s).` : ""}`,
         );
         return;
       }
@@ -808,7 +827,9 @@ export function FuelRecordsPage() {
       }
 
       setPageErrorMessage(
-        `Nenhum abastecimento importado. ${failures.slice(0, 3).join(" | ")}`,
+        `Nenhum abastecimento importado. ${failures.slice(0, 3).join(" | ")}${
+          ignoredCount > 0 ? ` ${ignoredCount} linha(s) ignorada(s).` : ""
+        }`,
       );
     } catch (error) {
       console.error("Erro ao importar XLS:", error);
