@@ -110,6 +110,27 @@ function normalizeHeader(value: unknown) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+function normalizePlate(value: unknown) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function extractPlateCandidate(value: unknown) {
+  const text = String(value || "").toUpperCase();
+  if (!text.trim()) return "";
+
+  const compact = text.replace(/[^A-Z0-9]/g, "");
+
+  const mercosul = compact.match(/[A-Z]{3}[0-9][A-Z][0-9]{2}/);
+  if (mercosul) return mercosul[0];
+
+  const antigo = compact.match(/[A-Z]{3}[0-9]{4}/);
+  if (antigo) return antigo[0];
+
+  return compact;
+}
+
 function parseNumberValue(value: unknown) {
   if (typeof value === "number") return value;
   const normalized = String(value || "")
@@ -563,10 +584,12 @@ export function FuelRecordsPage() {
 
         rows = matrix
           .slice(detectedHeaderIndex + 1)
-          .filter((row) =>
+          .map((row, rowIndex) => ({ row, rowIndex }))
+          .filter(({ row }) =>
             row.some((cell) => String(cell || "").trim().length > 0),
           )
-          .map((row) => ({
+          .map(({ row, rowIndex }) => ({
+            __line: detectedHeaderIndex + 2 + rowIndex,
             data:
               inferredDateIndex >= 0
                 ? row[inferredDateIndex]
@@ -604,7 +627,7 @@ export function FuelRecordsPage() {
       } else {
         rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
           defval: "",
-        });
+        }).map((row, rowIndex) => ({ ...row, __line: rowIndex + 2 }));
       }
 
       if (rows.length === 0) {
@@ -614,9 +637,13 @@ export function FuelRecordsPage() {
 
       let createdCount = 0;
       const failures: string[] = [];
+      const vehiclesByPlate = new Map(
+        vehicles.map((item) => [normalizePlate(item.plate), item]),
+      );
 
       for (let index = 0; index < rows.length; index += 1) {
         const row = rows[index];
+        const lineNumber = Number(row.__line) || index + 2;
         const rowMap = new Map<string, unknown>();
         for (const [key, value] of Object.entries(row)) {
           rowMap.set(normalizeHeader(key), value);
@@ -628,15 +655,29 @@ export function FuelRecordsPage() {
           rowMap.get("veiculoid") ||
           rowMap.get("vehicle") ||
           rowMap.get("carro");
-        const plate = String(plateRaw || "").trim().toUpperCase();
+        const plate = extractPlateCandidate(plateRaw);
+
+        let fallbackDetectedPlate = "";
+        if (!plate) {
+          for (const value of rowMap.values()) {
+            const candidate = extractPlateCandidate(value);
+            if (candidate.length >= 7) {
+              fallbackDetectedPlate = candidate;
+              break;
+            }
+          }
+        }
+        const normalizedPlate = normalizePlate(plate || fallbackDetectedPlate);
+
         const vehicle =
-          vehicles.find((item) => item.plate.toUpperCase() === plate) ||
+          vehiclesByPlate.get(normalizedPlate) ||
+          vehicles.find((item) => normalizePlate(item.plate) === normalizedPlate) ||
           vehicles.find((item) =>
-            formatVehicleLabel(item).toUpperCase().includes(plate.toUpperCase()),
+            formatVehicleLabel(item).toUpperCase().includes((plate || fallbackDetectedPlate).toUpperCase()),
           );
 
         if (!vehicle) {
-          failures.push(`Linha ${index + 2}: veículo/placa não encontrado.`);
+          failures.push(`Linha ${lineNumber}: veículo/placa não encontrado.`);
           continue;
         }
 
@@ -673,23 +714,23 @@ export function FuelRecordsPage() {
         ) || (vehicle.fuelType as FuelFormData["fuelType"]);
 
         if (!fuelType) {
-          failures.push(`Linha ${index + 2}: combustível inválido.`);
+          failures.push(`Linha ${lineNumber}: combustível inválido.`);
           continue;
         }
         if (!fuelDate) {
-          failures.push(`Linha ${index + 2}: data inválida.`);
+          failures.push(`Linha ${lineNumber}: data inválida.`);
           continue;
         }
         if (Number.isNaN(liters) || liters <= 0) {
-          failures.push(`Linha ${index + 2}: litros inválidos.`);
+          failures.push(`Linha ${lineNumber}: litros inválidos.`);
           continue;
         }
         if (Number.isNaN(totalValue) || totalValue <= 0) {
-          failures.push(`Linha ${index + 2}: valor total inválido.`);
+          failures.push(`Linha ${lineNumber}: valor total inválido.`);
           continue;
         }
         if (Number.isNaN(km) || km < 0) {
-          failures.push(`Linha ${index + 2}: KM inválido.`);
+          failures.push(`Linha ${lineNumber}: KM inválido.`);
           continue;
         }
 
@@ -715,7 +756,7 @@ export function FuelRecordsPage() {
           const text = Array.isArray(apiMessage)
             ? apiMessage.join(", ")
             : String(apiMessage);
-          failures.push(`Linha ${index + 2}: ${text}`);
+          failures.push(`Linha ${lineNumber}: ${text}`);
         }
       }
 

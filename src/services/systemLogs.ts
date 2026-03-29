@@ -60,6 +60,29 @@ export function getSystemLogs() {
   return readLogs();
 }
 
+export function updateSystemLog(
+  id: string,
+  input: Partial<Pick<SystemLogEntry, "action" | "details" | "actor" | "version">>,
+) {
+  const logs = readLogs();
+  const nextLogs = logs.map((log) => {
+    if (log.id !== id) return log;
+    return {
+      ...log,
+      action: input.action ?? log.action,
+      details: input.details ?? log.details,
+      actor: input.actor?.trim() || log.actor,
+      version: input.version ?? log.version,
+    };
+  });
+  writeLogs(nextLogs);
+}
+
+export function deleteSystemLog(id: string) {
+  const logs = readLogs();
+  writeLogs(logs.filter((log) => log.id !== id));
+}
+
 export function clearSystemLogs() {
   localStorage.removeItem(STORAGE_KEY);
 }

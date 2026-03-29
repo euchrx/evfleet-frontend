@@ -28,7 +28,12 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { useBranch } from "../contexts/BranchContext";
 import { useCompanyScope } from "../contexts/CompanyScopeContext";
-import { getSystemLogs, type SystemLogEntry } from "../services/systemLogs";
+import {
+  deleteSystemLog,
+  getSystemLogs,
+  updateSystemLog,
+  type SystemLogEntry,
+} from "../services/systemLogs";
 import { getFuelRecords } from "../services/fuelRecords";
 import { getVehicles } from "../services/vehicles";
 import { detectFuelAnomalies } from "../services/fuelAnomalies";
@@ -79,11 +84,6 @@ function formatDateOnly(iso: string) {
   return date.toLocaleDateString("pt-BR");
 }
 
-function formatLogEndpoint(endpoint: string) {
-  if (endpoint === "/administration/updates") return "/system/logs/manual";
-  return endpoint;
-}
-
 function parseLocalDate(value: string) {
   const raw = String(value || "").slice(0, 10);
   const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -130,6 +130,12 @@ export function AppLayout() {
   const [isCompanyScopeOpen, setIsCompanyScopeOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>([]);
+  const [editingLog, setEditingLog] = useState<SystemLogEntry | null>(null);
+  const [editingLogAction, setEditingLogAction] = useState("");
+  const [editingLogActor, setEditingLogActor] = useState("");
+  const [editingLogVersion, setEditingLogVersion] = useState("");
+  const [editingLogDetails, setEditingLogDetails] = useState("");
+  const [logToDelete, setLogToDelete] = useState<SystemLogEntry | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(() =>
     getCachedMenuVisibilityMap(),
@@ -298,6 +304,36 @@ export function AppLayout() {
   function handleOpenSystemLogsModal() {
     setSystemLogs(getSystemLogs());
     setIsSystemLogsModalOpen(true);
+  }
+
+  function handleOpenEditLog(log: SystemLogEntry) {
+    setEditingLog(log);
+    setEditingLogAction(log.action || "");
+    setEditingLogActor(log.actor || "");
+    setEditingLogVersion(log.version || systemVersion);
+    setEditingLogDetails(log.details || "");
+  }
+
+  function handleSaveEditLog() {
+    if (!editingLog) return;
+    if (!editingLogAction.trim()) return;
+
+    updateSystemLog(editingLog.id, {
+      action: editingLogAction.trim(),
+      actor: editingLogActor.trim() || "Sistema",
+      version: editingLogVersion.trim() || systemVersion,
+      details: editingLogDetails.trim(),
+    });
+
+    setSystemLogs(getSystemLogs());
+    setEditingLog(null);
+  }
+
+  function handleDeleteLog() {
+    if (!logToDelete) return;
+    deleteSystemLog(logToDelete.id);
+    setSystemLogs(getSystemLogs());
+    setLogToDelete(null);
   }
 
   async function loadNotifications() {
@@ -960,10 +996,25 @@ export function AppLayout() {
                       <p className="text-xs text-slate-500">
                         {formatDateTime(log.timestamp)} - {log.actor}
                       </p>
-                      <p className="text-xs text-slate-600">
-                        {formatLogEndpoint(log.endpoint)}
-                        {log.details ? ` - ${log.details}` : ""}
-                      </p>
+                      {log.details ? (
+                        <p className="text-xs text-slate-600">{log.details}</p>
+                      ) : null}
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditLog(log)}
+                          className="cursor-pointer rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLogToDelete(log)}
+                          className="cursor-pointer rounded-lg border border-red-300 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                        >
+                          Excluir
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -989,6 +1040,103 @@ export function AppLayout() {
                 className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {editingLog ? (
+        <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-slate-900">Editar atualização</h3>
+              <button
+                type="button"
+                onClick={() => setEditingLog(null)}
+                className="cursor-pointer rounded-xl border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">Título</span>
+                <input
+                  value={editingLogAction}
+                  onChange={(e) => setEditingLogAction(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">Implementado por</span>
+                <input
+                  value={editingLogActor}
+                  onChange={(e) => setEditingLogActor(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">Versão</span>
+                <input
+                  value={editingLogVersion}
+                  onChange={(e) => setEditingLogVersion(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">Mensagem</span>
+                <textarea
+                  rows={4}
+                  value={editingLogDetails}
+                  onChange={(e) => setEditingLogDetails(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingLog(null)}
+                className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEditLog}
+                className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {logToDelete ? (
+        <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-slate-900">Excluir atualização</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Deseja excluir esta atualização do system logs?
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setLogToDelete(null)}
+                className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteLog}
+                className="cursor-pointer rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Excluir
               </button>
             </div>
           </div>
