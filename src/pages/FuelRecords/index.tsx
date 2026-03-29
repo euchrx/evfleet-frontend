@@ -153,6 +153,14 @@ function isSummaryRow(rowMap: Map<string, unknown>) {
   return values.some((value) => value === "total" || value.startsWith("total "));
 }
 
+function findLinkedDriverByVehicleId(drivers: Driver[], vehicleId: string) {
+  const active = drivers.find(
+    (item) => item.vehicleId === vehicleId && String(item.status || "").toUpperCase() === "ACTIVE",
+  );
+  if (active) return active;
+  return drivers.find((item) => item.vehicleId === vehicleId) || null;
+}
+
 function parseNumberValue(value: unknown) {
   if (typeof value === "number") return value;
   const normalized = String(value || "")
@@ -388,6 +396,18 @@ export function FuelRecordsPage() {
   function getRecordBranchName(record: FuelRecord) {
     if (record.vehicle?.branch.name) return record.vehicle.branch.name;
     return getBranchNameByVehicleId(record.vehicleId);
+  }
+
+  function getRecordDriverName(record: FuelRecord) {
+    if (record.driver?.name) return record.driver.name;
+    const linkedDriver = findLinkedDriverByVehicleId(drivers, record.vehicleId);
+    return linkedDriver?.name || "Sem motorista";
+  }
+
+  function getRecordFuelType(record: FuelRecord) {
+    if (record.fuelType) return record.fuelType;
+    const vehicle = vehicles.find((item) => item.id === record.vehicleId);
+    return vehicle?.fuelType || "-";
   }
 
   function openCreateModal() {
@@ -734,21 +754,6 @@ export function FuelRecordsPage() {
         }
         const normalizedPlate = normalizePlate(plate || fallbackDetectedPlate);
 
-        const vehicle =
-          vehiclesByPlate.get(normalizedPlate) ||
-          findVehicleByPlateCandidate(vehicles, normalizedPlate) ||
-          vehicles.find((item) =>
-            formatVehicleLabel(item)
-              .toUpperCase()
-              .includes((plate || fallbackDetectedPlate).toUpperCase()),
-          );
-
-        if (!vehicle) {
-          if (normalizedPlate) missingPlates.add(normalizedPlate);
-          failures.push(`Linha ${lineNumber}: veículo/placa não encontrado.`);
-          continue;
-        }
-
         const driverNameRaw =
           rowMap.get("motorista") || rowMap.get("driver") || rowMap.get("condutor");
         const driverName = String(driverNameRaw || "").trim();
@@ -779,13 +784,44 @@ export function FuelRecordsPage() {
         );
         const fuelType = mapFuelType(
           rowMap.get("combustivel") || rowMap.get("tipocombustivel") || rowMap.get("fueltype"),
-        ) || (vehicle.fuelType as FuelFormData["fuelType"]);
+        );
 
-        if (!fuelType) {
+        if (!normalizedPlate) {
+          ignoredCount += 1;
+          continue;
+        }
+
+        const vehicle =
+          vehiclesByPlate.get(normalizedPlate) ||
+          findVehicleByPlateCandidate(vehicles, normalizedPlate) ||
+          vehicles.find((item) =>
+            formatVehicleLabel(item)
+              .toUpperCase()
+              .includes((plate || fallbackDetectedPlate).toUpperCase()),
+          );
+
+        if (!vehicle) {
+          if (normalizedPlate) missingPlates.add(normalizedPlate);
+          failures.push(`Linha ${lineNumber}: veículo/placa não encontrado.`);
+          continue;
+        }
+        const linkedDriver = !driver ? findLinkedDriverByVehicleId(drivers, vehicle.id) : null;
+        const resolvedFuelType = fuelType || (vehicle.fuelType as FuelFormData["fuelType"]);
+
+        if (!resolvedFuelType) {
           failures.push(`Linha ${lineNumber}: combustível inválido.`);
           continue;
         }
         if (!fuelDate) {
+          const hasCoreValues =
+            Number.isFinite(liters) &&
+            liters > 0 &&
+            Number.isFinite(totalValue) &&
+            totalValue > 0;
+          if (!hasCoreValues) {
+            ignoredCount += 1;
+            continue;
+          }
           failures.push(`Linha ${lineNumber}: data inválida.`);
           continue;
         }
@@ -812,9 +848,9 @@ export function FuelRecordsPage() {
             totalValue,
             km,
             fuelDate,
-            fuelType,
+            fuelType: resolvedFuelType,
             vehicleId: vehicle.id,
-            driverId: driver?.id || null,
+            driverId: driver?.id || linkedDriver?.id || null,
             station:
               String(rowMap.get("nome") || "").trim() || getBranchNameByVehicleId(vehicle.id),
           });
@@ -1296,13 +1332,13 @@ export function FuelRecordsPage() {
                       {record.vehicle ? formatVehicleLabel(record.vehicle) : record.vehicleId}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      {record.driver?.name || "Sem motorista"}
+                      {getRecordDriverName(record)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {formatLocalDate(record.fuelDate)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      {record.fuelType}
+                      {getRecordFuelType(record)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {record.liters.toLocaleString("pt-BR", {

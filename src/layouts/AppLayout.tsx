@@ -167,7 +167,6 @@ export function AppLayout() {
   });
   const [subscriptionStatus, setSubscriptionStatus] =
     useState<SubscriptionStatus | null>(null);
-  const previousPathRef = useRef(location.pathname);
   const companyScopeRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -686,16 +685,6 @@ export function AppLayout() {
     navigate,
     user,
   ]);
-
-  useEffect(() => {
-    const previousPath = previousPathRef.current;
-    if (previousPath !== location.pathname) {
-      previousPathRef.current = location.pathname;
-      window.location.reload();
-      return;
-    }
-    previousPathRef.current = location.pathname;
-  }, [location.pathname]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
