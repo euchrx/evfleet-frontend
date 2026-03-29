@@ -1,5 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import type { Vehicle } from "../../types/vehicle";
+import { useRef } from "react";
+import type { ChangeEvent } from "react";
 import type { Driver } from "../../types/driver";
 import {
   acknowledgeFuelRecordAnomaly,
@@ -19,7 +21,8 @@ import { getDrivers } from "../../services/drivers";
 import { useBranch } from "../../contexts/BranchContext";
 import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import { useLocation } from "react-router-dom";
-import { AlertTriangle, CarFront, Gauge } from "lucide-react";
+import { AlertTriangle, CarFront, FileSpreadsheet, Gauge } from "lucide-react";
+import * as XLSX from "xlsx";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
@@ -59,20 +62,177 @@ function formatMoney(value: string) {
 }
 
 function formatLocalDate(dateValue: string) {
-  const raw = String(dateValue || "").slice(0, 10);
-  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const raw = String(dateValue || "").trim();
+  if (!raw) return "-";
 
-  if (!match) {
-    const fallback = new Date(dateValue);
-    if (Number.isNaN(fallback.getTime())) return "-";
-    return fallback.toLocaleDateString("pt-BR");
+  const isoMatch = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::\d{2})?)?/,
+  );
+  if (isoMatch) {
+    const day = isoMatch[3];
+    const month = isoMatch[2];
+    const year = isoMatch[1];
+    const hour = isoMatch[4] || "00";
+    const minute = isoMatch[5] || "00";
+    return `${day}/${month}/${year} ${hour}:${minute}`;
   }
 
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const localDate = new Date(year, month - 1, day);
-  return localDate.toLocaleDateString("pt-BR");
+  const brMatch = raw.match(
+    /^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::\d{2})?)?/,
+  );
+  if (brMatch) {
+    const day = brMatch[1];
+    const month = brMatch[2];
+    const year = brMatch[3];
+    const hour = brMatch[4] || "00";
+    const minute = brMatch[5] || "00";
+    return `${day}/${month}/${year} ${hour}:${minute}`;
+  }
+
+  const fallback = new Date(raw);
+  if (Number.isNaN(fallback.getTime())) return "-";
+  return fallback.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function normalizeHeader(value: unknown) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function parseNumberValue(value: unknown) {
+  if (typeof value === "number") return value;
+  const normalized = String(value || "")
+    .trim()
+    .replace(/\./g, "")
+    .replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function parseFuelDateValue(dateValue: unknown, timeValue?: unknown) {
+  if (dateValue instanceof Date && !Number.isNaN(dateValue.getTime())) {
+    const y = dateValue.getFullYear();
+    const m = String(dateValue.getMonth() + 1).padStart(2, "0");
+    const d = String(dateValue.getDate()).padStart(2, "0");
+    const { hour, minute } = parseTimeParts(timeValue);
+    return `${y}-${m}-${d}T${hour}:${minute}:00`;
+  }
+
+  if (typeof dateValue === "number") {
+    const parsed = XLSX.SSF.parse_date_code(dateValue);
+    if (parsed) {
+      const y = String(parsed.y).padStart(4, "0");
+      const m = String(parsed.m).padStart(2, "0");
+      const d = String(parsed.d).padStart(2, "0");
+      const { hour, minute } = parseTimeParts(timeValue);
+      return `${y}-${m}-${d}T${hour}:${minute}:00`;
+    }
+  }
+
+  const text = String(dateValue || "").trim();
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const { hour, minute } = parseTimeParts(timeValue);
+    return `${text}T${hour}:${minute}:00`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(text)) {
+    const normalized = text.replace(" ", "T");
+    return normalized.length === 16 ? `${normalized}:00` : normalized;
+  }
+
+  const brMatch = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) {
+    const { hour, minute } = parseTimeParts(timeValue);
+    return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}T${hour}:${minute}:00`;
+  }
+
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return "";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const { hour, minute } = parseTimeParts(timeValue);
+  return `${y}-${m}-${d}T${hour}:${minute}:00`;
+}
+
+function parseTimeParts(value: unknown) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return {
+      hour: String(value.getHours()).padStart(2, "0"),
+      minute: String(value.getMinutes()).padStart(2, "0"),
+    };
+  }
+  if (typeof value === "number") {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed) {
+      return {
+        hour: String(parsed.H || 0).padStart(2, "0"),
+        minute: String(parsed.M || 0).padStart(2, "0"),
+      };
+    }
+  }
+  const text = String(value || "").trim();
+  const match = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (match) {
+    return {
+      hour: String(Number(match[1])).padStart(2, "0"),
+      minute: match[2],
+    };
+  }
+  return { hour: "00", minute: "00" };
+}
+
+function toDateTimeLocalInput(value?: string) {
+  if (!value) return "";
+  const raw = String(value).trim();
+  const iso = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::\d{2})?)?/,
+  );
+  if (iso) {
+    const hh = iso[4] || "00";
+    const mm = iso[5] || "00";
+    return `${iso[1]}-${iso[2]}-${iso[3]}T${hh}:${mm}`;
+  }
+  const br = raw.match(
+    /^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::\d{2})?)?/,
+  );
+  if (br) {
+    const hh = br[4] || "00";
+    const mm = br[5] || "00";
+    return `${br[3]}-${br[2]}-${br[1]}T${hh}:${mm}`;
+  }
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return "";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${d}T${hh}:${mm}`;
+}
+
+function mapFuelType(value: unknown): FuelFormData["fuelType"] {
+  const text = normalizeHeader(value);
+  if (!text) return "";
+  if (text.includes("diesel")) return "DIESEL";
+  if (text.includes("gasolina")) return "GASOLINE";
+  if (text.includes("etanol") || text.includes("alcool")) return "ETHANOL";
+  if (text.includes("flex")) return "FLEX";
+  if (text.includes("eletric")) return "ELECTRIC";
+  if (text.includes("hibrid")) return "HYBRID";
+  if (text.includes("gnv") || text.includes("cng")) return "CNG";
+  return "";
 }
 
 export function FuelRecordsPage() {
@@ -106,8 +266,10 @@ export function FuelRecordsPage() {
   const [editingRecord, setEditingRecord] = useState<FuelRecord | null>(null);
   const [recordToDelete, setRecordToDelete] = useState<FuelRecord | null>(null);
   const [deletingRecord, setDeletingRecord] = useState(false);
+  const [importingXls, setImportingXls] = useState(false);
   const [form, setForm] = useState<FuelFormData>(initialForm);
   const [anomalyRefreshSeed, setAnomalyRefreshSeed] = useState(0);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   function notifyHeaderNotifications() {
     window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
@@ -195,7 +357,7 @@ export function FuelRecordsPage() {
       liters: String(record.liters).replace(".", ","),
       totalValue: String(record.totalValue).replace(".", ","),
       km: String(record.km),
-      fuelDate: record.fuelDate.slice(0, 10),
+      fuelDate: toDateTimeLocalInput(record.fuelDate),
       fuelType: record.fuelType || "DIESEL",
       vehicleId: record.vehicleId,
       driverId: record.driverId || "",
@@ -246,7 +408,7 @@ export function FuelRecordsPage() {
       const nextErrors: FuelFieldErrors = {};
       if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veículo.";
       if (!payload.fuelType) nextErrors.fuelType = "Selecione o combustível.";
-      if (!payload.fuelDate) nextErrors.fuelDate = "Informe a data.";
+      if (!payload.fuelDate) nextErrors.fuelDate = "Informe data e hora.";
       if (Number.isNaN(payload.liters) || payload.liters <= 0) {
         nextErrors.liters = "Informe os litros corretamente.";
       }
@@ -330,6 +492,261 @@ export function FuelRecordsPage() {
       setPageErrorMessage("Não foi possível excluir o abastecimento.");
     } finally {
       setDeletingRecord(false);
+    }
+  }
+
+  function openImportXlsPicker() {
+    if (importingXls) return;
+    importInputRef.current?.click();
+  }
+
+  async function handleImportXls(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImportingXls(true);
+      setPageErrorMessage("");
+
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        setPageErrorMessage("Arquivo XLS sem planilhas válidas.");
+        return;
+      }
+
+      const sheet = workbook.Sheets[firstSheetName];
+      const matrix = XLSX.utils.sheet_to_json<(string | number | Date)[]>(sheet, {
+        header: 1,
+        defval: "",
+        raw: true,
+      });
+
+      if (matrix.length === 0) {
+        setPageErrorMessage("Nenhuma linha encontrada no arquivo XLS.");
+        return;
+      }
+
+      const detectedHeaderIndex = matrix.findIndex((row) => {
+        const normalized = row.map((cell) => normalizeHeader(cell));
+        return (
+          normalized.includes("hora") &&
+          normalized.includes("placa") &&
+          (normalized.includes("odometro") || normalized.includes("odometro"))
+        );
+      });
+
+      let rows: Array<Record<string, unknown>> = [];
+
+      if (detectedHeaderIndex >= 0) {
+        const headerRow = matrix[detectedHeaderIndex];
+        const indexByHeader = new Map<string, number>();
+        headerRow.forEach((cell, cellIndex) => {
+          const key = normalizeHeader(cell);
+          if (!key) return;
+          indexByHeader.set(key, cellIndex);
+        });
+
+        const hourIndex = indexByHeader.get("hora") ?? -1;
+        const dateHeaderIndex = indexByHeader.get("data") ?? -1;
+        let inferredDateIndex = dateHeaderIndex;
+        if (inferredDateIndex < 0 && hourIndex >= 0) {
+          const sampleDataRow = matrix[detectedHeaderIndex + 1] || [];
+          for (let i = 0; i < hourIndex; i += 1) {
+            if (String(sampleDataRow[i] || "").trim()) {
+              inferredDateIndex = i;
+              break;
+            }
+          }
+        }
+
+        rows = matrix
+          .slice(detectedHeaderIndex + 1)
+          .filter((row) =>
+            row.some((cell) => String(cell || "").trim().length > 0),
+          )
+          .map((row) => ({
+            data:
+              inferredDateIndex >= 0
+                ? row[inferredDateIndex]
+                : "",
+            hora: hourIndex >= 0 ? row[hourIndex] : "",
+            nota:
+              (indexByHeader.get("nota") ?? -1) >= 0
+                ? row[indexByHeader.get("nota") as number]
+                : "",
+            nome:
+              (indexByHeader.get("nome") ?? -1) >= 0
+                ? row[indexByHeader.get("nome") as number]
+                : "",
+            valor:
+              (indexByHeader.get("valor") ?? -1) >= 0
+                ? row[indexByHeader.get("valor") as number]
+                : "",
+            litros:
+              (indexByHeader.get("litros") ?? -1) >= 0
+                ? row[indexByHeader.get("litros") as number]
+                : "",
+            motorista:
+              (indexByHeader.get("motorista") ?? -1) >= 0
+                ? row[indexByHeader.get("motorista") as number]
+                : "",
+            placa:
+              (indexByHeader.get("placa") ?? -1) >= 0
+                ? row[indexByHeader.get("placa") as number]
+                : "",
+            odometro:
+              (indexByHeader.get("odometro") ?? -1) >= 0
+                ? row[indexByHeader.get("odometro") as number]
+                : "",
+          }));
+      } else {
+        rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+          defval: "",
+        });
+      }
+
+      if (rows.length === 0) {
+        setPageErrorMessage("Nenhum registro válido encontrado no arquivo XLS.");
+        return;
+      }
+
+      let createdCount = 0;
+      const failures: string[] = [];
+
+      for (let index = 0; index < rows.length; index += 1) {
+        const row = rows[index];
+        const rowMap = new Map<string, unknown>();
+        for (const [key, value] of Object.entries(row)) {
+          rowMap.set(normalizeHeader(key), value);
+        }
+
+        const plateRaw =
+          rowMap.get("placa") ||
+          rowMap.get("veiculo") ||
+          rowMap.get("veiculoid") ||
+          rowMap.get("vehicle") ||
+          rowMap.get("carro");
+        const plate = String(plateRaw || "").trim().toUpperCase();
+        const vehicle =
+          vehicles.find((item) => item.plate.toUpperCase() === plate) ||
+          vehicles.find((item) =>
+            formatVehicleLabel(item).toUpperCase().includes(plate.toUpperCase()),
+          );
+
+        if (!vehicle) {
+          failures.push(`Linha ${index + 2}: veículo/placa não encontrado.`);
+          continue;
+        }
+
+        const driverNameRaw =
+          rowMap.get("motorista") || rowMap.get("driver") || rowMap.get("condutor");
+        const driverName = String(driverNameRaw || "").trim();
+        const driver = driverName
+          ? drivers.find(
+              (item) =>
+                item.name.trim().toLowerCase() === driverName.toLowerCase(),
+            )
+          : null;
+
+        const liters = parseNumberValue(
+          rowMap.get("litros") || rowMap.get("litro"),
+        );
+        const totalValue = parseNumberValue(
+          rowMap.get("valortotal") ||
+            rowMap.get("valor") ||
+            rowMap.get("total") ||
+            rowMap.get("valorabastecido"),
+        );
+        const km = parseNumberValue(
+          rowMap.get("km") ||
+            rowMap.get("odometro") ||
+            rowMap.get("quilometragem"),
+        );
+        const fuelDate = parseFuelDateValue(
+          rowMap.get("data") || rowMap.get("fueldate") || rowMap.get("dataabastecimento"),
+          rowMap.get("hora"),
+        );
+        const fuelType = mapFuelType(
+          rowMap.get("combustivel") || rowMap.get("tipocombustivel") || rowMap.get("fueltype"),
+        ) || (vehicle.fuelType as FuelFormData["fuelType"]);
+
+        if (!fuelType) {
+          failures.push(`Linha ${index + 2}: combustível inválido.`);
+          continue;
+        }
+        if (!fuelDate) {
+          failures.push(`Linha ${index + 2}: data inválida.`);
+          continue;
+        }
+        if (Number.isNaN(liters) || liters <= 0) {
+          failures.push(`Linha ${index + 2}: litros inválidos.`);
+          continue;
+        }
+        if (Number.isNaN(totalValue) || totalValue <= 0) {
+          failures.push(`Linha ${index + 2}: valor total inválido.`);
+          continue;
+        }
+        if (Number.isNaN(km) || km < 0) {
+          failures.push(`Linha ${index + 2}: KM inválido.`);
+          continue;
+        }
+
+        try {
+          await createFuelRecord({
+            liters,
+            totalValue,
+            km,
+            fuelDate,
+            fuelType,
+            vehicleId: vehicle.id,
+            driverId: driver?.id || null,
+            station:
+              String(rowMap.get("nome") || "").trim() || getBranchNameByVehicleId(vehicle.id),
+          });
+          createdCount += 1;
+        } catch (error: any) {
+          const apiMessage =
+            error?.response?.data?.message ||
+            error?.response?.data?.error ||
+            error?.message ||
+            "falha ao importar";
+          const text = Array.isArray(apiMessage)
+            ? apiMessage.join(", ")
+            : String(apiMessage);
+          failures.push(`Linha ${index + 2}: ${text}`);
+        }
+      }
+
+      await loadData();
+      notifyHeaderNotifications();
+
+      if (createdCount > 0 && failures.length === 0) {
+        setPageErrorMessage(
+          `Importação concluída com sucesso. ${createdCount} abastecimento(s) cadastrado(s).`,
+        );
+        return;
+      }
+
+      if (createdCount > 0 && failures.length > 0) {
+        setPageErrorMessage(
+          `Importação parcial. Sucesso: ${createdCount}. Falhas: ${failures.length}. ${failures
+            .slice(0, 3)
+            .join(" | ")}`,
+        );
+        return;
+      }
+
+      setPageErrorMessage(
+        `Nenhum abastecimento importado. ${failures.slice(0, 3).join(" | ")}`,
+      );
+    } catch (error) {
+      console.error("Erro ao importar XLS:", error);
+      setPageErrorMessage("Não foi possível processar o arquivo XLS.");
+    } finally {
+      setImportingXls(false);
+      if (importInputRef.current) importInputRef.current.value = "";
     }
   }
 
@@ -573,13 +990,32 @@ export function FuelRecordsPage() {
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
-        >
-          + Cadastrar abastecimento
-        </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <button
+            type="button"
+            onClick={openImportXlsPicker}
+            disabled={importingXls}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+          >
+            <FileSpreadsheet size={16} />
+            {importingXls ? "Importando..." : "Importar XLS"}
+          </button>
+          <button
+            onClick={openCreateModal}
+            className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
+          >
+            + Cadastrar abastecimento
+          </button>
+        </div>
       </div>
+
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".xls,.xlsx"
+        className="hidden"
+        onChange={handleImportXls}
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -631,7 +1067,7 @@ export function FuelRecordsPage() {
                   <button type="button" onClick={() => handleSort("driver")} className="cursor-pointer">Motorista {getSortArrow("driver")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <button type="button" onClick={() => handleSort("fuelDate")} className="cursor-pointer">Data {getSortArrow("fuelDate")}</button>
+                  <button type="button" onClick={() => handleSort("fuelDate")} className="cursor-pointer">Data e Hora {getSortArrow("fuelDate")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button type="button" onClick={() => handleSort("fuelType")} className="cursor-pointer">Combustível {getSortArrow("fuelType")}</button>
@@ -916,10 +1352,10 @@ export function FuelRecordsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700">
-                    Data
+                    Data e Hora
                   </label>
                   <input
-                    type="date"
+                    type="datetime-local"
                     value={form.fuelDate}
                     onChange={(e) => handleChange("fuelDate", e.target.value)}
                     className={inputClass("fuelDate")}
