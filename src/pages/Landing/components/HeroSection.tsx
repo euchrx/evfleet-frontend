@@ -14,15 +14,15 @@ export function HeroSection({ productName }: HeroSectionProps) {
         <div className="min-w-0">
           <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-orange-200">
             <Zap size={14} />
-            SaaS para frotas elétricas
+            SaaS para gestão de frota
           </span>
 
           <h1 className="mt-4 text-2xl font-bold leading-tight sm:text-4xl lg:text-5xl">
-            Reduza custos e opere sua frota elétrica com controle total.
+            Reduza custos e opere sua frota com controle total.
           </h1>
 
           <p className="mt-4 max-w-2xl text-sm text-slate-200 sm:text-base">
-            O {productName} centraliza abastecimento elétrico, manutenção, viagens,
+            O {productName} centraliza abastecimentos, manutenção, viagens,
             débitos e indicadores financeiros em uma única plataforma moderna para
             gestores de operação e times executivos.
           </p>

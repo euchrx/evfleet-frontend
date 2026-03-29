@@ -14,7 +14,8 @@ import { ProblemSolutionSection } from "./components/ProblemSolutionSection";
 
 export function LandingPage() {
   const softwareSettings = readSoftwareSettings();
-  const productName = softwareSettings.companyName?.trim() || defaultSoftwareSettings.companyName;
+  const productName =
+    softwareSettings.companyName?.trim() || defaultSoftwareSettings.companyName;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900">
@@ -30,13 +31,22 @@ export function LandingPage() {
           </Link>
 
           <nav className="hidden items-center gap-4 md:flex">
-            <a href="#funcionalidades" className="text-sm font-medium text-slate-600 transition hover:text-slate-900">
+            <a
+              href="#funcionalidades"
+              className="text-sm font-medium text-slate-600 transition hover:text-slate-900"
+            >
               Funcionalidades
             </a>
-            <a href="#beneficios" className="text-sm font-medium text-slate-600 transition hover:text-slate-900">
+            <a
+              href="#beneficios"
+              className="text-sm font-medium text-slate-600 transition hover:text-slate-900"
+            >
               Benefícios
             </a>
-            <a href="#preview" className="text-sm font-medium text-slate-600 transition hover:text-slate-900">
+            <a
+              href="#preview"
+              className="text-sm font-medium text-slate-600 transition hover:text-slate-900"
+            >
               Preview
             </a>
           </nav>
@@ -68,8 +78,11 @@ export function LandingPage() {
 
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <p>© {new Date().getFullYear()} {productName}. Todos os direitos reservados.</p>
-          <p>Gestão de frota elétrica com foco em eficiência, controle e escala.</p>
+          <p>
+            © {new Date().getFullYear()} {productName}. Todos os direitos
+            reservados.
+          </p>
+          <p>Gestão de frota com foco em eficiência, controle e escala.</p>
         </div>
       </footer>
     </div>

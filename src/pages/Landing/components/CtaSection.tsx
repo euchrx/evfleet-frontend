@@ -6,10 +6,10 @@ export function CtaSection() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">
-            Pronto para elevar a gestão da sua frota elétrica?
+            Pronto para elevar a gestão da sua frota?
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-700">
-            Comece agora com uma plataforma orientada a performance operacional,
+            Comece agora com uma plataforma orientada à performance operacional,
             custos controlados e visibilidade completa para o seu negócio.
           </p>
         </div>

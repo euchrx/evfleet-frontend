@@ -13,7 +13,7 @@ const features = [
     icon: BarChart3,
     title: "Dashboard executivo em tempo real",
     description:
-      "Acompanhe custos, ativos, rankings e indicadores chave em poucos cliques.",
+      "Acompanhe custos, ativos, rankings e indicadores-chave em poucos cliques.",
   },
   {
     icon: Wrench,
@@ -51,9 +51,11 @@ export function FeaturesSection() {
   return (
     <section>
       <div className="mb-5">
-        <h2 className="text-2xl font-bold text-slate-900">Funcionalidades que aceleram a operação</h2>
+        <h2 className="text-2xl font-bold text-slate-900">
+          Funcionalidades que aceleram a operação
+        </h2>
         <p className="mt-2 max-w-3xl text-sm text-slate-600">
-          Tudo o que um gestor de frota elétrica precisa para reduzir retrabalho,
+          Tudo o que um gestor de frota precisa para reduzir retrabalho,
           aumentar previsibilidade e tomar decisões com dados confiáveis.
         </p>
       </div>
@@ -67,7 +69,9 @@ export function FeaturesSection() {
             <div className="mb-3 inline-flex rounded-xl bg-orange-100 p-2 text-orange-600">
               <feature.icon size={18} />
             </div>
-            <h3 className="text-base font-semibold text-slate-900">{feature.title}</h3>
+            <h3 className="text-base font-semibold text-slate-900">
+              {feature.title}
+            </h3>
             <p className="mt-2 text-sm text-slate-600">{feature.description}</p>
           </article>
         ))}
