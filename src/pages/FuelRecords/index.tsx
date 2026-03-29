@@ -27,6 +27,7 @@ import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
+import { formatFuelTypeLabel } from "../../utils/fuelTypeLabel";
 
 type FuelFormData = {
   liters: string;
@@ -292,18 +293,6 @@ function mapFuelType(value: unknown): FuelFormData["fuelType"] {
   if (text.includes("hibrid")) return "HYBRID";
   if (text.includes("gnv") || text.includes("cng")) return "CNG";
   return "";
-}
-
-function formatFuelTypeLabel(value?: FuelFormData["fuelType"] | string | null) {
-  const fuelType = String(value || "").toUpperCase();
-  if (fuelType === "GASOLINE") return "Gasolina";
-  if (fuelType === "ETHANOL") return "Etanol";
-  if (fuelType === "DIESEL") return "Diesel";
-  if (fuelType === "FLEX") return "Flex";
-  if (fuelType === "ELECTRIC") return "Elétrico";
-  if (fuelType === "HYBRID") return "Híbrido";
-  if (fuelType === "CNG") return "GNV";
-  return value || "-";
 }
 
 export function FuelRecordsPage() {
@@ -778,6 +767,14 @@ export function FuelRecordsPage() {
           }
         }
         const normalizedPlate = normalizePlate(plate || fallbackDetectedPlate);
+        const preFuelDate = parseFuelDateValue(
+          rowMap.get("data") || rowMap.get("fueldate") || rowMap.get("dataabastecimento"),
+          rowMap.get("hora"),
+        );
+        if (!preFuelDate) {
+          ignoredCount += 1;
+          continue;
+        }
 
         const driverNameRaw =
           rowMap.get("motorista") || rowMap.get("driver") || rowMap.get("condutor");
@@ -803,10 +800,7 @@ export function FuelRecordsPage() {
             rowMap.get("odometro") ||
             rowMap.get("quilometragem"),
         );
-        const fuelDate = parseFuelDateValue(
-          rowMap.get("data") || rowMap.get("fueldate") || rowMap.get("dataabastecimento"),
-          rowMap.get("hora"),
-        );
+        const fuelDate = preFuelDate;
         const fuelType = mapFuelType(
           rowMap.get("combustivel") || rowMap.get("tipocombustivel") || rowMap.get("fueltype"),
         );

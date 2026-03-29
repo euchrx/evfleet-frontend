@@ -11,6 +11,7 @@ import {
 import type { Vehicle } from "../../types/vehicle";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
+import { formatFuelTypeLabel } from "../../utils/fuelTypeLabel";
 
 type RegisterForm = {
   recordId?: string;
@@ -403,7 +404,7 @@ export function MaintenanceRegisterPage() {
                 </p>
                 <p>
                   <span className="font-semibold text-slate-900">Combustível:</span>{" "}
-                  {selectedVehicle.fuelType || "-"}
+                  {formatFuelTypeLabel(selectedVehicle.fuelType)}
                 </p>
               </div>
             ) : (
