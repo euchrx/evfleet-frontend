@@ -79,6 +79,11 @@ function formatDateOnly(iso: string) {
   return date.toLocaleDateString("pt-BR");
 }
 
+function formatLogEndpoint(endpoint: string) {
+  if (endpoint === "/administration/updates") return "/system/logs/manual";
+  return endpoint;
+}
+
 function parseLocalDate(value: string) {
   const raw = String(value || "").slice(0, 10);
   const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -133,6 +138,10 @@ export function AppLayout() {
   const [companyName, setCompanyName] = useState(() => {
     const saved = readSoftwareSettings().companyName?.trim();
     return saved || defaultSoftwareSettings.companyName;
+  });
+  const [systemVersion, setSystemVersion] = useState(() => {
+    const saved = readSoftwareSettings().systemVersion?.trim();
+    return saved || defaultSoftwareSettings.systemVersion;
   });
   const [subscriptionStatus, setSubscriptionStatus] =
     useState<SubscriptionStatus | null>(null);
@@ -556,8 +565,11 @@ export function AppLayout() {
 
   useEffect(() => {
     function refreshSoftwareSettings() {
-      const saved = readSoftwareSettings().companyName?.trim();
-      setCompanyName(saved || defaultSoftwareSettings.companyName);
+      const nextSettings = readSoftwareSettings();
+      const savedCompanyName = nextSettings.companyName?.trim();
+      const savedVersion = nextSettings.systemVersion?.trim();
+      setCompanyName(savedCompanyName || defaultSoftwareSettings.companyName);
+      setSystemVersion(savedVersion || defaultSoftwareSettings.systemVersion);
     }
 
     window.addEventListener(
@@ -695,7 +707,7 @@ export function AppLayout() {
               Ambiente
             </p>
             <p className="mt-1 text-sm font-medium text-slate-200">
-              {companyName} v1.0
+              {companyName} {systemVersion}
             </p>
           </button>
         </div>
@@ -917,7 +929,7 @@ export function AppLayout() {
                 <p className="text-sm text-slate-600">
                   Nome do sistema: {companyName}
                 </p>
-                <p className="text-sm text-slate-600">Versão atual: v1.0</p>
+                <p className="text-sm text-slate-600">Versão atual: {systemVersion}</p>
               </div>
               <ClipboardList size={22} className="text-orange-600" />
             </div>
@@ -937,14 +949,19 @@ export function AppLayout() {
                       key={log.id}
                       className="rounded-lg border border-slate-200 bg-white px-3 py-2"
                     >
-                      <p className="text-sm font-semibold text-slate-800">
-                        {log.action}
-                      </p>
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-slate-800">
+                          {log.action}
+                        </p>
+                        <span className="shrink-0 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700">
+                          {log.version || systemVersion}
+                        </span>
+                      </div>
                       <p className="text-xs text-slate-500">
                         {formatDateTime(log.timestamp)} - {log.actor}
                       </p>
                       <p className="text-xs text-slate-600">
-                        {log.endpoint}
+                        {formatLogEndpoint(log.endpoint)}
                         {log.details ? ` - ${log.details}` : ""}
                       </p>
                     </div>

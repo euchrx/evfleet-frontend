@@ -1,5 +1,6 @@
 export type SoftwareSettings = {
   companyName: string;
+  systemVersion: string;
   timezone: string;
   language: string;
   currency: string;
@@ -20,6 +21,7 @@ export const ADMIN_SETTINGS_STORAGE_KEY = "evfleet_admin_settings_v1";
 
 export const defaultSoftwareSettings: SoftwareSettings = {
   companyName: "EvFleet",
+  systemVersion: "v1.0",
   timezone: "America/Sao_Paulo",
   language: "pt-BR",
   currency: "BRL",

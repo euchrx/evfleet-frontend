@@ -23,6 +23,7 @@ export function AdministrationPage() {
   const [saveMessage, setSaveMessage] = useState("");
   const [updateTitle, setUpdateTitle] = useState("");
   const [updateMessage, setUpdateMessage] = useState("");
+  const [updateActor, setUpdateActor] = useState("");
   const [updateFeedback, setUpdateFeedback] = useState("");
   const [resettingAll, setResettingAll] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -33,6 +34,12 @@ export function AdministrationPage() {
     setSettings(readSoftwareSettings());
     fetchMenuVisibilityMap().then(setMenuVisibility);
   }, []);
+
+  function normalizeVersionInput(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    return /^v/i.test(trimmed) ? trimmed : `v${trimmed}`;
+  }
 
   function handleChange<K extends keyof SoftwareSettings>(field: K, value: SoftwareSettings[K]) {
     setSettings((prev) => ({ ...prev, [field]: value }));
@@ -91,13 +98,16 @@ export function AdministrationPage() {
     addSystemLog({
       method: "MANUAL",
       action: title,
-      endpoint: "/administration/updates",
+      endpoint: "/system/logs/manual",
       status: "INFO",
       details: message,
+      actor: updateActor.trim() || undefined,
+      version: settings.systemVersion,
     });
 
     setUpdateTitle("");
     setUpdateMessage("");
+    setUpdateActor("");
     setUpdateFeedback("Atualização registrada no system logs.");
     window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
     window.setTimeout(() => setUpdateFeedback(""), 2500);
@@ -292,6 +302,30 @@ export function AdministrationPage() {
               value={updateTitle}
               onChange={(e) => setUpdateTitle(e.target.value)}
               placeholder="Ex: Melhorias na tela de manutenção"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-sm font-medium text-slate-700">Quem implementou</span>
+            <input
+              value={updateActor}
+              onChange={(e) => setUpdateActor(e.target.value)}
+              placeholder="Ex: Christian Evangelista"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-sm font-medium text-slate-700">Versão do sistema</span>
+            <input
+              value={settings.systemVersion}
+              onChange={(e) => handleChange("systemVersion", normalizeVersionInput(e.target.value))}
+              onBlur={(e) =>
+                handleChange(
+                  "systemVersion",
+                  normalizeVersionInput(e.target.value) || defaultSoftwareSettings.systemVersion,
+                )
+              }
+              placeholder="Ex: 1.1"
               className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
           </label>

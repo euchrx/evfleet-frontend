@@ -4,6 +4,7 @@ export type SystemLogEntry = {
   id: string;
   timestamp: string;
   actor: string;
+  version?: string;
   method: string;
   action: string;
   endpoint: string;
@@ -42,6 +43,7 @@ export function addSystemLog(
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
     actor: input.actor?.trim() || resolveActor(),
+    version: input.version,
     method: input.method,
     action: input.action,
     endpoint: input.endpoint,
