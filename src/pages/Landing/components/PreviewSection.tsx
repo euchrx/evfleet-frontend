@@ -58,7 +58,7 @@ export function PreviewSection() {
           </div>
 
           <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
-            <table className="min-w-full text-sm">
+            <table className="min-w-[680px] text-sm">
               <thead className="border-b border-slate-200 bg-slate-50">
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Veículo</th>

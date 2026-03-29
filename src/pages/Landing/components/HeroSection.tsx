@@ -11,13 +11,13 @@ export function HeroSection({ productName }: HeroSectionProps) {
       <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-blue-500/20 blur-3xl" />
 
       <div className="relative grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-orange-200">
+        <div className="min-w-0">
+          <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-orange-200">
             <Zap size={14} />
             SaaS para frotas elétricas
           </span>
 
-          <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">
+          <h1 className="mt-4 text-2xl font-bold leading-tight sm:text-4xl lg:text-5xl">
             Reduza custos e opere sua frota elétrica com controle total.
           </h1>
 
@@ -30,14 +30,14 @@ export function HeroSection({ productName }: HeroSectionProps) {
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <a
               href="/login"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
             >
               Acessar plataforma
               <ArrowRight size={16} />
             </a>
             <a
               href="#preview"
-              className="inline-flex items-center justify-center rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/20"
+              className="inline-flex w-full items-center justify-center rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/20 sm:w-auto"
             >
               Ver preview do sistema
             </a>

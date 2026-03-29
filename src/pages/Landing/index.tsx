@@ -17,14 +17,16 @@ export function LandingPage() {
   const productName = softwareSettings.companyName?.trim() || defaultSoftwareSettings.companyName;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <Link to="/landing" className="inline-flex items-center gap-2">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500 text-white">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6 lg:px-8">
+          <Link to="/landing" className="inline-flex min-w-0 items-center gap-2">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white">
               <Building2 size={18} />
             </span>
-            <span className="text-lg font-bold text-slate-900">{productName}</span>
+            <span className="truncate text-base font-bold text-slate-900 sm:text-lg">
+              {productName}
+            </span>
           </Link>
 
           <nav className="hidden items-center gap-4 md:flex">
@@ -41,10 +43,11 @@ export function LandingPage() {
 
           <Link
             to="/login"
-            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-orange-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 sm:px-4"
+            aria-label="Entrar"
           >
             <LogIn size={16} />
-            Entrar
+            <span className="hidden sm:inline">Entrar</span>
           </Link>
         </div>
       </header>
