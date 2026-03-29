@@ -1,5 +1,6 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AppLayout } from "../layouts/AppLayout";
+import { LandingPage } from "../pages/Landing";
 import { DashboardPage } from "../pages/Dashboard";
 import { LoginPage } from "../pages/Login";
 import { UsersPage } from "../pages/Users";
@@ -25,7 +26,8 @@ export function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
 
         <Route element={<PrivateRoute />}>

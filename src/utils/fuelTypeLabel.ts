@@ -5,13 +5,13 @@ export function formatFuelTypeLabel(value?: string | null) {
     .replace(/\s+/g, "_")
     .replace(/-/g, "_");
 
-  if (fuelType === "GASOLINE") return "Gasolina";
-  if (fuelType === "ETHANOL") return "Etanol";
-  if (fuelType === "DIESEL") return "Diesel";
-  if (fuelType === "FLEX") return "Flex";
-  if (fuelType === "ELECTRIC") return "Elétrico";
-  if (fuelType === "HYBRID") return "Híbrido";
+  if (fuelType === "GASOLINE") return "GASOLINA";
+  if (fuelType === "ETHANOL") return "ETANOL";
+  if (fuelType === "DIESEL") return "DIESEL";
+  if (fuelType === "FLEX") return "FLEX";
+  if (fuelType === "ELECTRIC") return "ELÉTRICO";
+  if (fuelType === "HYBRID") return "HÍBRIDO";
   if (fuelType === "CNG") return "GNV";
 
-  return value || "-";
+  return String(value || "-").toUpperCase();
 }
