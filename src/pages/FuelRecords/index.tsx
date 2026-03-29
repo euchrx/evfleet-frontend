@@ -116,7 +116,7 @@ function normalizePlate(value: unknown) {
     .replace(/[^A-Z0-9]/g, "");
 }
 
-function extractPlateCandidate(value: unknown) {
+function extractPlateCandidate(value: unknown, options?: { allowLoose?: boolean }) {
   const text = String(value || "").toUpperCase();
   if (!text.trim()) return "";
 
@@ -128,7 +128,15 @@ function extractPlateCandidate(value: unknown) {
   const antigo = compact.match(/[A-Z]{3}[0-9]{4}/);
   if (antigo) return antigo[0];
 
-  return compact;
+  if (options?.allowLoose) {
+    const hasLetters = /[A-Z]/.test(compact);
+    const hasNumbers = /[0-9]/.test(compact);
+    if (hasLetters && hasNumbers && compact.length >= 7 && compact.length <= 8) {
+      return compact;
+    }
+  }
+
+  return "";
 }
 
 function findVehicleByPlateCandidate(vehicles: Vehicle[], candidate: string) {
@@ -284,6 +292,18 @@ function mapFuelType(value: unknown): FuelFormData["fuelType"] {
   if (text.includes("hibrid")) return "HYBRID";
   if (text.includes("gnv") || text.includes("cng")) return "CNG";
   return "";
+}
+
+function formatFuelTypeLabel(value?: FuelFormData["fuelType"] | string | null) {
+  const fuelType = String(value || "").toUpperCase();
+  if (fuelType === "GASOLINE") return "Gasolina";
+  if (fuelType === "ETHANOL") return "Etanol";
+  if (fuelType === "DIESEL") return "Diesel";
+  if (fuelType === "FLEX") return "Flex";
+  if (fuelType === "ELECTRIC") return "Elétrico";
+  if (fuelType === "HYBRID") return "Híbrido";
+  if (fuelType === "CNG") return "GNV";
+  return value || "-";
 }
 
 export function FuelRecordsPage() {
@@ -745,13 +765,13 @@ export function FuelRecordsPage() {
           rowMap.get("veiculoid") ||
           rowMap.get("vehicle") ||
           rowMap.get("carro");
-        const plate = extractPlateCandidate(plateRaw);
+        const plate = extractPlateCandidate(plateRaw, { allowLoose: true });
 
         let fallbackDetectedPlate = "";
         if (!plate) {
           for (const value of rowMap.values()) {
-            const candidate = extractPlateCandidate(value);
-            if (candidate.length >= 7) {
+            const candidate = extractPlateCandidate(value, { allowLoose: false });
+            if (candidate) {
               fallbackDetectedPlate = candidate;
               break;
             }
@@ -1345,7 +1365,7 @@ export function FuelRecordsPage() {
                       {formatLocalDate(record.fuelDate)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      {getRecordFuelType(record)}
+                      {formatFuelTypeLabel(getRecordFuelType(record))}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {record.liters.toLocaleString("pt-BR", {
