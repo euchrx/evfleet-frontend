@@ -14,6 +14,7 @@ export type SystemLogEntry = {
 
 const STORAGE_KEY = "evfleet_system_logs_v1";
 const MAX_LOGS = 1500;
+export const SYSTEM_LOGS_UPDATED_EVENT = "evfleet-system-logs-updated";
 
 function readLogs(): SystemLogEntry[] {
   try {
@@ -29,6 +30,9 @@ function readLogs(): SystemLogEntry[] {
 
 function writeLogs(logs: SystemLogEntry[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(logs.slice(0, MAX_LOGS)));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(SYSTEM_LOGS_UPDATED_EVENT));
+  }
 }
 
 function resolveActor() {
@@ -85,4 +89,7 @@ export function deleteSystemLog(id: string) {
 
 export function clearSystemLogs() {
   localStorage.removeItem(STORAGE_KEY);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(SYSTEM_LOGS_UPDATED_EVENT));
+  }
 }

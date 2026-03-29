@@ -31,6 +31,7 @@ import { useCompanyScope } from "../contexts/CompanyScopeContext";
 import {
   deleteSystemLog,
   getSystemLogs,
+  SYSTEM_LOGS_UPDATED_EVENT,
   updateSystemLog,
   type SystemLogEntry,
 } from "../services/systemLogs";
@@ -84,6 +85,21 @@ function formatDateOnly(iso: string) {
   return date.toLocaleDateString("pt-BR");
 }
 
+function normalizeVersionLabel(value?: string) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return /^v/i.test(text) ? text : `v${text}`;
+}
+
+function getLatestVersionFromLogs(logs: SystemLogEntry[]) {
+  const latestManualWithVersion = [...logs]
+    .filter((log) => String(log.method || "").toUpperCase() === "MANUAL")
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .find((log) => normalizeVersionLabel(log.version));
+
+  return normalizeVersionLabel(latestManualWithVersion?.version);
+}
+
 function parseLocalDate(value: string) {
   const raw = String(value || "").slice(0, 10);
   const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -129,7 +145,7 @@ export function AppLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCompanyScopeOpen, setIsCompanyScopeOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>([]);
+  const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>(() => getSystemLogs());
   const [editingLog, setEditingLog] = useState<SystemLogEntry | null>(null);
   const [editingLogAction, setEditingLogAction] = useState("");
   const [editingLogActor, setEditingLogActor] = useState("");
@@ -284,6 +300,10 @@ export function AppLayout() {
         .slice(0, 20),
     [systemLogs],
   );
+  const effectiveSystemVersion = useMemo(
+    () => getLatestVersionFromLogs(systemLogs) || normalizeVersionLabel(systemVersion) || "v1.0",
+    [systemLogs, systemVersion],
+  );
   const initial = user?.name?.charAt(0).toUpperCase() || "U";
 
   function handleCompanyScopeChange(nextCompanyId: string) {
@@ -310,7 +330,7 @@ export function AppLayout() {
     setEditingLog(log);
     setEditingLogAction(log.action || "");
     setEditingLogActor(log.actor || "");
-    setEditingLogVersion(log.version || systemVersion);
+    setEditingLogVersion(normalizeVersionLabel(log.version) || effectiveSystemVersion);
     setEditingLogDetails(log.details || "");
   }
 
@@ -321,7 +341,7 @@ export function AppLayout() {
     updateSystemLog(editingLog.id, {
       action: editingLogAction.trim(),
       actor: editingLogActor.trim() || "Sistema",
-      version: editingLogVersion.trim() || systemVersion,
+      version: normalizeVersionLabel(editingLogVersion) || effectiveSystemVersion,
       details: editingLogDetails.trim(),
     });
 
@@ -621,6 +641,19 @@ export function AppLayout() {
   }, []);
 
   useEffect(() => {
+    function refreshSystemLogs() {
+      setSystemLogs(getSystemLogs());
+    }
+
+    window.addEventListener(SYSTEM_LOGS_UPDATED_EVENT, refreshSystemLogs);
+    window.addEventListener("storage", refreshSystemLogs);
+    return () => {
+      window.removeEventListener(SYSTEM_LOGS_UPDATED_EVENT, refreshSystemLogs);
+      window.removeEventListener("storage", refreshSystemLogs);
+    };
+  }, []);
+
+  useEffect(() => {
     if (isLoadingMenuVisibility) return;
     if (!user) return;
     if (location.pathname === "/login") return;
@@ -743,7 +776,7 @@ export function AppLayout() {
               Ambiente
             </p>
             <p className="mt-1 text-sm font-medium text-slate-200">
-              {companyName} {systemVersion}
+              {companyName} {effectiveSystemVersion}
             </p>
           </button>
         </div>
@@ -965,7 +998,7 @@ export function AppLayout() {
                 <p className="text-sm text-slate-600">
                   Nome do sistema: {companyName}
                 </p>
-                <p className="text-sm text-slate-600">Versão atual: {systemVersion}</p>
+                <p className="text-sm text-slate-600">Versão atual: {effectiveSystemVersion}</p>
               </div>
               <ClipboardList size={22} className="text-orange-600" />
             </div>
@@ -990,7 +1023,7 @@ export function AppLayout() {
                           {log.action}
                         </p>
                         <span className="shrink-0 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700">
-                          {log.version || systemVersion}
+                          {normalizeVersionLabel(log.version) || effectiveSystemVersion}
                         </span>
                       </div>
                       <p className="text-xs text-slate-500">
