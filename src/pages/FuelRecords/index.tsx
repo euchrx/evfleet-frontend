@@ -309,6 +309,9 @@ export function FuelRecordsPage() {
   const [editingRecord, setEditingRecord] = useState<FuelRecord | null>(null);
   const [recordToDelete, setRecordToDelete] = useState<FuelRecord | null>(null);
   const [deletingRecord, setDeletingRecord] = useState(false);
+  const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
+  const [deletingSelectedRecords, setDeletingSelectedRecords] = useState(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [importingXls, setImportingXls] = useState(false);
   const [form, setForm] = useState<FuelFormData>(initialForm);
   const [anomalyRefreshSeed, setAnomalyRefreshSeed] = useState(0);
@@ -535,6 +538,39 @@ export function FuelRecordsPage() {
       setPageErrorMessage("Não foi possível excluir o abastecimento.");
     } finally {
       setDeletingRecord(false);
+    }
+  }
+
+  async function confirmDeleteSelectedRecords() {
+    if (selectedRecordIds.length === 0) return;
+
+    try {
+      setDeletingSelectedRecords(true);
+      setPageErrorMessage("");
+
+      const results = await Promise.allSettled(
+        selectedRecordIds.map((id) => deleteFuelRecord(id)),
+      );
+      const successCount = results.filter((result) => result.status === "fulfilled").length;
+      const failCount = results.length - successCount;
+
+      setSelectedRecordIds([]);
+      await loadData();
+      notifyHeaderNotifications();
+
+      if (failCount > 0) {
+        setPageErrorMessage(
+          `Exclusão parcial. Registros removidos: ${successCount}. Falhas: ${failCount}.`,
+        );
+        return;
+      }
+
+      setPageErrorMessage(`${successCount} abastecimento(s) excluído(s) com sucesso.`);
+    } catch (error) {
+      console.error("Erro ao excluir abastecimentos selecionados:", error);
+      setPageErrorMessage("Não foi possível excluir os abastecimentos selecionados.");
+    } finally {
+      setDeletingSelectedRecords(false);
     }
   }
 
@@ -1021,6 +1057,16 @@ export function FuelRecordsPage() {
     return filteredRecords.slice(start, start + TABLE_PAGE_SIZE);
   }, [filteredRecords, currentPage]);
 
+  const selectedRecordIdsSet = useMemo(
+    () => new Set(selectedRecordIds),
+    [selectedRecordIds],
+  );
+  const allPageSelected =
+    paginatedRecords.length > 0 &&
+    paginatedRecords.every((record) => selectedRecordIdsSet.has(record.id));
+  const somePageSelected =
+    paginatedRecords.some((record) => selectedRecordIdsSet.has(record.id)) && !allPageSelected;
+
   useEffect(() => {
     setCurrentPage(1);
   }, [search, selectedBranchId, sortBy, sortDirection]);
@@ -1030,6 +1076,11 @@ export function FuelRecordsPage() {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    const validIds = new Set(filteredRecords.map((record) => record.id));
+    setSelectedRecordIds((prev) => prev.filter((id) => validIds.has(id)));
+  }, [filteredRecords]);
 
   const anomalyMapByRecordId = useMemo(() => {
     const list = detectFuelAnomalies(filteredRecords, vehicles);
@@ -1143,10 +1194,37 @@ export function FuelRecordsPage() {
       )}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <p className="text-sm text-slate-600">
+            {selectedRecordIds.length > 0
+              ? `${selectedRecordIds.length} abastecimento(s) selecionado(s)`
+              : "Selecione registros para excluir em lote"}
+          </p>
+          <button
+            type="button"
+            disabled={selectedRecordIds.length === 0 || deletingSelectedRecords}
+            onClick={() => setIsBulkDeleteModalOpen(true)}
+            className="cursor-pointer rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {deletingSelectedRecords ? "Excluindo..." : "Excluir selecionados"}
+          </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
+                <th className="px-4 py-4 text-left text-sm font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={allPageSelected}
+                    ref={(element) => {
+                      if (element) element.indeterminate = somePageSelected;
+                    }}
+                    onChange={toggleSelectAllPage}
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300"
+                    aria-label="Selecionar abastecimentos da página"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button type="button" onClick={() => handleSort("branch")} className="cursor-pointer">Filial {getSortArrow("branch")}</button>
                 </th>
@@ -1184,7 +1262,7 @@ export function FuelRecordsPage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={10}
+                    colSpan={11}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
                     Carregando abastecimentos...
@@ -1193,7 +1271,7 @@ export function FuelRecordsPage() {
               ) : filteredRecords.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={10}
+                    colSpan={11}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
                     Nenhum abastecimento encontrado.
@@ -1202,6 +1280,15 @@ export function FuelRecordsPage() {
               ) : (
                 paginatedRecords.map((record) => (
                   <tr key={record.id} className="border-t border-slate-200">
+                    <td className="px-4 py-4 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={selectedRecordIdsSet.has(record.id)}
+                        onChange={() => toggleRecordSelection(record.id)}
+                        className="h-4 w-4 cursor-pointer rounded border-slate-300"
+                        aria-label={`Selecionar abastecimento ${record.id}`}
+                      />
+                    </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {getRecordBranchName(record)}
                     </td>
@@ -1585,6 +1672,17 @@ export function FuelRecordsPage() {
         onCancel={() => setRecordToDelete(null)}
         onConfirm={confirmDeleteRecord}
       />
+      <ConfirmDeleteModal
+        isOpen={isBulkDeleteModalOpen}
+        title="Excluir abastecimentos selecionados"
+        description={`Deseja excluir ${selectedRecordIds.length} abastecimento(s) selecionado(s)?`}
+        loading={deletingSelectedRecords}
+        onCancel={() => setIsBulkDeleteModalOpen(false)}
+        onConfirm={async () => {
+          await confirmDeleteSelectedRecords();
+          setIsBulkDeleteModalOpen(false);
+        }}
+      />
     </div>
   );
   function handleSort(column: FuelSortBy) {
@@ -1599,5 +1697,22 @@ export function FuelRecordsPage() {
   function getSortArrow(column: FuelSortBy) {
     if (sortBy !== column) return "↕";
     return sortDirection === "asc" ? "↑" : "↓";
+  }
+
+  function toggleRecordSelection(recordId: string) {
+    setSelectedRecordIds((prev) =>
+      prev.includes(recordId) ? prev.filter((id) => id !== recordId) : [...prev, recordId],
+    );
+  }
+
+  function toggleSelectAllPage() {
+    if (allPageSelected) {
+      const pageIds = new Set(paginatedRecords.map((record) => record.id));
+      setSelectedRecordIds((prev) => prev.filter((id) => !pageIds.has(id)));
+      return;
+    }
+    const next = new Set(selectedRecordIds);
+    paginatedRecords.forEach((record) => next.add(record.id));
+    setSelectedRecordIds(Array.from(next));
   }
 }
