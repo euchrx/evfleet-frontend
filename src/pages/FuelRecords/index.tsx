@@ -405,9 +405,8 @@ export function FuelRecordsPage() {
   }
 
   function getRecordFuelType(record: FuelRecord) {
-    if (record.fuelType) return record.fuelType;
     const vehicle = vehicles.find((item) => item.id === record.vehicleId);
-    return vehicle?.fuelType || "-";
+    return vehicle?.fuelType || record.fuelType || "-";
   }
 
   function openCreateModal() {
@@ -470,6 +469,12 @@ export function FuelRecordsPage() {
         vehicleId: form.vehicleId,
         driverId: form.driverId || null,
       };
+      const selectedVehicleForPayload = vehicles.find(
+        (item) => item.id === payload.vehicleId,
+      );
+      payload.fuelType =
+        (selectedVehicleForPayload?.fuelType as FuelFormData["fuelType"]) ||
+        payload.fuelType;
 
       const nextErrors: FuelFieldErrors = {};
       if (!payload.vehicleId) nextErrors.vehicleId = "Selecione um veículo.";
@@ -806,7 +811,9 @@ export function FuelRecordsPage() {
           continue;
         }
         const linkedDriver = !driver ? findLinkedDriverByVehicleId(drivers, vehicle.id) : null;
-        const resolvedFuelType = fuelType || (vehicle.fuelType as FuelFormData["fuelType"]);
+        const resolvedFuelType =
+          (vehicle.fuelType as FuelFormData["fuelType"]) ||
+          fuelType;
 
         if (!resolvedFuelType) {
           failures.push(`Linha ${lineNumber}: combustível inválido.`);
