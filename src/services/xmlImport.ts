@@ -162,6 +162,136 @@ export async function processXmlInvoiceFuel(invoiceId: string) {
   return data;
 }
 
+export type ConfirmFuelPayload = {
+  vehicleId?: string;
+  driverId?: string;
+  km?: number;
+  branchId?: string;
+};
+
+export type ConfirmMaintenancePayload = {
+  vehicleId?: string;
+  branchId?: string;
+  descriptionComplement?: string;
+};
+
+export type ConfirmCostPayload = {
+  vehicleId?: string;
+  branchId?: string;
+  category?: string;
+};
+
+export type ConfirmRetailProductPayload = {
+  branchId?: string;
+  category?: string;
+};
+
+export async function confirmXmlInvoiceFuel(
+  invoiceId: string,
+  payload: ConfirmFuelPayload,
+) {
+  try {
+    const { data } = await api.post(`/xml-import/invoices/${invoiceId}/confirm/fuel`, payload);
+    return data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      await processXmlInvoiceFuel(invoiceId);
+      if (payload.vehicleId) {
+        await completeXmlFuelLink(invoiceId, {
+          vehicleId: payload.vehicleId,
+          ...(payload.driverId ? { driverId: payload.driverId } : {}),
+          ...(typeof payload.km === "number" ? { km: payload.km } : {}),
+          ...(payload.branchId ? { branchId: payload.branchId } : {}),
+        });
+      }
+      return { invoiceId, processingStatus: "PROCESSED" };
+    }
+    throw error;
+  }
+}
+
+export async function confirmXmlInvoiceMaintenance(
+  invoiceId: string,
+  payload: ConfirmMaintenancePayload,
+) {
+  try {
+    const { data } = await api.post(
+      `/xml-import/invoices/${invoiceId}/confirm/maintenance`,
+      payload,
+    );
+    return data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      await processXmlInvoiceMaintenance(invoiceId);
+      if (payload.vehicleId) {
+        await completeXmlMaintenanceLink(invoiceId, {
+          vehicleId: payload.vehicleId,
+          ...(payload.branchId ? { branchId: payload.branchId } : {}),
+          ...(payload.descriptionComplement
+            ? { descriptionComplement: payload.descriptionComplement }
+            : {}),
+        });
+      }
+      return { invoiceId, processingStatus: "PROCESSED" };
+    }
+    throw error;
+  }
+}
+
+export async function confirmXmlInvoiceCost(
+  invoiceId: string,
+  payload: ConfirmCostPayload,
+) {
+  try {
+    const { data } = await api.post(`/xml-import/invoices/${invoiceId}/confirm/cost`, payload);
+    return data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      await processXmlInvoiceCost(invoiceId);
+      if (payload.vehicleId || payload.branchId || payload.category) {
+        await completeXmlCostLink(invoiceId, {
+          ...(payload.vehicleId ? { vehicleId: payload.vehicleId } : {}),
+          ...(payload.branchId ? { branchId: payload.branchId } : {}),
+          ...(payload.category ? { category: payload.category } : {}),
+        });
+      }
+      return { invoiceId, processingStatus: "PROCESSED" };
+    }
+    throw error;
+  }
+}
+
+export async function confirmXmlInvoiceRetailProduct(
+  invoiceId: string,
+  payload: ConfirmRetailProductPayload,
+) {
+  try {
+    const { data } = await api.post(
+      `/xml-import/invoices/${invoiceId}/confirm/retail-product`,
+      payload,
+    );
+    return data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      await processXmlInvoiceRetailProduct(invoiceId);
+      return { invoiceId, processingStatus: "PROCESSED" };
+    }
+    throw error;
+  }
+}
+
+export async function rejectXmlInvoice(invoiceId: string) {
+  try {
+    const { data } = await api.post(`/xml-import/invoices/${invoiceId}/reject`);
+    return data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return ignoreXmlInvoice(invoiceId);
+    }
+    throw error;
+  }
+}
+
 export async function processXmlInvoiceMaintenance(invoiceId: string) {
   const { data } = await api.post<XmlInvoiceProcessResult>(
     `/xml-import/invoices/${invoiceId}/process/maintenance`,

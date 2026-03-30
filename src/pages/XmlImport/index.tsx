@@ -2,14 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import { FileArchive, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { TablePagination } from "../../components/TablePagination";
+import { getBranches } from "../../services/branches";
+import { getDrivers } from "../../services/drivers";
+import { getVehicles } from "../../services/vehicles";
 import {
+  confirmXmlInvoiceCost,
+  confirmXmlInvoiceFuel,
+  confirmXmlInvoiceMaintenance,
+  confirmXmlInvoiceRetailProduct,
   deleteXmlImportBatch,
   deleteXmlImportInvoices,
   getXmlImportBatches,
+  getXmlImportInvoiceById,
   getXmlImportInvoices,
-  ignoreXmlInvoice,
+  rejectXmlInvoice,
   type XmlImportBatch,
   type XmlInvoice,
+  type XmlInvoiceDetail,
 } from "../../services/xmlImport";
 import { formatDate } from "../../utils/formatters";
 
@@ -37,6 +46,14 @@ function formatProcessingStatus(status?: string | null) {
   if (status === "IGNORED") return "Ignorada";
   if (status === "ERROR") return "Erro";
   return "Não definido";
+}
+
+function processingStatusBadgeClass(status?: string | null) {
+  if (status === "PROCESSED") return "status-pill status-active";
+  if (status === "IGNORED") return "status-pill";
+  if (status === "SUGGESTED") return "status-pill status-pending";
+  if (status === "ERROR") return "status-pill status-inactive";
+  return "status-pill status-pending";
 }
 
 function formatCompetencia(invoice: XmlInvoice) {
@@ -75,6 +92,7 @@ export function XmlImportPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [processingTypeFilter, setProcessingTypeFilter] = useState("ALL");
   const [processingStatusFilter, setProcessingStatusFilter] = useState("ALL");
+  const [showProcessedQueue, setShowProcessedQueue] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -82,6 +100,34 @@ export function XmlImportPage() {
   const [rowLoading, setRowLoading] = useState<Record<string, string>>({});
   const [deletingSelected, setDeletingSelected] = useState(false);
   const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
+  const [confirmModalInvoice, setConfirmModalInvoice] = useState<XmlInvoice | null>(null);
+  const [confirmModalDetail, setConfirmModalDetail] = useState<XmlInvoiceDetail | null>(null);
+  const [confirmModalLoading, setConfirmModalLoading] = useState(false);
+  const [confirmModalSaving, setConfirmModalSaving] = useState(false);
+  const [confirmModalError, setConfirmModalError] = useState("");
+  const [confirmVehicles, setConfirmVehicles] = useState<any[]>([]);
+  const [confirmDrivers, setConfirmDrivers] = useState<any[]>([]);
+  const [confirmBranches, setConfirmBranches] = useState<any[]>([]);
+  const [confirmFuelForm, setConfirmFuelForm] = useState({
+    vehicleId: "",
+    driverId: "",
+    km: "",
+    branchId: "",
+  });
+  const [confirmMaintenanceForm, setConfirmMaintenanceForm] = useState({
+    vehicleId: "",
+    branchId: "",
+    descriptionComplement: "",
+  });
+  const [confirmCostForm, setConfirmCostForm] = useState({
+    vehicleId: "",
+    branchId: "",
+    category: "",
+  });
+  const [confirmRetailForm, setConfirmRetailForm] = useState({
+    branchId: "",
+    category: "",
+  });
 
   async function loadData(manual = false) {
     try {
@@ -120,6 +166,8 @@ export function XmlImportPage() {
       const procStatus = String(invoice.processingStatus || "PENDING");
       const issuedAt = invoice.issuedAt ? new Date(invoice.issuedAt) : null;
 
+      if (!showProcessedQueue && procStatus === "PROCESSED") return false;
+
       if (batchFilter.trim() && !batchId.includes(batchFilter.trim().toLowerCase())) return false;
       if (invoiceKeyFilter.trim() && !invoiceKey.includes(invoiceKeyFilter.trim().toLowerCase()))
         return false;
@@ -147,6 +195,7 @@ export function XmlImportPage() {
     statusFilter,
     processingTypeFilter,
     processingStatusFilter,
+    showProcessedQueue,
     dateFrom,
     dateTo,
   ]);
@@ -194,7 +243,7 @@ export function XmlImportPage() {
     if (!window.confirm("Deseja ignorar esta nota?")) return;
     try {
       setRowLoading((prev) => ({ ...prev, [invoice.id]: "ignore" }));
-      await ignoreXmlInvoice(invoice.id);
+      await rejectXmlInvoice(invoice.id);
       setInvoices((prev) =>
         prev.map((item) =>
           item.id === invoice.id
@@ -212,6 +261,156 @@ export function XmlImportPage() {
         delete next[invoice.id];
         return next;
       });
+    }
+  }
+
+  function openConfirmModal(invoice: XmlInvoice) {
+    setConfirmModalInvoice(invoice);
+    setConfirmModalDetail(null);
+    setConfirmModalError("");
+    setConfirmModalLoading(true);
+    setConfirmFuelForm({ vehicleId: "", driverId: "", km: "", branchId: "" });
+    setConfirmMaintenanceForm({ vehicleId: "", branchId: "", descriptionComplement: "" });
+    setConfirmCostForm({ vehicleId: "", branchId: "", category: "" });
+    setConfirmRetailForm({ branchId: "", category: "" });
+
+    Promise.all([
+      getXmlImportInvoiceById(invoice.id),
+      getVehicles(),
+      getDrivers(),
+      getBranches(),
+    ])
+      .then(([detail, vehicles, drivers, branches]) => {
+        setConfirmModalDetail(detail);
+        setConfirmVehicles(Array.isArray(vehicles) ? vehicles : []);
+        setConfirmDrivers(Array.isArray(drivers) ? drivers : []);
+        setConfirmBranches(Array.isArray(branches) ? branches : []);
+        setConfirmFuelForm((prev) => ({
+          ...prev,
+          branchId: detail.branchId || "",
+          vehicleId: detail.linkedFuelRecord?.vehicleId || "",
+          driverId: detail.linkedFuelRecord?.driverId || "",
+          km:
+            typeof detail.linkedFuelRecord?.km === "number"
+              ? String(detail.linkedFuelRecord.km)
+              : "",
+        }));
+        setConfirmMaintenanceForm((prev) => ({
+          ...prev,
+          branchId: detail.branchId || "",
+          vehicleId: detail.linkedMaintenanceRecord?.vehicleId || "",
+        }));
+        setConfirmCostForm((prev) => ({
+          ...prev,
+          branchId: detail.branchId || "",
+          vehicleId: detail.linkedCost?.vehicleId || "",
+          category: detail.linkedCost?.category || "",
+        }));
+        setConfirmRetailForm((prev) => ({
+          ...prev,
+          branchId: detail.branchId || "",
+        }));
+      })
+      .catch((error) => {
+        setConfirmModalError(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível carregar os dados da nota.",
+        );
+      })
+      .finally(() => {
+        setConfirmModalLoading(false);
+      });
+  }
+
+  function closeConfirmModal() {
+    if (confirmModalSaving) return;
+    setConfirmModalInvoice(null);
+    setConfirmModalDetail(null);
+    setConfirmModalError("");
+    setConfirmModalLoading(false);
+  }
+
+  async function handleConfirmImport() {
+    if (!confirmModalInvoice) return;
+
+    const processingType = String(confirmModalInvoice.processingType || "UNKNOWN");
+
+    try {
+      setConfirmModalSaving(true);
+      setConfirmModalError("");
+
+      if (processingType === "FUEL") {
+        await confirmXmlInvoiceFuel(confirmModalInvoice.id, {
+          ...(confirmFuelForm.vehicleId ? { vehicleId: confirmFuelForm.vehicleId } : {}),
+          ...(confirmFuelForm.driverId ? { driverId: confirmFuelForm.driverId } : {}),
+          ...(confirmFuelForm.km ? { km: Number(confirmFuelForm.km) } : {}),
+          ...(confirmFuelForm.branchId ? { branchId: confirmFuelForm.branchId } : {}),
+        });
+      } else if (processingType === "PRODUCT" || processingType === "SERVICE") {
+        await confirmXmlInvoiceMaintenance(confirmModalInvoice.id, {
+          ...(confirmMaintenanceForm.vehicleId
+            ? { vehicleId: confirmMaintenanceForm.vehicleId }
+            : {}),
+          ...(confirmMaintenanceForm.branchId
+            ? { branchId: confirmMaintenanceForm.branchId }
+            : {}),
+          ...(confirmMaintenanceForm.descriptionComplement
+            ? { descriptionComplement: confirmMaintenanceForm.descriptionComplement }
+            : {}),
+        });
+      } else if (processingType === "RETAIL_PRODUCT") {
+        await confirmXmlInvoiceRetailProduct(confirmModalInvoice.id, {
+          ...(confirmRetailForm.branchId ? { branchId: confirmRetailForm.branchId } : {}),
+          ...(confirmRetailForm.category ? { category: confirmRetailForm.category } : {}),
+        });
+      } else {
+        await confirmXmlInvoiceCost(confirmModalInvoice.id, {
+          ...(confirmCostForm.vehicleId ? { vehicleId: confirmCostForm.vehicleId } : {}),
+          ...(confirmCostForm.branchId ? { branchId: confirmCostForm.branchId } : {}),
+          ...(confirmCostForm.category ? { category: confirmCostForm.category } : {}),
+        });
+      }
+
+      setInvoices((prev) =>
+        prev.map((item) =>
+          item.id === confirmModalInvoice.id
+            ? { ...item, processingStatus: "PROCESSED", processedAt: new Date().toISOString() }
+            : item,
+        ),
+      );
+      setSuccessMessage("Nota processada e importada com sucesso.");
+      setErrorMessage("");
+      closeConfirmModal();
+    } catch (error) {
+      setConfirmModalError(
+        error instanceof Error ? error.message : "Não foi possível confirmar a importação.",
+      );
+    } finally {
+      setConfirmModalSaving(false);
+    }
+  }
+
+  async function handleRejectFromModal() {
+    if (!confirmModalInvoice) return;
+    try {
+      setConfirmModalSaving(true);
+      setConfirmModalError("");
+      await rejectXmlInvoice(confirmModalInvoice.id);
+      setInvoices((prev) =>
+        prev.map((item) =>
+          item.id === confirmModalInvoice.id
+            ? { ...item, processingStatus: "IGNORED", processedAt: new Date().toISOString() }
+            : item,
+        ),
+      );
+      setSuccessMessage("Nota ignorada com sucesso.");
+      setErrorMessage("");
+      closeConfirmModal();
+    } catch (error) {
+      setConfirmModalError(error instanceof Error ? error.message : "Falha ao ignorar nota.");
+    } finally {
+      setConfirmModalSaving(false);
     }
   }
 
@@ -336,7 +535,21 @@ export function XmlImportPage() {
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-bold text-slate-900">Filtros</h2>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-lg font-bold text-slate-900">Fila operacional</h2>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={showProcessedQueue}
+              onChange={(event) => setShowProcessedQueue(event.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-orange-500"
+            />
+            Mostrar processadas
+          </label>
+        </div>
+        <p className="mt-1 text-sm text-slate-500">
+          Importe o XML, revise rapidamente no modal e confirme ou ignore.
+        </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-8">
           <input value={batchFilter} onChange={(e) => setBatchFilter(e.target.value)} placeholder="Batch ID" className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
           <input value={invoiceKeyFilter} onChange={(e) => setInvoiceKeyFilter(e.target.value)} placeholder="Chave NF-e" className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
@@ -435,7 +648,7 @@ export function XmlImportPage() {
           </div>
           <h2 className="text-lg font-bold text-slate-900">Notas importadas</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Auditoria global por lote, chave e status de processamento.
+            Priorize ações rápidas: processar ou ignorar. Detalhes ficam como apoio de auditoria.
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -493,24 +706,38 @@ export function XmlImportPage() {
                     <td className="px-4 py-3 text-slate-700">{formatDate(invoice.issuedAt || undefined)}</td>
                     <td className="px-4 py-3 text-slate-700">{formatInvoiceStatus(invoice.invoiceStatus)}</td>
                     <td className="px-4 py-3 text-slate-700">{formatProcessingType(invoice.processingType)}</td>
-                    <td className="px-4 py-3 text-slate-700">{formatProcessingStatus(invoice.processingStatus)}</td>
+                    <td className="px-4 py-3 text-slate-700">
+                      <span className={processingStatusBadgeClass(invoice.processingStatus)}>
+                        {formatProcessingStatus(invoice.processingStatus)}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-slate-900">{formatAmountReais(invoice.totalAmount)}</td>
                     <td className="px-4 py-3 text-xs text-slate-600">{invoice.invoiceKey}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Link to={`/xml-import/invoices/${invoice.id}`} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                        {invoice.processingStatus === "SUGGESTED" ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openConfirmModal(invoice)}
+                              disabled={Boolean(rowLoading[invoice.id])}
+                              className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-60"
+                            >
+                              Processar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => ignoreInvoice(invoice)}
+                              disabled={Boolean(rowLoading[invoice.id])}
+                              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-60"
+                            >
+                              {rowLoading[invoice.id] === "ignore" ? "Ignorando..." : "Ignorar"}
+                            </button>
+                          </>
+                        ) : null}
+                        <Link to={`/xml-import/invoices/${invoice.id}`} className="text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline">
                           Ver detalhes
                         </Link>
-                        {invoice.processingStatus === "SUGGESTED" ? (
-                          <button
-                            type="button"
-                            onClick={() => ignoreInvoice(invoice)}
-                            disabled={Boolean(rowLoading[invoice.id])}
-                            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-60"
-                          >
-                            {rowLoading[invoice.id] === "ignore" ? "Ignorando..." : "Ignorar"}
-                          </button>
-                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -529,6 +756,156 @@ export function XmlImportPage() {
           itemLabel="notas"
         />
       </section>
+
+      {confirmModalInvoice ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Confirmar importação da nota</h3>
+                <p className="text-sm text-slate-500">
+                  Revise os dados e confirme em um único passo.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeConfirmModal}
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              {confirmModalError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {confirmModalError}
+                </div>
+              ) : null}
+
+              {confirmModalLoading ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+                  Carregando dados da nota...
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Emitente</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{confirmModalInvoice.issuerName || "-"}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Número</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{confirmModalInvoice.number || "-"}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Data</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatDate(confirmModalInvoice.issuedAt || undefined)}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Valor total</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatAmountReais(confirmModalInvoice.totalAmount)}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tipo detectado</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatProcessingType(confirmModalInvoice.processingType)}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Situação</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatProcessingStatus(confirmModalInvoice.processingStatus)}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Resumo de itens</p>
+                    <div className="mt-2 grid gap-2">
+                      {confirmModalDetail?.items?.slice(0, 5).map((item) => (
+                        <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                          <p className="text-sm font-semibold text-slate-900">{item.description}</p>
+                          <p className="text-xs text-slate-600">
+                            Qtd: {item.quantity ?? "-"} · Unitário: {formatAmountReais(item.unitValue)} · Total: {formatAmountReais(item.totalValue)}
+                          </p>
+                        </div>
+                      ))}
+                      {!confirmModalDetail?.items?.length ? (
+                        <p className="text-sm text-slate-500">Sem itens disponíveis para resumo.</p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {confirmModalInvoice.processingType === "FUEL" ? (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <select value={confirmFuelForm.vehicleId} onChange={(e) => setConfirmFuelForm((prev) => ({ ...prev, vehicleId: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                        <option value="">Selecione um veículo</option>
+                        {confirmVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.plate} · {vehicle.brand} {vehicle.model}</option>)}
+                      </select>
+                      <select value={confirmFuelForm.driverId} onChange={(e) => setConfirmFuelForm((prev) => ({ ...prev, driverId: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                        <option value="">Selecione um motorista</option>
+                        {confirmDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
+                      </select>
+                      <input value={confirmFuelForm.km} onChange={(e) => setConfirmFuelForm((prev) => ({ ...prev, km: e.target.value }))} placeholder="KM" className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
+                      <select value={confirmFuelForm.branchId} onChange={(e) => setConfirmFuelForm((prev) => ({ ...prev, branchId: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                        <option value="">Selecione a filial</option>
+                        {confirmBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                      </select>
+                    </div>
+                  ) : null}
+
+                  {confirmModalInvoice.processingType === "PRODUCT" || confirmModalInvoice.processingType === "SERVICE" ? (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      <select value={confirmMaintenanceForm.vehicleId} onChange={(e) => setConfirmMaintenanceForm((prev) => ({ ...prev, vehicleId: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                        <option value="">Selecione um veículo</option>
+                        {confirmVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.plate} · {vehicle.brand} {vehicle.model}</option>)}
+                      </select>
+                      <select value={confirmMaintenanceForm.branchId} onChange={(e) => setConfirmMaintenanceForm((prev) => ({ ...prev, branchId: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                        <option value="">Selecione a filial</option>
+                        {confirmBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                      </select>
+                      <input value={confirmMaintenanceForm.descriptionComplement} onChange={(e) => setConfirmMaintenanceForm((prev) => ({ ...prev, descriptionComplement: e.target.value }))} placeholder="Descrição complementar (opcional)" className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
+                    </div>
+                  ) : null}
+
+                  {confirmModalInvoice.processingType === "UNKNOWN" ? (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      <select value={confirmCostForm.vehicleId} onChange={(e) => setConfirmCostForm((prev) => ({ ...prev, vehicleId: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                        <option value="">Selecione um veículo (opcional)</option>
+                        {confirmVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.plate} · {vehicle.brand} {vehicle.model}</option>)}
+                      </select>
+                      <select value={confirmCostForm.branchId} onChange={(e) => setConfirmCostForm((prev) => ({ ...prev, branchId: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                        <option value="">Selecione a filial (opcional)</option>
+                        {confirmBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                      </select>
+                      <input value={confirmCostForm.category} onChange={(e) => setConfirmCostForm((prev) => ({ ...prev, category: e.target.value }))} placeholder="Categoria (opcional)" className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
+                    </div>
+                  ) : null}
+
+                  {confirmModalInvoice.processingType === "RETAIL_PRODUCT" ? (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <select value={confirmRetailForm.branchId} onChange={(e) => setConfirmRetailForm((prev) => ({ ...prev, branchId: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
+                        <option value="">Selecione a filial (opcional)</option>
+                        {confirmBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                      </select>
+                      <input value={confirmRetailForm.category} onChange={(e) => setConfirmRetailForm((prev) => ({ ...prev, category: e.target.value }))} placeholder="Categoria (opcional)" className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+              <button type="button" onClick={closeConfirmModal} disabled={confirmModalSaving} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                Cancelar
+              </button>
+              <button type="button" onClick={handleRejectFromModal} disabled={confirmModalSaving || confirmModalLoading} className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                {confirmModalSaving ? "Salvando..." : "Ignorar nota"}
+              </button>
+              <button type="button" onClick={handleConfirmImport} disabled={confirmModalSaving || confirmModalLoading} className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-60">
+                {confirmModalSaving ? "Importando..." : "Confirmar e importar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
