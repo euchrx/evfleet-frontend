@@ -10,6 +10,7 @@ import {
   processXmlInvoiceCost,
   processXmlInvoiceFuel,
   processXmlInvoiceMaintenance,
+  processXmlInvoiceRetailProduct,
   uploadXmlZip,
   type XmlImportBatch,
   type XmlImportBatchSummary,
@@ -18,6 +19,13 @@ import {
 import { formatDate } from "../../utils/formatters";
 
 const PAGE_SIZE = 10;
+const XML_TYPE_ORDER = [
+  "FUEL",
+  "PRODUCT",
+  "SERVICE",
+  "RETAIL_PRODUCT",
+  "UNKNOWN",
+] as const;
 
 function formatInvoiceStatus(status?: string) {
   if (status === "AUTHORIZED") return "Autorizada";
@@ -35,8 +43,9 @@ function statusBadgeClass(status?: string) {
 
 function formatProcessingType(type?: string | null) {
   if (type === "FUEL") return "Combustível";
-  if (type === "PRODUCT") return "Produto";
-  if (type === "SERVICE") return "Serviço";
+  if (type === "PRODUCT") return "Peças / Insumos";
+  if (type === "SERVICE") return "Serviços";
+  if (type === "RETAIL_PRODUCT") return "Produtos / Conveniência";
   return "Não classificada";
 }
 
@@ -44,6 +53,7 @@ function processingTypeBadgeClass(type?: string | null) {
   if (type === "FUEL") return "status-pill status-active";
   if (type === "PRODUCT") return "status-pill status-pending";
   if (type === "SERVICE") return "status-pill status-anomaly";
+  if (type === "RETAIL_PRODUCT") return "status-pill status-warning";
   return "status-pill";
 }
 
@@ -205,6 +215,27 @@ export function XmlImportPage() {
     dateTo,
   ]);
 
+  const typeSummary = useMemo(() => {
+    const summary = {
+      FUEL: 0,
+      PRODUCT: 0,
+      SERVICE: 0,
+      RETAIL_PRODUCT: 0,
+      UNKNOWN: 0,
+    };
+
+    for (const invoice of invoices) {
+      const type = String(invoice.processingType || "UNKNOWN");
+      if (type in summary) {
+        summary[type as keyof typeof summary] += 1;
+      } else {
+        summary.UNKNOWN += 1;
+      }
+    }
+
+    return summary;
+  }, [invoices]);
+
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredInvoices.length / PAGE_SIZE)),
     [filteredInvoices.length],
@@ -285,13 +316,18 @@ export function XmlImportPage() {
     }
   }
 
-  async function processInvoice(invoice: XmlInvoice, action: "fuel" | "maintenance" | "cost") {
+  async function processInvoice(
+    invoice: XmlInvoice,
+    action: "fuel" | "maintenance" | "cost" | "retail-product",
+  ) {
     const actionLabel =
       action === "fuel"
         ? "criar abastecimento"
         : action === "maintenance"
           ? "criar manutenção"
-          : "criar custo";
+          : action === "cost"
+            ? "criar custo"
+            : "enviar para produtos";
 
     if (!window.confirm(`Deseja ${actionLabel} para esta nota?`)) {
       return;
@@ -306,6 +342,8 @@ export function XmlImportPage() {
         await processXmlInvoiceFuel(invoice.id);
       } else if (action === "maintenance") {
         await processXmlInvoiceMaintenance(invoice.id);
+      } else if (action === "retail-product") {
+        await processXmlInvoiceRetailProduct(invoice.id);
       } else {
         await processXmlInvoiceCost(invoice.id);
       }
@@ -438,6 +476,15 @@ export function XmlImportPage() {
     }
   }
 
+  function applyQuickFilters(options: {
+    processingStatus?: string;
+    processingType?: string;
+  }) {
+    setProcessingStatusFilter(options.processingStatus || "ALL");
+    setProcessingTypeFilter(options.processingType || "ALL");
+    setCurrentPage(1);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -447,15 +494,23 @@ export function XmlImportPage() {
             Envie um ZIP com XMLs para importar notas fiscais em lote por empresa.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => loadData(true)}
-          disabled={refreshing}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-          Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/xml-import/retail-products"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+          >
+            Produtos importados
+          </Link>
+          <button
+            type="button"
+            onClick={() => loadData(true)}
+            disabled={refreshing}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+            Atualizar
+          </button>
+        </div>
       </div>
 
       {errorMessage ? (
@@ -469,6 +524,66 @@ export function XmlImportPage() {
           {successMessage}
         </div>
       ) : null}
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <Link
+          to="/xml-import/retail-products"
+          className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 shadow-sm transition hover:bg-violet-100"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+            Fluxo dedicado
+          </p>
+          <p className="mt-1 text-base font-bold text-violet-900">Produtos importados</p>
+          <p className="text-xs text-violet-700">Notas RETAIL_PRODUCT processadas</p>
+        </Link>
+        <button
+          type="button"
+          onClick={() => applyQuickFilters({ processingStatus: "PROCESSED" })}
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left shadow-sm transition hover:bg-emerald-100"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+            Atalho
+          </p>
+          <p className="mt-1 text-base font-bold text-emerald-900">Notas processadas</p>
+          <p className="text-xs text-emerald-700">
+            {invoices.filter((item) => item.processingStatus === "PROCESSED").length} no total
+          </p>
+        </button>
+        <button
+          type="button"
+          onClick={() => applyQuickFilters({ processingStatus: "SUGGESTED" })}
+          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left shadow-sm transition hover:bg-amber-100"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+            Atalho
+          </p>
+          <p className="mt-1 text-base font-bold text-amber-900">Notas pendentes</p>
+          <p className="text-xs text-amber-700">
+            {invoices.filter((item) => item.processingStatus === "SUGGESTED").length} no total
+          </p>
+        </button>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {XML_TYPE_ORDER.map((type) => (
+          <button
+            key={type}
+            type="button"
+            onClick={() => applyQuickFilters({ processingType: type })}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-orange-300 hover:bg-orange-50"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {formatProcessingType(type)}
+            </p>
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-3xl font-bold text-slate-900">
+                {typeSummary[type] || 0}
+              </p>
+              <span className={processingTypeBadgeClass(type)}>{type}</span>
+            </div>
+          </button>
+        ))}
+      </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="grid gap-4 lg:grid-cols-[1fr_220px_220px_auto]">
@@ -619,6 +734,9 @@ export function XmlImportPage() {
           </p>
         </div>
         <div className="border-b border-slate-200 p-4">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Filtros de triagem (tipo, situação, período e emitente)
+          </p>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
             <input
               value={competenciaFilter}
@@ -656,8 +774,9 @@ export function XmlImportPage() {
             >
               <option value="ALL">Todos os tipos</option>
               <option value="FUEL">Combustível</option>
-              <option value="PRODUCT">Produto</option>
-              <option value="SERVICE">Serviço</option>
+              <option value="PRODUCT">Peças / Insumos</option>
+              <option value="SERVICE">Serviços</option>
+              <option value="RETAIL_PRODUCT">Produtos / Conveniência</option>
               <option value="UNKNOWN">Não classificada</option>
             </select>
             <select
@@ -809,6 +928,18 @@ export function XmlImportPage() {
                               {rowLoading[invoice.id] === "cost"
                                 ? "Processando..."
                                 : "Criar custo"}
+                            </button>
+                          ) : null}
+                          {invoice.processingType === "RETAIL_PRODUCT" ? (
+                            <button
+                              type="button"
+                              onClick={() => processInvoice(invoice, "retail-product")}
+                              disabled={Boolean(rowLoading[invoice.id])}
+                              className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {rowLoading[invoice.id] === "retail-product"
+                                ? "Processando..."
+                                : "Enviar para Produtos"}
                             </button>
                           ) : null}
                           <button

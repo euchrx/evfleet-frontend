@@ -68,6 +68,7 @@ export type XmlInvoiceDetailItem = {
 export type XmlInvoiceDetail = XmlInvoice & {
   updatedAt?: string;
   rawXml?: string | null;
+  linkedRetailProductImportId?: string | null;
   linkedFuelRecord?: {
     id: string;
     vehicleId?: string | null;
@@ -98,7 +99,11 @@ export type XmlInvoiceDetail = XmlInvoice & {
 export type XmlInvoiceProcessResult = {
   invoiceId: string;
   processingStatus: string;
-  createdRecordType: "FUEL_RECORD" | "MAINTENANCE_RECORD" | "COST_RECORD";
+  createdRecordType:
+    | "FUEL_RECORD"
+    | "MAINTENANCE_RECORD"
+    | "COST_RECORD"
+    | "RETAIL_PRODUCT_IMPORT";
   createdRecordId: string;
 };
 
@@ -163,6 +168,13 @@ export async function processXmlInvoiceCost(invoiceId: string) {
   return data;
 }
 
+export async function processXmlInvoiceRetailProduct(invoiceId: string) {
+  const { data } = await api.post<XmlInvoiceProcessResult>(
+    `/xml-import/invoices/${invoiceId}/process/retail-product`,
+  );
+  return data;
+}
+
 export async function ignoreXmlInvoice(invoiceId: string) {
   const { data } = await api.post<XmlInvoiceIgnoreResult>(
     `/xml-import/invoices/${invoiceId}/ignore`,
@@ -181,6 +193,97 @@ export async function getXmlImportInvoiceById(invoiceId: string, includeRawXml =
   const { data } = await api.get<XmlInvoiceDetail>(`/xml-import/invoices/${invoiceId}`, {
     params: includeRawXml ? { includeRawXml: "true" } : undefined,
   });
+  return data;
+}
+
+export type RetailProductImportListItem = {
+  id: string;
+  supplierName?: string | null;
+  supplierDocument?: string | null;
+  invoiceNumber?: string | null;
+  invoiceSeries?: string | null;
+  issuedAt?: string | null;
+  totalAmount?: string | number | null;
+  createdAt: string;
+  updatedAt?: string;
+  branch?: {
+    id: string;
+    name: string;
+  } | null;
+  xmlInvoice: {
+    id: string;
+    invoiceKey: string;
+    number?: string | null;
+    series?: string | null;
+    issuedAt?: string | null;
+    invoiceStatus: string;
+    processingType?: string | null;
+    processingStatus?: string | null;
+  };
+  _count?: {
+    items?: number;
+  };
+};
+
+export type RetailProductImportItem = {
+  id: string;
+  productCode?: string | null;
+  description: string;
+  quantity?: string | number | null;
+  unitValue?: string | number | null;
+  totalValue?: string | number | null;
+  createdAt: string;
+};
+
+export type RetailProductImportDetail = RetailProductImportListItem & {
+  items: RetailProductImportItem[];
+  xmlInvoice: RetailProductImportListItem["xmlInvoice"] & {
+    issuerName?: string | null;
+    issuerDocument?: string | null;
+    recipientName?: string | null;
+    recipientDocument?: string | null;
+    processedAt?: string | null;
+    protocolNumber?: string | null;
+    totalAmount?: string | number | null;
+    folderName?: string | null;
+    fileName?: string | null;
+  };
+};
+
+export type ListRetailProductImportsFilters = {
+  dateFrom?: string;
+  dateTo?: string;
+  supplier?: string;
+  invoiceNumber?: string;
+  itemDescription?: string;
+};
+
+export async function getRetailProductImports(
+  filters: ListRetailProductImportsFilters = {},
+) {
+  const { data } = await api.get<RetailProductImportListItem[]>(
+    "/xml-import/retail-products",
+    {
+      params: {
+        ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
+        ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
+        ...(filters.supplier ? { supplier: filters.supplier } : {}),
+        ...(filters.invoiceNumber
+          ? { invoiceNumber: filters.invoiceNumber }
+          : {}),
+        ...(filters.itemDescription
+          ? { itemDescription: filters.itemDescription }
+          : {}),
+      },
+    },
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getRetailProductImportById(id: string) {
+  const { data } = await api.get<RetailProductImportDetail>(
+    `/xml-import/retail-products/${id}`,
+  );
   return data;
 }
 

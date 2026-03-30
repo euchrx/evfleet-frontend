@@ -30,6 +30,7 @@ function formatProcessingType(type?: string | null) {
   if (type === "FUEL") return "Combustível";
   if (type === "PRODUCT") return "Produto";
   if (type === "SERVICE") return "Serviço";
+  if (type === "RETAIL_PRODUCT") return "Produto de loja";
   return "Não classificada";
 }
 
@@ -37,6 +38,7 @@ function processingTypeBadgeClass(type?: string | null) {
   if (type === "FUEL") return "status-pill status-active";
   if (type === "PRODUCT") return "status-pill status-pending";
   if (type === "SERVICE") return "status-pill status-anomaly";
+  if (type === "RETAIL_PRODUCT") return "status-pill status-warning";
   return "status-pill";
 }
 
@@ -182,6 +184,12 @@ export function XmlInvoiceDetailPage() {
     }
     if (invoice.linkedCostId) {
       links.push({ label: "Custo criado", value: invoice.linkedCostId });
+    }
+    if (invoice.linkedRetailProductImportId) {
+      links.push({
+        label: "Importação de produtos criada",
+        value: invoice.linkedRetailProductImportId,
+      });
     }
     return links;
   }, [invoice]);

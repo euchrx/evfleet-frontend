@@ -18,6 +18,7 @@ import {
   LayoutDashboard,
   Menu,
   LogOut,
+  PackageSearch,
   Route,
   ShieldCheck,
   Truck,
@@ -188,6 +189,12 @@ export function AppLayout() {
       name: "Importação XML NF-e",
       path: "/xml-import",
       icon: FileArchive,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Produtos XML",
+      path: "/xml-import/retail-products",
+      icon: PackageSearch,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
