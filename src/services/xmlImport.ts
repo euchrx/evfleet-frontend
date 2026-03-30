@@ -29,6 +29,7 @@ export type XmlImportBatch = {
 export type XmlInvoice = {
   id: string;
   batchId: string;
+  branchId?: string | null;
   fileName: string;
   folderName?: string | null;
   invoiceKey: string;
@@ -54,11 +55,64 @@ export type XmlInvoice = {
   };
 };
 
+export type XmlInvoiceDetailItem = {
+  id: string;
+  productCode?: string | null;
+  description: string;
+  quantity?: string | number | null;
+  unitValue?: string | number | null;
+  totalValue?: string | number | null;
+  createdAt: string;
+};
+
+export type XmlInvoiceDetail = XmlInvoice & {
+  updatedAt?: string;
+  rawXml?: string | null;
+  linkedFuelRecord?: {
+    id: string;
+    vehicleId?: string | null;
+    driverId?: string | null;
+    km?: number | null;
+    fuelDate?: string | null;
+    totalValue?: string | number | null;
+  } | null;
+  linkedMaintenanceRecord?: {
+    id: string;
+    vehicleId?: string | null;
+    description?: string | null;
+    maintenanceDate?: string | null;
+    status?: string | null;
+    cost?: string | number | null;
+  } | null;
+  linkedCost?: {
+    id: string;
+    vehicleId?: string | null;
+    category?: string | null;
+    amount?: string | number | null;
+    debtDate?: string | null;
+    status?: string | null;
+  } | null;
+  items: XmlInvoiceDetailItem[];
+};
+
 export type XmlInvoiceProcessResult = {
   invoiceId: string;
   processingStatus: string;
   createdRecordType: "FUEL_RECORD" | "MAINTENANCE_RECORD" | "COST_RECORD";
   createdRecordId: string;
+};
+
+export type XmlInvoiceIgnoreResult = {
+  invoiceId: string;
+  processingStatus: string;
+  processedAt?: string | null;
+};
+
+export type DeleteXmlInvoicesResult = {
+  requested: number;
+  deleted: number;
+  notFound: number;
+  notFoundIds: string[];
 };
 
 export async function uploadXmlZip(file: File, branchId?: string, periodLabel?: string) {
@@ -106,5 +160,66 @@ export async function processXmlInvoiceCost(invoiceId: string) {
   const { data } = await api.post<XmlInvoiceProcessResult>(
     `/xml-import/invoices/${invoiceId}/process/cost`,
   );
+  return data;
+}
+
+export async function ignoreXmlInvoice(invoiceId: string) {
+  const { data } = await api.post<XmlInvoiceIgnoreResult>(
+    `/xml-import/invoices/${invoiceId}/ignore`,
+  );
+  return data;
+}
+
+export async function deleteXmlImportInvoices(invoiceIds: string[]) {
+  const { data } = await api.delete<DeleteXmlInvoicesResult>("/xml-import/invoices", {
+    data: { invoiceIds },
+  });
+  return data;
+}
+
+export async function getXmlImportInvoiceById(invoiceId: string, includeRawXml = false) {
+  const { data } = await api.get<XmlInvoiceDetail>(`/xml-import/invoices/${invoiceId}`, {
+    params: includeRawXml ? { includeRawXml: "true" } : undefined,
+  });
+  return data;
+}
+
+export type CompleteFuelLinkInput = {
+  vehicleId: string;
+  driverId?: string;
+  km?: number;
+  branchId?: string;
+};
+
+export type CompleteMaintenanceLinkInput = {
+  vehicleId: string;
+  branchId?: string;
+  descriptionComplement?: string;
+};
+
+export type CompleteCostLinkInput = {
+  vehicleId?: string;
+  branchId?: string;
+  category?: string;
+};
+
+export async function completeXmlFuelLink(invoiceId: string, payload: CompleteFuelLinkInput) {
+  const { data } = await api.patch(`/xml-import/invoices/${invoiceId}/link/fuel`, payload);
+  return data;
+}
+
+export async function completeXmlMaintenanceLink(
+  invoiceId: string,
+  payload: CompleteMaintenanceLinkInput,
+) {
+  const { data } = await api.patch(
+    `/xml-import/invoices/${invoiceId}/link/maintenance`,
+    payload,
+  );
+  return data;
+}
+
+export async function completeXmlCostLink(invoiceId: string, payload: CompleteCostLinkInput) {
+  const { data } = await api.patch(`/xml-import/invoices/${invoiceId}/link/cost`, payload);
   return data;
 }

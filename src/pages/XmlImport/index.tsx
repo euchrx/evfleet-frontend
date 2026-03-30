@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileArchive, RefreshCw, Upload } from "lucide-react";
+import { FileArchive, RefreshCw, Trash2, Upload } from "lucide-react";
+import { Link } from "react-router-dom";
 import { TablePagination } from "../../components/TablePagination";
 import {
+  deleteXmlImportInvoices,
   getXmlImportBatches,
   getXmlImportInvoices,
+  ignoreXmlInvoice,
   processXmlInvoiceCost,
   processXmlInvoiceFuel,
   processXmlInvoiceMaintenance,
@@ -116,7 +119,8 @@ export function XmlImportPage() {
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowLoading, setRowLoading] = useState<Record<string, string>>({});
-  const [ignoredInvoiceIds, setIgnoredInvoiceIds] = useState<string[]>([]);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   async function loadData(isManualRefresh = false) {
     try {
@@ -156,10 +160,6 @@ export function XmlImportPage() {
       const processingType = String(invoice.processingType || "UNKNOWN");
       const issuedAt = invoice.issuedAt ? new Date(invoice.issuedAt) : null;
 
-      if (ignoredInvoiceIds.includes(invoice.id)) {
-        return false;
-      }
-
       if (competenciaFilter.trim() && !competencia.includes(competenciaFilter.trim())) {
         return false;
       }
@@ -195,7 +195,6 @@ export function XmlImportPage() {
     });
   }, [
     invoices,
-    ignoredInvoiceIds,
     competenciaFilter,
     emitenteFilter,
     numeroFilter,
@@ -216,6 +215,18 @@ export function XmlImportPage() {
     return filteredInvoices.slice(start, start + PAGE_SIZE);
   }, [currentPage, filteredInvoices]);
 
+  const allPageIds = useMemo(
+    () => paginatedInvoices.map((invoice) => invoice.id),
+    [paginatedInvoices],
+  );
+
+  const allSelectedInPage = useMemo(
+    () =>
+      allPageIds.length > 0 &&
+      allPageIds.every((id) => selectedInvoiceIds.includes(id)),
+    [allPageIds, selectedInvoiceIds],
+  );
+
   useEffect(() => {
     setCurrentPage(1);
   }, [
@@ -232,6 +243,12 @@ export function XmlImportPage() {
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setSelectedInvoiceIds((prev) =>
+      prev.filter((id) => invoices.some((invoice) => invoice.id === id)),
+    );
+  }, [invoices]);
 
   async function handleUpload() {
     if (!selectedFile) {
@@ -318,10 +335,107 @@ export function XmlImportPage() {
     }
   }
 
-  function ignoreInvoice(invoiceId: string) {
+  async function ignoreInvoice(invoice: XmlInvoice) {
     if (!window.confirm("Deseja ignorar esta nota?")) return;
-    setIgnoredInvoiceIds((prev) => (prev.includes(invoiceId) ? prev : [...prev, invoiceId]));
-    setSuccessMessage("Nota marcada como ignorada nesta visualização.");
+
+    try {
+      setRowLoading((prev) => ({ ...prev, [invoice.id]: "ignore" }));
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      await ignoreXmlInvoice(invoice.id);
+
+      setInvoices((prev) =>
+        prev.map((item) =>
+          item.id === invoice.id
+            ? {
+                ...item,
+                processingStatus: "IGNORED",
+                processedAt: new Date().toISOString(),
+              }
+            : item,
+        ),
+      );
+      setSuccessMessage("Nota ignorada com sucesso.");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Não foi possível ignorar a nota.",
+      );
+    } finally {
+      setRowLoading((prev) => {
+        const next = { ...prev };
+        delete next[invoice.id];
+        return next;
+      });
+    }
+  }
+
+  function toggleInvoiceSelection(invoiceId: string, checked: boolean) {
+    setSelectedInvoiceIds((prev) => {
+      if (checked) {
+        if (prev.includes(invoiceId)) return prev;
+        return [...prev, invoiceId];
+      }
+      return prev.filter((id) => id !== invoiceId);
+    });
+  }
+
+  function toggleSelectAllInPage(checked: boolean) {
+    setSelectedInvoiceIds((prev) => {
+      const pageIds = new Set(allPageIds);
+      if (checked) {
+        const merged = new Set([...prev, ...allPageIds]);
+        return Array.from(merged);
+      }
+      return prev.filter((id) => !pageIds.has(id));
+    });
+  }
+
+  async function handleDeleteSelected() {
+    const ids = Array.from(
+      new Set(
+        selectedInvoiceIds
+          .map((id) => String(id || "").trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (ids.length === 0) {
+      setErrorMessage("Selecione ao menos uma nota para excluir.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Deseja excluir ${ids.length} nota(s) importada(s)? Essa ação não pode ser desfeita.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingSelected(true);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      const result = await deleteXmlImportInvoices(ids);
+
+      if (result.deleted > 0) {
+        setInvoices((prev) => prev.filter((invoice) => !ids.includes(invoice.id)));
+      }
+      setSelectedInvoiceIds((prev) => prev.filter((id) => !ids.includes(id)));
+
+      const summaryMessage =
+        result.notFound > 0
+          ? `Exclusão concluída. Removidas: ${result.deleted}. Não encontradas: ${result.notFound}.`
+          : `Exclusão concluída. Removidas: ${result.deleted} nota(s).`;
+      setSuccessMessage(summaryMessage);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível excluir as notas selecionadas.",
+      );
+    } finally {
+      setDeletingSelected(false);
+    }
   }
 
   return (
@@ -486,6 +600,19 @@ export function XmlImportPage() {
 
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-5 py-4">
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={handleDeleteSelected}
+              disabled={deletingSelected || selectedInvoiceIds.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 size={16} />
+              {deletingSelected
+                ? "Excluindo..."
+                : `Excluir selecionadas (${selectedInvoiceIds.length})`}
+            </button>
+          </div>
           <h2 className="text-lg font-bold text-slate-900">Notas importadas</h2>
           <p className="mt-1 text-sm text-slate-500">
             Consulte e filtre as NF-e importadas por competência, emitente, número, status e data.
@@ -564,6 +691,15 @@ export function XmlImportPage() {
           <table className="min-w-[1460px] w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
+                <th className="w-12 px-4 py-3 text-left font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={allSelectedInPage}
+                    onChange={(event) => toggleSelectAllInPage(event.target.checked)}
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-orange-500 focus:ring-orange-300"
+                    aria-label="Selecionar notas da página"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Competência</th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Emitente</th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Número</th>
@@ -580,19 +716,30 @@ export function XmlImportPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={12} className="px-4 py-8 text-center text-slate-500">
                     Carregando notas...
                   </td>
                 </tr>
               ) : paginatedInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={12} className="px-4 py-8 text-center text-slate-500">
                     Nenhuma nota encontrada com os filtros selecionados.
                   </td>
                 </tr>
               ) : (
                 paginatedInvoices.map((invoice) => (
                   <tr key={invoice.id} className="border-t border-slate-100">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedInvoiceIds.includes(invoice.id)}
+                        onChange={(event) =>
+                          toggleInvoiceSelection(invoice.id, event.target.checked)
+                        }
+                        className="h-4 w-4 cursor-pointer rounded border-slate-300 text-orange-500 focus:ring-orange-300"
+                        aria-label={`Selecionar nota ${invoice.number || invoice.invoiceKey}`}
+                      />
+                    </td>
                     <td className="px-4 py-3 text-slate-700">{formatCompetencia(invoice)}</td>
                     <td className="px-4 py-3 text-slate-700">{invoice.issuerName || "-"}</td>
                     <td className="px-4 py-3 text-slate-700">{invoice.number || "-"}</td>
@@ -618,8 +765,15 @@ export function XmlImportPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">{invoice.invoiceKey}</td>
                     <td className="px-4 py-3 text-slate-700">
-                      {invoice.processingStatus === "SUGGESTED" ? (
-                        <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          to={`/xml-import/invoices/${invoice.id}`}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          Ver detalhes
+                        </Link>
+                        {invoice.processingStatus === "SUGGESTED" ? (
+                          <>
                           {invoice.processingType === "FUEL" ? (
                             <button
                               type="button"
@@ -659,16 +813,17 @@ export function XmlImportPage() {
                           ) : null}
                           <button
                             type="button"
-                            onClick={() => ignoreInvoice(invoice.id)}
+                            onClick={() => ignoreInvoice(invoice)}
                             disabled={Boolean(rowLoading[invoice.id])}
                             className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            Ignorar
+                            {rowLoading[invoice.id] === "ignore" ? "Ignorando..." : "Ignorar"}
                           </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-500">Sem ações</span>
-                      )}
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-500">Sem ações adicionais</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
