@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import axios from "axios";
 import { getBranches } from "../../services/branches";
 import { getDrivers } from "../../services/drivers";
 import { getVehicles } from "../../services/vehicles";
@@ -223,8 +224,17 @@ export function XmlInvoiceDetailPage() {
       await reloadInvoice();
       setSuccessMessage("Vínculo de abastecimento completado com sucesso.");
     } catch (error) {
+      const apiMessage = axios.isAxiosError(error)
+        ? error.response?.data?.message || error.response?.data?.error
+        : null;
+      const parsedMessage = Array.isArray(apiMessage)
+        ? apiMessage.join(", ")
+        : typeof apiMessage === "string"
+          ? apiMessage
+          : null;
       setErrorMessage(
-        error instanceof Error ? error.message : "Não foi possível completar o vínculo.",
+        parsedMessage ||
+          (error instanceof Error ? error.message : "Não foi possível completar o vínculo."),
       );
     } finally {
       setSavingLink(false);
