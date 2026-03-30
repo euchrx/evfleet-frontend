@@ -12,13 +12,11 @@ import {
   ClipboardList,
   CreditCard,
   Crown,
-  FileArchive,
   FileText,
   Fuel,
   LayoutDashboard,
   Menu,
   LogOut,
-  PackageSearch,
   Route,
   ShieldCheck,
   Truck,
@@ -242,26 +240,12 @@ export function AppLayout() {
       icon: ShieldCheck,
       roles: ["ADMIN"],
     },
-    {
-      name: "Central XML (auditoria)",
-      path: "/xml-import",
-      icon: FileArchive,
-      roles: ["ADMIN"],
-    },
-    {
-      name: "Importação XML de produtos",
-      path: "/xml-import/retail-products",
-      icon: PackageSearch,
-      roles: ["ADMIN"],
-    },
   ];
 
   const administrativePaths = new Set([
     "/companies",
     "/finance",
     "/users",
-    "/xml-import",
-    "/xml-import/retail-products",
     "/administration",
   ]);
   const isAdminWithoutCompanyScope =

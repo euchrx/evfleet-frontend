@@ -9,8 +9,6 @@ export type MenuVisibilityItem = {
 
 export const MENU_VISIBILITY_ITEMS: MenuVisibilityItem[] = [
   { label: "Dashboard", path: "/dashboard" },
-  { label: "Central XML (auditoria)", path: "/xml-import" },
-  { label: "Importação XML de produtos", path: "/xml-import/retail-products" },
   { label: "Relatórios", path: "/reports" },
   { label: "Veículos", path: "/vehicles" },
   { label: "Motoristas", path: "/drivers" },

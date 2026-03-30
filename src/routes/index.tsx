@@ -19,10 +19,7 @@ import { VehicleDocumentsPage } from "../pages/VehicleDocuments";
 import { HowToPage } from "../pages/HowTo";
 import { SubscriptionPage } from "../pages/Subscription";
 import { BillingSuccessPage } from "../pages/BillingSuccess";
-import { XmlImportPage } from "../pages/XmlImport";
 import { XmlInvoiceDetailPage } from "../pages/XmlImport/InvoiceDetail";
-import { XmlRetailProductsPage } from "../pages/XmlImport/RetailProducts";
-import { XmlRetailProductDetailPage } from "../pages/XmlImport/RetailProductDetail";
 import { PrivateRoute } from "./PrivateRoute";
 import { RoleRoute } from "./RoleRoute";
 
@@ -46,16 +43,7 @@ export function AppRoutes() {
             <Route path="/vehicle-documents" element={<VehicleDocumentsPage />} />
             <Route path="/debts" element={<DebtsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/xml-import" element={<XmlImportPage />} />
             <Route path="/xml-import/invoices/:id" element={<XmlInvoiceDetailPage />} />
-            <Route
-              path="/xml-import/retail-products"
-              element={<XmlRetailProductsPage />}
-            />
-            <Route
-              path="/xml-import/retail-products/:id"
-              element={<XmlRetailProductDetailPage />}
-            />
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/billing/success" element={<BillingSuccessPage />} />
             <Route path="/how-to-use" element={<HowToPage />} />

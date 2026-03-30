@@ -1119,7 +1119,7 @@ export function FuelRecordsPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <input
           type="text"
-          placeholder="Buscar por filial, placa ou nota"
+          placeholder="Buscar por filial ou placa"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
@@ -1168,9 +1168,6 @@ export function FuelRecordsPage() {
                   <button type="button" onClick={() => handleSort("branch")} className="cursor-pointer">Filial {getSortArrow("branch")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <button type="button" onClick={() => handleSort("invoiceNumber")} className="cursor-pointer">Nota {getSortArrow("invoiceNumber")}</button>
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button type="button" onClick={() => handleSort("vehicle")} className="cursor-pointer">Veículo {getSortArrow("vehicle")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
@@ -1204,7 +1201,7 @@ export function FuelRecordsPage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={12}
+                    colSpan={11}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
                     Carregando abastecimentos...
@@ -1213,7 +1210,7 @@ export function FuelRecordsPage() {
               ) : filteredRecords.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={12}
+                    colSpan={11}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
                     Nenhum abastecimento encontrado.
@@ -1233,9 +1230,6 @@ export function FuelRecordsPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {getRecordBranchName(record)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      {record.invoiceNumber || "-"}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {record.vehicle ? formatVehicleLabel(record.vehicle) : record.vehicleId}
