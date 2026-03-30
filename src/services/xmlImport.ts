@@ -42,10 +42,23 @@ export type XmlInvoice = {
   totalAmount?: string | number | null;
   protocolNumber?: string | null;
   invoiceStatus: string;
+  processingType?: string | null;
+  processingStatus?: string | null;
+  processedAt?: string | null;
+  linkedFuelRecordId?: string | null;
+  linkedMaintenanceRecordId?: string | null;
+  linkedCostId?: string | null;
   createdAt: string;
   _count?: {
     items?: number;
   };
+};
+
+export type XmlInvoiceProcessResult = {
+  invoiceId: string;
+  processingStatus: string;
+  createdRecordType: "FUEL_RECORD" | "MAINTENANCE_RECORD" | "COST_RECORD";
+  createdRecordId: string;
 };
 
 export async function uploadXmlZip(file: File, branchId?: string, periodLabel?: string) {
@@ -75,3 +88,23 @@ export async function getXmlImportInvoices(batchId?: string) {
   return Array.isArray(data) ? data : [];
 }
 
+export async function processXmlInvoiceFuel(invoiceId: string) {
+  const { data } = await api.post<XmlInvoiceProcessResult>(
+    `/xml-import/invoices/${invoiceId}/process/fuel`,
+  );
+  return data;
+}
+
+export async function processXmlInvoiceMaintenance(invoiceId: string) {
+  const { data } = await api.post<XmlInvoiceProcessResult>(
+    `/xml-import/invoices/${invoiceId}/process/maintenance`,
+  );
+  return data;
+}
+
+export async function processXmlInvoiceCost(invoiceId: string) {
+  const { data } = await api.post<XmlInvoiceProcessResult>(
+    `/xml-import/invoices/${invoiceId}/process/cost`,
+  );
+  return data;
+}

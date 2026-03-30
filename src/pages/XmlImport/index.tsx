@@ -4,6 +4,9 @@ import { TablePagination } from "../../components/TablePagination";
 import {
   getXmlImportBatches,
   getXmlImportInvoices,
+  processXmlInvoiceCost,
+  processXmlInvoiceFuel,
+  processXmlInvoiceMaintenance,
   uploadXmlZip,
   type XmlImportBatch,
   type XmlImportBatchSummary,
@@ -24,6 +27,37 @@ function statusBadgeClass(status?: string) {
   if (status === "AUTHORIZED") return "status-pill status-active";
   if (status === "CANCELED") return "status-pill status-inactive";
   if (status === "DENIED") return "status-pill status-anomaly";
+  return "status-pill status-pending";
+}
+
+function formatProcessingType(type?: string | null) {
+  if (type === "FUEL") return "Combustível";
+  if (type === "PRODUCT") return "Produto";
+  if (type === "SERVICE") return "Serviço";
+  return "Não classificada";
+}
+
+function processingTypeBadgeClass(type?: string | null) {
+  if (type === "FUEL") return "status-pill status-active";
+  if (type === "PRODUCT") return "status-pill status-pending";
+  if (type === "SERVICE") return "status-pill status-anomaly";
+  return "status-pill";
+}
+
+function formatProcessingStatus(status?: string | null) {
+  if (status === "PENDING") return "Pendente";
+  if (status === "SUGGESTED") return "Sugerida";
+  if (status === "PROCESSED") return "Processada";
+  if (status === "IGNORED") return "Ignorada";
+  if (status === "ERROR") return "Erro";
+  return "Não definido";
+}
+
+function processingStatusBadgeClass(status?: string | null) {
+  if (status === "PROCESSED") return "status-pill status-active";
+  if (status === "IGNORED") return "status-pill";
+  if (status === "ERROR") return "status-pill status-inactive";
+  if (status === "SUGGESTED") return "status-pill status-pending";
   return "status-pill status-pending";
 }
 
@@ -76,9 +110,13 @@ export function XmlImportPage() {
   const [emitenteFilter, setEmitenteFilter] = useState("");
   const [numeroFilter, setNumeroFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [processingStatusFilter, setProcessingStatusFilter] = useState("ALL");
+  const [processingTypeFilter, setProcessingTypeFilter] = useState("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [rowLoading, setRowLoading] = useState<Record<string, string>>({});
+  const [ignoredInvoiceIds, setIgnoredInvoiceIds] = useState<string[]>([]);
 
   async function loadData(isManualRefresh = false) {
     try {
@@ -114,7 +152,13 @@ export function XmlImportPage() {
       const emitente = String(invoice.issuerName || "").toLowerCase();
       const numero = String(invoice.number || "");
       const status = String(invoice.invoiceStatus || "");
+      const processingStatus = String(invoice.processingStatus || "PENDING");
+      const processingType = String(invoice.processingType || "UNKNOWN");
       const issuedAt = invoice.issuedAt ? new Date(invoice.issuedAt) : null;
+
+      if (ignoredInvoiceIds.includes(invoice.id)) {
+        return false;
+      }
 
       if (competenciaFilter.trim() && !competencia.includes(competenciaFilter.trim())) {
         return false;
@@ -131,6 +175,12 @@ export function XmlImportPage() {
       if (statusFilter !== "ALL" && status !== statusFilter) {
         return false;
       }
+      if (processingStatusFilter !== "ALL" && processingStatus !== processingStatusFilter) {
+        return false;
+      }
+      if (processingTypeFilter !== "ALL" && processingType !== processingTypeFilter) {
+        return false;
+      }
       if (dateFrom && issuedAt) {
         const fromDate = new Date(`${dateFrom}T00:00:00`);
         if (issuedAt < fromDate) return false;
@@ -143,7 +193,18 @@ export function XmlImportPage() {
       if (dateTo && !issuedAt) return false;
       return true;
     });
-  }, [invoices, competenciaFilter, emitenteFilter, numeroFilter, statusFilter, dateFrom, dateTo]);
+  }, [
+    invoices,
+    ignoredInvoiceIds,
+    competenciaFilter,
+    emitenteFilter,
+    numeroFilter,
+    statusFilter,
+    processingStatusFilter,
+    processingTypeFilter,
+    dateFrom,
+    dateTo,
+  ]);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredInvoices.length / PAGE_SIZE)),
@@ -157,7 +218,16 @@ export function XmlImportPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [competenciaFilter, emitenteFilter, numeroFilter, statusFilter, dateFrom, dateTo]);
+  }, [
+    competenciaFilter,
+    emitenteFilter,
+    numeroFilter,
+    statusFilter,
+    processingStatusFilter,
+    processingTypeFilter,
+    dateFrom,
+    dateTo,
+  ]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -196,6 +266,62 @@ export function XmlImportPage() {
     } finally {
       setUploading(false);
     }
+  }
+
+  async function processInvoice(invoice: XmlInvoice, action: "fuel" | "maintenance" | "cost") {
+    const actionLabel =
+      action === "fuel"
+        ? "criar abastecimento"
+        : action === "maintenance"
+          ? "criar manutenção"
+          : "criar custo";
+
+    if (!window.confirm(`Deseja ${actionLabel} para esta nota?`)) {
+      return;
+    }
+
+    try {
+      setRowLoading((prev) => ({ ...prev, [invoice.id]: action }));
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      if (action === "fuel") {
+        await processXmlInvoiceFuel(invoice.id);
+      } else if (action === "maintenance") {
+        await processXmlInvoiceMaintenance(invoice.id);
+      } else {
+        await processXmlInvoiceCost(invoice.id);
+      }
+
+      setInvoices((prev) =>
+        prev.map((item) =>
+          item.id === invoice.id
+            ? {
+                ...item,
+                processingStatus: "PROCESSED",
+                processedAt: new Date().toISOString(),
+              }
+            : item,
+        ),
+      );
+      setSuccessMessage("Nota processada com sucesso.");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Não foi possível processar a nota.",
+      );
+    } finally {
+      setRowLoading((prev) => {
+        const next = { ...prev };
+        delete next[invoice.id];
+        return next;
+      });
+    }
+  }
+
+  function ignoreInvoice(invoiceId: string) {
+    if (!window.confirm("Deseja ignorar esta nota?")) return;
+    setIgnoredInvoiceIds((prev) => (prev.includes(invoiceId) ? prev : [...prev, invoiceId]));
+    setSuccessMessage("Nota marcada como ignorada nesta visualização.");
   }
 
   return (
@@ -329,13 +455,13 @@ export function XmlImportPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={11} className="px-4 py-8 text-center text-slate-500">
                     Carregando lotes...
                   </td>
                 </tr>
               ) : batches.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={11} className="px-4 py-8 text-center text-slate-500">
                     Nenhum lote importado.
                   </td>
                 </tr>
@@ -366,7 +492,7 @@ export function XmlImportPage() {
           </p>
         </div>
         <div className="border-b border-slate-200 p-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
             <input
               value={competenciaFilter}
               onChange={(event) => setCompetenciaFilter(event.target.value)}
@@ -396,6 +522,29 @@ export function XmlImportPage() {
               <option value="DENIED">Denegada</option>
               <option value="UNKNOWN">Desconhecida</option>
             </select>
+            <select
+              value={processingTypeFilter}
+              onChange={(event) => setProcessingTypeFilter(event.target.value)}
+              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            >
+              <option value="ALL">Todos os tipos</option>
+              <option value="FUEL">Combustível</option>
+              <option value="PRODUCT">Produto</option>
+              <option value="SERVICE">Serviço</option>
+              <option value="UNKNOWN">Não classificada</option>
+            </select>
+            <select
+              value={processingStatusFilter}
+              onChange={(event) => setProcessingStatusFilter(event.target.value)}
+              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            >
+              <option value="ALL">Todas as situações</option>
+              <option value="PENDING">Pendente</option>
+              <option value="SUGGESTED">Sugerida</option>
+              <option value="PROCESSED">Processada</option>
+              <option value="IGNORED">Ignorada</option>
+              <option value="ERROR">Erro</option>
+            </select>
             <input
               type="date"
               value={dateFrom}
@@ -412,7 +561,7 @@ export function XmlImportPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-[1240px] w-full text-sm">
+          <table className="min-w-[1460px] w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Competência</th>
@@ -421,8 +570,11 @@ export function XmlImportPage() {
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Série</th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Data</th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Tipo</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Situação</th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Total</th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Chave</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -451,10 +603,73 @@ export function XmlImportPage() {
                         {formatInvoiceStatus(invoice.invoiceStatus)}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      <span className={processingTypeBadgeClass(invoice.processingType)}>
+                        {formatProcessingType(invoice.processingType)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      <span className={processingStatusBadgeClass(invoice.processingStatus)}>
+                        {formatProcessingStatus(invoice.processingStatus)}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       {formatAmountReais(invoice.totalAmount)}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">{invoice.invoiceKey}</td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {invoice.processingStatus === "SUGGESTED" ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {invoice.processingType === "FUEL" ? (
+                            <button
+                              type="button"
+                              onClick={() => processInvoice(invoice, "fuel")}
+                              disabled={Boolean(rowLoading[invoice.id])}
+                              className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {rowLoading[invoice.id] === "fuel"
+                                ? "Processando..."
+                                : "Criar abastecimento"}
+                            </button>
+                          ) : null}
+                          {invoice.processingType === "PRODUCT" ||
+                          invoice.processingType === "SERVICE" ? (
+                            <button
+                              type="button"
+                              onClick={() => processInvoice(invoice, "maintenance")}
+                              disabled={Boolean(rowLoading[invoice.id])}
+                              className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {rowLoading[invoice.id] === "maintenance"
+                                ? "Processando..."
+                                : "Criar manutenção"}
+                            </button>
+                          ) : null}
+                          {invoice.processingType === "UNKNOWN" ? (
+                            <button
+                              type="button"
+                              onClick={() => processInvoice(invoice, "cost")}
+                              disabled={Boolean(rowLoading[invoice.id])}
+                              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {rowLoading[invoice.id] === "cost"
+                                ? "Processando..."
+                                : "Criar custo"}
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => ignoreInvoice(invoice.id)}
+                            disabled={Boolean(rowLoading[invoice.id])}
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Ignorar
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-500">Sem ações</span>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -474,4 +689,3 @@ export function XmlImportPage() {
     </div>
   );
 }
-
