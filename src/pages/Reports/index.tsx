@@ -396,13 +396,6 @@ export function ReportsPage() {
     debts,
   ]);
 
-  const metrics = useMemo(() => {
-    const fuelCost = filteredData.fuel.reduce((sum, item) => sum + (item.totalValue || 0), 0);
-    const maintenanceCost = filteredData.maintenance.reduce((sum, item) => sum + (item.cost || 0), 0);
-    const debtsCost = filteredData.debts.reduce((sum, item) => sum + (item.amount || 0), 0);
-    return { total: fuelCost + maintenanceCost + debtsCost };
-  }, [filteredData]);
-
   function vehicleStatusLabel(value?: string) {
     if (value === "ACTIVE") return "Ativo";
     if (value === "INACTIVE") return "Inativo";
@@ -424,6 +417,18 @@ export function ReportsPage() {
     const showFuel = selectedModules.includes("FUEL");
     const showMaintenance = selectedModules.includes("MAINTENANCE");
     const showDebts = selectedModules.includes("DEBTS");
+    const vehiclesModuleTotal = 0;
+    const fuelModuleTotal = filteredData.fuel.reduce((sum, item) => sum + Number(item.totalValue || 0), 0);
+    const maintenanceModuleTotal = filteredData.maintenance.reduce(
+      (sum, item) => sum + Number(item.cost || 0),
+      0
+    );
+    const debtsModuleTotal = filteredData.debts.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const totalGeral =
+      (showVehicles ? vehiclesModuleTotal : 0) +
+      (showFuel ? fuelModuleTotal : 0) +
+      (showMaintenance ? maintenanceModuleTotal : 0) +
+      (showDebts ? debtsModuleTotal : 0);
     const selectedVehicleStatusesLabel =
       selectedVehicleStatuses.length > 0
         ? selectedVehicleStatuses.map((status) => vehicleStatusLabel(status)).join(", ")
@@ -444,7 +449,8 @@ export function ReportsPage() {
                          labelVehicleType(item.vehicleType)
                        )}</td><td>${escapeHtml(vehicleStatusLabel(item.status))}</td></tr>`
                    )
-                   .join("")}</tbody></table>`,
+                   .join("")}</tbody></table>
+                 <div class="module-total">Total do módulo Veículos: ${toCurrency(vehiclesModuleTotal)}</div>`,
       },
       {
         enabled: showFuel,
@@ -462,7 +468,8 @@ export function ReportsPage() {
                          "pt-BR"
                        )}</td></tr>`
                    )
-                   .join("")}</tbody></table>`,
+                   .join("")}</tbody></table>
+                 <div class="module-total">Total do módulo Abastecimentos: ${toCurrency(fuelModuleTotal)}</div>`,
       },
       {
         enabled: showMaintenance,
@@ -480,7 +487,8 @@ export function ReportsPage() {
                          "pt-BR"
                        )}</td></tr>`
                    )
-                   .join("")}</tbody></table>`,
+                   .join("")}</tbody></table>
+                 <div class="module-total">Total do módulo Manutenções: ${toCurrency(maintenanceModuleTotal)}</div>`,
       },
       {
         enabled: showDebts,
@@ -496,7 +504,8 @@ export function ReportsPage() {
                          item.description || "-"
                        )}</td><td>${escapeHtml(labelDebtStatus(item.status))}</td><td>${toCurrency(item.amount || 0)}</td></tr>`
                    )
-                   .join("")}</tbody></table>`,
+                   .join("")}</tbody></table>
+                 <div class="module-total">Total do módulo Débitos e multas: ${toCurrency(debtsModuleTotal)}</div>`,
       },
     ];
 
@@ -523,14 +532,24 @@ export function ReportsPage() {
             table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
             th, td { border: 1px solid #cbd5e1; padding: 6px; text-align: left; }
             th { background: #f8fafc; }
+            .module-total { margin: 8px 0 14px; font-size: 13px; font-weight: 700; color: #0f172a; }
+            .grand-total {
+              margin-top: 18px;
+              padding-top: 10px;
+              border-top: 2px solid #cbd5e1;
+              font-size: 16px;
+              font-weight: 800;
+              color: #0f172a;
+            }
           </style>
         </head>
         <body>
           <h1>Relatório operacional</h1>
           <div class="meta">Período: ${escapeHtml(formatDate(startDate))} até ${escapeHtml(formatDate(endDate))}</div>
-          ${metrics.total > 0 ? `<div class="meta">Total de despesas: ${toCurrency(metrics.total)}</div>` : ""}
+          ${totalGeral > 0 ? `<div class="meta">Total de despesas: ${toCurrency(totalGeral)}</div>` : ""}
           ${showVehicles ? `<div class="meta">Status de veículos: ${escapeHtml(selectedVehicleStatusesLabel)}</div>` : ""}
           ${moduleSections}
+          <div class="grand-total">Valor total geral: ${toCurrency(totalGeral)}</div>
         </body>
       </html>
     `;

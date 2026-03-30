@@ -13,6 +13,7 @@ type BillingPlanApi = {
   name: string;
   description?: string | null;
   priceCents: number;
+  vehicleLimit?: number | null;
   currency: string;
   interval: PlanInterval;
   isActive?: boolean;
@@ -70,6 +71,7 @@ export type SubscriptionPlan = {
   code: string;
   name: string;
   priceCents: number;
+  vehicleLimit?: number | null;
   currency: string;
   billingCycle: PlanInterval;
   description: string;
@@ -79,6 +81,7 @@ export type SubscriptionPlan = {
 export type SubscriptionInvoice = {
   id: string;
   date?: string;
+  paidAt?: string;
   description: string;
   amountCents: number;
   status: PaymentStatus;
@@ -111,6 +114,7 @@ export type CreateBillingPlanInput = {
   name: string;
   description?: string;
   priceCents: number;
+  vehicleLimit?: number;
   currency?: string;
   interval: PlanInterval;
   active?: boolean;
@@ -162,6 +166,10 @@ function toPlanView(plan: BillingPlanApi, currentPlanId?: string): SubscriptionP
     code: plan.code,
     name: plan.name,
     priceCents: Number(plan.priceCents || 0),
+    vehicleLimit:
+      typeof plan.vehicleLimit === "number" && plan.vehicleLimit > 0
+        ? Number(plan.vehicleLimit)
+        : null,
     currency: plan.currency || "BRL",
     billingCycle: plan.interval,
     description: (plan.description || "Plano corporativo de assinatura.").trim(),
@@ -180,6 +188,7 @@ function toInvoiceView(payment: BillingPaymentApi, planName: string): Subscripti
   return {
     id: payment.id,
     date: payment.createdAt || payment.dueAt || payment.dueDate || payment.paidAt || undefined,
+    paidAt: payment.paidAt || undefined,
     description: `Assinatura - ${planName}`,
     amountCents: Number(amountCents || 0),
     status: payment.status,
@@ -295,6 +304,10 @@ export async function createBillingPlan(input: CreateBillingPlanInput) {
     name: input.name.trim(),
     description: input.description?.trim() || undefined,
     priceCents: Number(input.priceCents),
+    vehicleLimit:
+      typeof input.vehicleLimit === "number" && Number.isFinite(input.vehicleLimit)
+        ? Math.max(1, Math.floor(input.vehicleLimit))
+        : undefined,
     currency: (input.currency || "BRL").trim().toUpperCase(),
     interval: input.interval,
     active: input.active ?? true,
@@ -309,6 +322,10 @@ export async function updateBillingPlan(planId: string, input: UpdateBillingPlan
     name: input.name.trim(),
     description: input.description?.trim() || undefined,
     priceCents: Number(input.priceCents),
+    vehicleLimit:
+      typeof input.vehicleLimit === "number" && Number.isFinite(input.vehicleLimit)
+        ? Math.max(1, Math.floor(input.vehicleLimit))
+        : undefined,
     currency: (input.currency || "BRL").trim().toUpperCase(),
     interval: input.interval,
     active: input.active ?? true,

@@ -75,6 +75,13 @@ function getStatusAlert(status?: SubscriptionStatus) {
   return null;
 }
 
+function parseDateSafe(value?: string) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
 export function SubscriptionPage() {
   const location = useLocation();
   const { user } = useAuth();
@@ -103,6 +110,7 @@ export function SubscriptionPage() {
     name: "",
     description: "",
     priceCents: "",
+    vehicleLimit: "",
     interval: "MONTHLY" as PlanInterval,
   });
 
@@ -131,6 +139,39 @@ export function SubscriptionPage() {
   const canManagePlans = user?.role === "ADMIN";
   const hasCompanyScope = Boolean(data?.companyId);
   const statusAlert = getStatusAlert(overview?.status);
+  const paymentUnlockDaysBeforeDue = 5;
+  const now = new Date();
+  const nextBillingDate = parseDateSafe(overview?.nextBillingDate);
+  const currentPeriodStart = parseDateSafe(overview?.startedAt);
+  const latestPaidInvoice = [...invoices]
+    .filter((invoice) => invoice.status === "PAID")
+    .sort((a, b) => {
+      const dateA = parseDateSafe(a.paidAt || a.date)?.getTime() || 0;
+      const dateB = parseDateSafe(b.paidAt || b.date)?.getTime() || 0;
+      return dateB - dateA;
+    })[0];
+  const latestPaidDate = parseDateSafe(latestPaidInvoice?.paidAt || latestPaidInvoice?.date);
+  const hasPaidCurrentCycle = Boolean(
+    latestPaidDate && (!currentPeriodStart || latestPaidDate >= currentPeriodStart),
+  );
+  const paymentUnlockDate = nextBillingDate
+    ? new Date(nextBillingDate.getTime() - paymentUnlockDaysBeforeDue * 24 * 60 * 60 * 1000)
+    : null;
+  const isInsideUnlockWindow = paymentUnlockDate ? now >= paymentUnlockDate : true;
+  const paymentWindowBlocked = Boolean(
+    overview &&
+      overview.status !== "PAST_DUE" &&
+      overview.status !== "CANCELED" &&
+      hasPaidCurrentCycle &&
+      !isInsideUnlockWindow,
+  );
+  const paymentWindowBlockedMessage = paymentWindowBlocked
+    ? paymentUnlockDate
+      ? `Pagamento deste ciclo ja confirmado. Nova cobranca sera liberada em ${paymentUnlockDate.toLocaleDateString(
+          "pt-BR",
+        )}.`
+      : "Pagamento deste ciclo ja confirmado. Aguarde a proxima janela de cobranca."
+    : "";
 
   function redirectToCheckout(checkoutUrl: string) {
     const normalizedUrl = String(checkoutUrl || "").trim();
@@ -148,6 +189,7 @@ export function SubscriptionPage() {
       name: "",
       description: "",
       priceCents: "",
+      vehicleLimit: "",
       interval: "MONTHLY",
     });
     setIsPlanModalOpen(true);
@@ -160,6 +202,10 @@ export function SubscriptionPage() {
       name: plan.name,
       description: plan.description || "",
       priceCents: String(plan.priceCents),
+      vehicleLimit:
+        typeof plan.vehicleLimit === "number" && plan.vehicleLimit > 0
+          ? String(plan.vehicleLimit)
+          : "",
       interval: plan.billingCycle,
     });
     setIsPlanModalOpen(true);
@@ -195,6 +241,12 @@ export function SubscriptionPage() {
       .filter(Boolean);
     const normalized = descriptionParts.slice(0, 6);
 
+    if (typeof plan.vehicleLimit === "number" && plan.vehicleLimit > 0) {
+      normalized.unshift(`Limite de ${plan.vehicleLimit} veículo(s) por empresa.`);
+    } else {
+      normalized.unshift("Sem limite de veículos no cadastro.");
+    }
+
     if (normalized.length === 0) {
       normalized.push("Acesso completo ao módulo de gestão de frota.");
       normalized.push("Suporte para operação multiempresa.");
@@ -206,6 +258,10 @@ export function SubscriptionPage() {
 
   async function handleSelectPlanAndPay() {
     if (!selectedPlanForCheckout?.id) return;
+    if (paymentWindowBlocked) {
+      setErrorMessage(paymentWindowBlockedMessage || "Pagamento ja confirmado para o ciclo atual.");
+      return;
+    }
     if (!canManagePlans) {
       setErrorMessage("Somente administrador pode alterar o plano.");
       return;
@@ -256,6 +312,10 @@ export function SubscriptionPage() {
 
   async function handlePayNow() {
     if (!overview?.subscriptionId) return;
+    if (paymentWindowBlocked) {
+      setErrorMessage(paymentWindowBlockedMessage || "Pagamento ja confirmado para o ciclo atual.");
+      return;
+    }
     try {
       setPayingNow(true);
       setErrorMessage("");
@@ -280,6 +340,7 @@ export function SubscriptionPage() {
         name: newPlan.name,
         description: newPlan.description,
         priceCents: Number(newPlan.priceCents),
+        vehicleLimit: newPlan.vehicleLimit ? Number(newPlan.vehicleLimit) : undefined,
         interval: newPlan.interval,
         currency: "BRL",
         active: true,
@@ -296,6 +357,7 @@ export function SubscriptionPage() {
         name: "",
         description: "",
         priceCents: "",
+        vehicleLimit: "",
         interval: "MONTHLY",
       });
       await loadData();
@@ -401,10 +463,10 @@ export function SubscriptionPage() {
             <button
               type="button"
               onClick={handlePayNow}
-              disabled={payingNow}
+              disabled={payingNow || paymentWindowBlocked}
               className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {payingNow ? "Redirecionando..." : "Pagar agora"}
+              {payingNow ? "Redirecionando..." : paymentWindowBlocked ? "Pago no ciclo atual" : "Pagar agora"}
             </button>
           ) : null}
           <button
@@ -428,6 +490,11 @@ export function SubscriptionPage() {
       {statusAlert ? (
         <div className={`rounded-2xl border px-4 py-3 text-sm font-medium ${statusAlert.className}`}>
           {statusAlert.message}
+        </div>
+      ) : null}
+      {paymentWindowBlockedMessage ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+          {paymentWindowBlockedMessage}
         </div>
       ) : null}
 
@@ -556,6 +623,11 @@ export function SubscriptionPage() {
                     /{plan.billingCycle === "MONTHLY" ? "mês" : "ano"}
                   </span>
                 </p>
+                <p className="mt-1 text-sm font-medium text-slate-600">
+                  {typeof plan.vehicleLimit === "number" && plan.vehicleLimit > 0
+                    ? `Limite de ${plan.vehicleLimit} veículo(s)`
+                    : "Sem limite de veículos"}
+                </p>
 
                 <button
                   type="button"
@@ -619,7 +691,7 @@ export function SubscriptionPage() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-4">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Código</p>
                   <p className="mt-1 text-sm font-semibold text-slate-900">{selectedPlanForCheckout.code}</p>
@@ -633,6 +705,15 @@ export function SubscriptionPage() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
                   <p className="mt-1 text-sm font-semibold text-slate-900">Disponível</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Limite de veículos</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {typeof selectedPlanForCheckout.vehicleLimit === "number" &&
+                    selectedPlanForCheckout.vehicleLimit > 0
+                      ? `${selectedPlanForCheckout.vehicleLimit} veículo(s)`
+                      : "Ilimitado"}
+                  </p>
                 </div>
               </div>
 
@@ -723,10 +804,10 @@ export function SubscriptionPage() {
                 <button
                   type="button"
                   onClick={handlePayNow}
-                  disabled={payingNow || !data?.canPayNow}
+                  disabled={payingNow || !data?.canPayNow || paymentWindowBlocked}
                   className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {payingNow ? "Redirecionando..." : "Pagar agora"}
+                  {payingNow ? "Redirecionando..." : paymentWindowBlocked ? "Pago no ciclo atual" : "Pagar agora"}
                 </button>
               ) : (
                 <button
@@ -886,6 +967,19 @@ export function SubscriptionPage() {
                       setNewPlan((prev) => ({ ...prev, priceCents: event.target.value }))
                     }
                     placeholder="Ex: 59900"
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Limite de veículos permitidos</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newPlan.vehicleLimit}
+                    onChange={(event) =>
+                      setNewPlan((prev) => ({ ...prev, vehicleLimit: event.target.value }))
+                    }
+                    placeholder="Ex: 20 (deixe vazio para ilimitado)"
                     className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                   />
                 </div>

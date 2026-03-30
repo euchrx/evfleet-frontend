@@ -30,6 +30,7 @@ import { formatVehicleLabel } from "../../utils/vehicleLabel";
 import { formatFuelTypeLabel } from "../../utils/fuelTypeLabel";
 
 type FuelFormData = {
+  invoiceNumber: string;
   liters: string;
   totalValue: string;
   km: string;
@@ -42,6 +43,7 @@ type FuelFormData = {
 type FuelFieldErrors = Partial<Record<keyof FuelFormData, string>>;
 
 const initialForm: FuelFormData = {
+  invoiceNumber: "",
   liters: "",
   totalValue: "",
   km: "",
@@ -300,6 +302,7 @@ export function FuelRecordsPage() {
   const { branches } = useBranch();
   const { selectedCompanyId } = useCompanyScope();
   type FuelSortBy =
+    | "invoiceNumber"
     | "branch"
     | "vehicle"
     | "driver"
@@ -454,6 +457,7 @@ export function FuelRecordsPage() {
   function openEditModal(record: FuelRecord) {
     setEditingRecord(record);
     setForm({
+      invoiceNumber: record.invoiceNumber || "",
       liters: String(record.liters).replace(".", ","),
       totalValue: String(record.totalValue).replace(".", ","),
       km: String(record.km),
@@ -496,6 +500,7 @@ export function FuelRecordsPage() {
       setFieldErrors({});
 
       const payload = {
+        invoiceNumber: form.invoiceNumber.trim() || null,
         liters: Number(form.liters.replace(/\./g, "").replace(",", ".")),
         totalValue: Number(form.totalValue.replace(/\./g, "").replace(",", ".")),
         km: Number(form.km),
@@ -523,6 +528,9 @@ export function FuelRecordsPage() {
       }
       if (Number.isNaN(payload.km) || payload.km < 0) {
         nextErrors.km = "Informe o KM corretamente.";
+      }
+      if (payload.invoiceNumber && payload.invoiceNumber.length > 80) {
+        nextErrors.invoiceNumber = "A nota deve ter no máximo 80 caracteres.";
       }
       if (Object.keys(nextErrors).length > 0) {
         setFieldErrors(nextErrors);
@@ -563,6 +571,9 @@ export function FuelRecordsPage() {
       }
 
       const apiText = typeof apiMessage === "string" ? apiMessage : "";
+      if (/nota/i.test(apiText)) {
+        setFieldErrors((prev) => ({ ...prev, invoiceNumber: apiText }));
+      }
       if (/litro/i.test(apiText)) {
         setFieldErrors((prev) => ({ ...prev, liters: "Litros inválidos." }));
       }
@@ -832,6 +843,14 @@ export function FuelRecordsPage() {
         const fuelType = mapFuelType(
           rowMap.get("combustivel") || rowMap.get("tipocombustivel") || rowMap.get("fueltype"),
         );
+        const invoiceNumber = String(
+          rowMap.get("nota") ||
+            rowMap.get("notafiscal") ||
+            rowMap.get("numeronota") ||
+            "",
+        )
+          .trim()
+          .toUpperCase();
 
         if (!normalizedPlate) {
           ignoredCount += 1;
@@ -893,6 +912,7 @@ export function FuelRecordsPage() {
 
         try {
           await createFuelRecord({
+            invoiceNumber: invoiceNumber || null,
             liters,
             totalValue,
             km,
@@ -1054,6 +1074,7 @@ export function FuelRecordsPage() {
             record.vehicle?.plate || "",
             record.vehicle ? formatVehicleLabel(record.vehicle) : "",
             record.driver?.name || "",
+            record.invoiceNumber || "",
             record.fuelType,
             formatLocalDate(record.fuelDate),
             String(record.liters),
@@ -1084,6 +1105,13 @@ export function FuelRecordsPage() {
       }
       if (sortBy === "fuelDate") {
         return (new Date(a.fuelDate).getTime() - new Date(b.fuelDate).getTime()) * direction;
+      }
+      if (sortBy === "invoiceNumber") {
+        return (
+          String(a.invoiceNumber || "").localeCompare(String(b.invoiceNumber || ""), "pt-BR", {
+            sensitivity: "base",
+          }) * direction
+        );
       }
       if (sortBy === "fuelType") return a.fuelType.localeCompare(b.fuelType, "pt-BR") * direction;
       if (sortBy === "liters") return (a.liters - b.liters) * direction;
@@ -1242,7 +1270,7 @@ export function FuelRecordsPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <input
           type="text"
-          placeholder="Buscar por filial ou placa"
+          placeholder="Buscar por filial, placa ou nota"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
@@ -1300,6 +1328,9 @@ export function FuelRecordsPage() {
                   <button type="button" onClick={() => handleSort("fuelDate")} className="cursor-pointer">Data e Hora {getSortArrow("fuelDate")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button type="button" onClick={() => handleSort("invoiceNumber")} className="cursor-pointer">Nota {getSortArrow("invoiceNumber")}</button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button type="button" onClick={() => handleSort("fuelType")} className="cursor-pointer">Combustível {getSortArrow("fuelType")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
@@ -1324,7 +1355,7 @@ export function FuelRecordsPage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={12}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
                     Carregando abastecimentos...
@@ -1333,7 +1364,7 @@ export function FuelRecordsPage() {
               ) : filteredRecords.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={12}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
                     Nenhum abastecimento encontrado.
@@ -1362,6 +1393,9 @@ export function FuelRecordsPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {formatLocalDate(record.fuelDate)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      {record.invoiceNumber || "-"}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {formatFuelTypeLabel(getRecordFuelType(record))}
@@ -1517,6 +1551,24 @@ export function FuelRecordsPage() {
                   </select>
                   {fieldErrors.fuelType ? (
                     <p className="mt-1 text-xs text-red-600">{fieldErrors.fuelType}</p>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Nota
+                  </label>
+                  <input
+                    type="text"
+                    value={form.invoiceNumber}
+                    onChange={(e) =>
+                      handleChange("invoiceNumber", e.target.value.toUpperCase())
+                    }
+                    className={inputClass("invoiceNumber")}
+                    placeholder="Ex: 123456"
+                  />
+                  {fieldErrors.invoiceNumber ? (
+                    <p className="mt-1 text-xs text-red-600">{fieldErrors.invoiceNumber}</p>
                   ) : null}
                 </div>
 

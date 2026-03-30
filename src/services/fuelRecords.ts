@@ -2,6 +2,7 @@ import { api } from "./api";
 
 export type FuelRecord = {
   id: string;
+  invoiceNumber?: string | null;
   liters: number;
   totalValue: number;
   km: number;
@@ -66,6 +67,7 @@ export type FuelInsights = {
 };
 
 export type CreateFuelRecordInput = {
+  invoiceNumber?: string | null;
   liters: number;
   totalValue: number;
   km: number;
