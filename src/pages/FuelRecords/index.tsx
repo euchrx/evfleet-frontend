@@ -297,7 +297,7 @@ function mapFuelType(value: unknown): FuelFormData["fuelType"] {
 
 export function FuelRecordsPage() {
   const location = useLocation();
-  const { selectedBranchId, branches } = useBranch();
+  const { branches } = useBranch();
   const { selectedCompanyId } = useCompanyScope();
   type FuelSortBy =
     | "branch"
@@ -519,6 +519,8 @@ export function FuelRecordsPage() {
 
       closeModal();
       await loadData();
+      setSearch("");
+      setCurrentPage(1);
       notifyHeaderNotifications();
     } catch (error: any) {
       console.error("Erro ao salvar abastecimento:", error);
@@ -935,13 +937,7 @@ export function FuelRecordsPage() {
 
 
   const availableVehicles = useMemo(() => {
-    let filtered = vehicles;
-
-    if (selectedBranchId) {
-      filtered = filtered.filter((vehicle) => vehicle.branchId === selectedBranchId);
-    }
-
-    const sorted = [...filtered].sort((a, b) =>
+    const sorted = [...vehicles].sort((a, b) =>
       a.plate.localeCompare(b.plate, "pt-BR", { sensitivity: "base" })
     );
 
@@ -952,18 +948,10 @@ export function FuelRecordsPage() {
     }
 
     return sorted.filter((vehicle) => vehicle.status === "ACTIVE");
-  }, [vehicles, selectedBranchId, editingRecord, form.vehicleId]);
+  }, [vehicles, editingRecord, form.vehicleId]);
 
   const availableDrivers = useMemo(() => {
-    let filtered = drivers;
-
-    if (selectedBranchId) {
-      filtered = filtered.filter(
-        (driver) => !driver.vehicle || driver.vehicle.branchId === selectedBranchId
-      );
-    }
-
-    const sorted = [...filtered].sort((a, b) =>
+    const sorted = [...drivers].sort((a, b) =>
       a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
     );
 
@@ -974,7 +962,7 @@ export function FuelRecordsPage() {
     }
 
     return sorted.filter((driver) => driver.status === "ACTIVE");
-  }, [drivers, selectedBranchId, editingRecord, form.driverId]);
+  }, [drivers, editingRecord, form.driverId]);
 
   const latestKmByVehicle = useMemo(
     () => resolveLatestVehicleKmMap({ vehicles, fuelRecords: records }),
@@ -1022,15 +1010,6 @@ export function FuelRecordsPage() {
 
   const filteredRecords = useMemo(() => {
     let filtered = records;
-
-    if (selectedBranchId) {
-      filtered = filtered.filter(
-        (record) =>
-          record.vehicle?.branchId === selectedBranchId ||
-          vehicles.find((vehicle) => vehicle.id === record.vehicleId)?.branchId ===
-          selectedBranchId
-      );
-    }
 
     if (search.trim()) {
       const searchLower = search.toLowerCase();
@@ -1102,7 +1081,7 @@ export function FuelRecordsPage() {
       const plateB = b.vehicle?.plate || "";
       return plateA.localeCompare(plateB, "pt-BR", { sensitivity: "base" }) * direction;
     });
-  }, [records, search, selectedBranchId, vehicles, branches, sortBy, sortDirection]);
+  }, [records, search, vehicles, branches, sortBy, sortDirection]);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredRecords.length / TABLE_PAGE_SIZE)),
@@ -1126,7 +1105,7 @@ export function FuelRecordsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, selectedBranchId, sortBy, sortDirection]);
+  }, [search, sortBy, sortDirection]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
