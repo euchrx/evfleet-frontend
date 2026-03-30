@@ -12,6 +12,7 @@ import {
   ClipboardList,
   CreditCard,
   Crown,
+  FileArchive,
   FileText,
   Fuel,
   LayoutDashboard,
@@ -181,6 +182,12 @@ export function AppLayout() {
       name: "Relatórios",
       path: "/reports",
       icon: BarChart3,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Importação XML NF-e",
+      path: "/xml-import",
+      icon: FileArchive,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {

@@ -532,7 +532,13 @@ export function ReportsPage() {
             table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
             th, td { border: 1px solid #cbd5e1; padding: 6px; text-align: left; }
             th { background: #f8fafc; }
-            .module-total { margin: 8px 0 14px; font-size: 13px; font-weight: 700; color: #0f172a; }
+            .module-total {
+              margin: 8px 0 14px;
+              font-size: 13px;
+              font-weight: 700;
+              color: #0f172a;
+              text-align: right;
+            }
             .grand-total {
               margin-top: 18px;
               padding-top: 10px;
@@ -540,13 +546,13 @@ export function ReportsPage() {
               font-size: 16px;
               font-weight: 800;
               color: #0f172a;
+              text-align: right;
             }
           </style>
         </head>
         <body>
           <h1>Relatório operacional</h1>
           <div class="meta">Período: ${escapeHtml(formatDate(startDate))} até ${escapeHtml(formatDate(endDate))}</div>
-          ${totalGeral > 0 ? `<div class="meta">Total de despesas: ${toCurrency(totalGeral)}</div>` : ""}
           ${showVehicles ? `<div class="meta">Status de veículos: ${escapeHtml(selectedVehicleStatusesLabel)}</div>` : ""}
           ${moduleSections}
           <div class="grand-total">Valor total geral: ${toCurrency(totalGeral)}</div>

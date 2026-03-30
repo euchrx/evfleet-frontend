@@ -1319,6 +1319,9 @@ export function FuelRecordsPage() {
                   <button type="button" onClick={() => handleSort("branch")} className="cursor-pointer">Filial {getSortArrow("branch")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button type="button" onClick={() => handleSort("invoiceNumber")} className="cursor-pointer">Nota {getSortArrow("invoiceNumber")}</button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button type="button" onClick={() => handleSort("vehicle")} className="cursor-pointer">Veículo {getSortArrow("vehicle")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
@@ -1326,9 +1329,6 @@ export function FuelRecordsPage() {
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button type="button" onClick={() => handleSort("fuelDate")} className="cursor-pointer">Data e Hora {getSortArrow("fuelDate")}</button>
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <button type="button" onClick={() => handleSort("invoiceNumber")} className="cursor-pointer">Nota {getSortArrow("invoiceNumber")}</button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button type="button" onClick={() => handleSort("fuelType")} className="cursor-pointer">Combustível {getSortArrow("fuelType")}</button>
@@ -1386,6 +1386,9 @@ export function FuelRecordsPage() {
                       {getRecordBranchName(record)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
+                      {record.invoiceNumber || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
                       {record.vehicle ? formatVehicleLabel(record.vehicle) : record.vehicleId}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
@@ -1393,9 +1396,6 @@ export function FuelRecordsPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {formatLocalDate(record.fuelDate)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      {record.invoiceNumber || "-"}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {formatFuelTypeLabel(getRecordFuelType(record))}

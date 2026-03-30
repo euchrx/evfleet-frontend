@@ -29,6 +29,26 @@ const initialForm: CompanyFormData = {
   active: true,
 };
 
+function onlyDigits(value: string) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function formatCnpj(value?: string | null) {
+  const digits = onlyDigits(String(value || "")).slice(0, 14);
+  if (!digits) return "-";
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+  if (digits.length <= 12) {
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+  }
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12, 14)}`;
+}
+
+function applyCnpjMask(value: string) {
+  return formatCnpj(value).replace("-", "");
+}
+
 export function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +96,7 @@ export function CompaniesPage() {
     setEditingCompany(company);
     setForm({
       name: company.name,
-      document: company.document || "",
+      document: applyCnpjMask(company.document || ""),
       slug: company.slug || "",
       active: company.active,
     });
@@ -109,7 +129,7 @@ export function CompaniesPage() {
     setErrorMessage("");
 
     const name = form.name.trim();
-    const document = form.document.trim();
+    const document = onlyDigits(form.document);
     const slug = form.slug.trim();
 
     const nextErrors: CompanyFieldErrors = {};
@@ -378,7 +398,7 @@ export function CompaniesPage() {
                 paginatedCompanies.map((company) => (
                   <tr key={company.id} className="border-t border-slate-200">
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">{company.name}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{company.document || "-"}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{formatCnpj(company.document)}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{company.slug || "-"}</td>
                     <td className="px-6 py-4 text-sm">
                       <span
@@ -459,9 +479,10 @@ export function CompaniesPage() {
                   <input
                     type="text"
                     value={form.document}
-                    onChange={(event) => handleChange("document", event.target.value)}
+                    onChange={(event) => handleChange("document", applyCnpjMask(event.target.value))}
                     className={inputClass("document")}
                     placeholder="Ex: 12.345.678/0001-90"
+                    maxLength={18}
                   />
                 </div>
 

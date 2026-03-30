@@ -9,6 +9,7 @@ export type MenuVisibilityItem = {
 
 export const MENU_VISIBILITY_ITEMS: MenuVisibilityItem[] = [
   { label: "Dashboard", path: "/dashboard" },
+  { label: "Importação XML NF-e", path: "/xml-import" },
   { label: "Relatórios", path: "/reports" },
   { label: "Veículos", path: "/vehicles" },
   { label: "Motoristas", path: "/drivers" },
