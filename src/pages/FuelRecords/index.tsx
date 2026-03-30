@@ -341,19 +341,45 @@ export function FuelRecordsPage() {
   async function loadData() {
     try {
       setLoading(true);
-      setPageErrorMessage("");
+      const [recordsResult, vehiclesResult, driversResult, insightsResult] =
+        await Promise.allSettled([
+          getFuelRecords(),
+          getVehicles(),
+          getDrivers(),
+          getFuelInsights(),
+        ]);
 
-      const [recordsData, vehiclesData, driversData, insightsData] = await Promise.all([
-        getFuelRecords(),
-        getVehicles(),
-        getDrivers(),
-        getFuelInsights(),
-      ]);
+      const nextRecords =
+        recordsResult.status === "fulfilled" && Array.isArray(recordsResult.value)
+          ? recordsResult.value
+          : [];
+      const nextVehicles =
+        vehiclesResult.status === "fulfilled" && Array.isArray(vehiclesResult.value)
+          ? vehiclesResult.value
+          : [];
+      const nextDrivers =
+        driversResult.status === "fulfilled" && Array.isArray(driversResult.value)
+          ? driversResult.value
+          : [];
+      const nextInsights =
+        insightsResult.status === "fulfilled" ? insightsResult.value : null;
 
-      setRecords(Array.isArray(recordsData) ? recordsData : []);
-      setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
-      setDrivers(Array.isArray(driversData) ? driversData : []);
-      setInsights(insightsData || null);
+      setRecords(nextRecords);
+      setVehicles(nextVehicles);
+      setDrivers(nextDrivers);
+      setInsights(nextInsights);
+
+      const hasCriticalFailure =
+        recordsResult.status === "rejected" ||
+        vehiclesResult.status === "rejected" ||
+        driversResult.status === "rejected";
+      if (hasCriticalFailure) {
+        setPageErrorMessage("Não foi possível carregar todos os dados dos abastecimentos.");
+      } else if (insightsResult.status === "rejected") {
+        setPageErrorMessage("Dados carregados. O painel de insights está temporariamente indisponível.");
+      } else {
+        setPageErrorMessage("");
+      }
     } catch (error) {
       console.error("Erro ao carregar abastecimentos:", error);
       setPageErrorMessage("Não foi possível carregar os abastecimentos.");
