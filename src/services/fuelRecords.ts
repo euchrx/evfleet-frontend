@@ -92,6 +92,46 @@ export type FuelXmlImportSummary = {
   ignoredByDomainFilter: number;
 };
 
+export type FuelXmlPreviewItem = {
+  invoiceKey: string;
+  issuerName?: string | null;
+  number?: string | null;
+  series?: string | null;
+  issuedAt?: string | null;
+  totalAmount?: string | number | null;
+  items: Array<{
+    description: string;
+    quantity?: number;
+    unitValue?: number;
+    totalValue?: number;
+  }>;
+  suggestedBranchId?: string | null;
+  xmlInvoiceId?: string | null;
+  alreadyExists?: boolean;
+};
+
+export type FuelXmlPreviewResponse = {
+  totalFiles: number;
+  eligibleCount: number;
+  ignoredDuplicates: number;
+  ignoredNonFuel: number;
+  previewItems: FuelXmlPreviewItem[];
+};
+
+export type FuelXmlConfirmInput = {
+  invoiceKey: string;
+  vehicleId?: string;
+  driverId?: string;
+  km?: number;
+  branchId?: string;
+};
+
+export type FuelXmlConfirmResponse = {
+  createdCount: number;
+  ignoredCount: number;
+  createdIds: string[];
+};
+
 export type FuelImportedXmlInvoice = {
   id: string;
   issuerName?: string | null;
@@ -140,6 +180,36 @@ export async function importFuelXml(
         "Content-Type": "multipart/form-data",
       },
     },
+  );
+  return response.data;
+}
+
+export async function previewFuelXml(
+  file: File,
+  branchId?: string,
+  periodLabel?: string,
+) {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (branchId?.trim()) formData.append("branchId", branchId.trim());
+  if (periodLabel?.trim()) formData.append("periodLabel", periodLabel.trim());
+
+  const response = await api.post<FuelXmlPreviewResponse>(
+    "/fuel-records/import-xml/preview",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    },
+  );
+  return response.data;
+}
+
+export async function confirmFuelXmlImports(imports: FuelXmlConfirmInput[]) {
+  const response = await api.post<FuelXmlConfirmResponse>(
+    "/fuel-records/import-xml/confirm",
+    { imports },
   );
   return response.data;
 }
