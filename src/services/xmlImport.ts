@@ -1,4 +1,5 @@
 import { api } from "./api";
+import axios from "axios";
 
 export type XmlImportBatchSummary = {
   batchId: string;
@@ -120,6 +121,13 @@ export type DeleteXmlInvoicesResult = {
   notFoundIds: string[];
 };
 
+export type DeleteXmlBatchResult = {
+  batchId: string;
+  deleted: boolean;
+  deletedInvoices: number;
+  deletedRetailProductImports: number;
+};
+
 export async function uploadXmlZip(file: File, branchId?: string, periodLabel?: string) {
   const formData = new FormData();
   formData.append("file", file);
@@ -186,6 +194,11 @@ export async function deleteXmlImportInvoices(invoiceIds: string[]) {
   const { data } = await api.delete<DeleteXmlInvoicesResult>("/xml-import/invoices", {
     data: { invoiceIds },
   });
+  return data;
+}
+
+export async function deleteXmlImportBatch(batchId: string) {
+  const { data } = await api.delete<DeleteXmlBatchResult>(`/xml-import/batches/${batchId}`);
   return data;
 }
 
@@ -307,8 +320,19 @@ export type CompleteCostLinkInput = {
 };
 
 export async function completeXmlFuelLink(invoiceId: string, payload: CompleteFuelLinkInput) {
-  const { data } = await api.patch(`/xml-import/invoices/${invoiceId}/link/fuel`, payload);
-  return data;
+  try {
+    const { data } = await api.patch(`/xml-import/invoices/${invoiceId}/link/fuel`, payload);
+    return data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      const { data } = await api.patch(
+        `/fuel-records/imported-xml/${invoiceId}/link/fuel`,
+        payload,
+      );
+      return data;
+    }
+    throw error;
+  }
 }
 
 export async function completeXmlMaintenanceLink(

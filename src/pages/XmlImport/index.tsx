@@ -3,6 +3,7 @@ import { FileArchive, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { TablePagination } from "../../components/TablePagination";
 import {
+  deleteXmlImportBatch,
   deleteXmlImportInvoices,
   getXmlImportBatches,
   getXmlImportInvoices,
@@ -80,6 +81,7 @@ export function XmlImportPage() {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [rowLoading, setRowLoading] = useState<Record<string, string>>({});
   const [deletingSelected, setDeletingSelected] = useState(false);
+  const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
 
   async function loadData(manual = false) {
     try {
@@ -233,6 +235,40 @@ export function XmlImportPage() {
     }
   }
 
+  async function handleDeleteBatch(batchId: string) {
+    const confirmed = window.confirm(
+      "Deseja excluir este lote importado? As notas deste lote também serão removidas.",
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingBatchId(batchId);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      const result = await deleteXmlImportBatch(batchId);
+      const removedInvoiceIds = new Set(
+        invoices
+          .filter((invoice) => invoice.batchId === batchId)
+          .map((invoice) => invoice.id),
+      );
+
+      setBatches((prev) => prev.filter((batch) => batch.id !== batchId));
+      setInvoices((prev) => prev.filter((invoice) => invoice.batchId !== batchId));
+      setSelectedInvoiceIds((prev) => prev.filter((id) => !removedInvoiceIds.has(id)));
+
+      setSuccessMessage(
+        `Lote removido com sucesso. Notas removidas: ${result.deletedInvoices}. Produtos vinculados removidos: ${result.deletedRetailProductImports}.`,
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Não foi possível remover o lote.",
+      );
+    } finally {
+      setDeletingBatchId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -348,13 +384,14 @@ export function XmlImportPage() {
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Duplicados</th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Erros</th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Criado em</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Carregando lotes...</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Carregando lotes...</td></tr>
               ) : batches.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Nenhum lote importado.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Nenhum lote importado.</td></tr>
               ) : (
                 batches.map((batch) => (
                   <tr key={batch.id} className="border-t border-slate-100">
@@ -365,6 +402,16 @@ export function XmlImportPage() {
                     <td className="px-4 py-3 text-slate-700">{batch.duplicateFiles}</td>
                     <td className="px-4 py-3 text-slate-700">{batch.errorFiles}</td>
                     <td className="px-4 py-3 text-slate-700">{formatDate(batch.createdAt)}</td>
+                    <td className="px-4 py-3 text-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBatch(batch.id)}
+                        disabled={deletingBatchId === batch.id}
+                        className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {deletingBatchId === batch.id ? "Excluindo..." : "Excluir lote"}
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

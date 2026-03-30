@@ -1,7 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import type { Vehicle } from "../../types/vehicle";
-import { useRef } from "react";
-import type { ChangeEvent } from "react";
 import type { Driver } from "../../types/driver";
 import {
   acknowledgeFuelRecordAnomaly,
@@ -30,11 +28,9 @@ import {
   AlertTriangle,
   CarFront,
   FileCode2,
-  FileSpreadsheet,
   Gauge,
   Upload,
 } from "lucide-react";
-import * as XLSX from "xlsx";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
@@ -116,155 +112,12 @@ function formatLocalDate(dateValue: string) {
   });
 }
 
-function normalizeHeader(value: unknown) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/[^a-z0-9]/g, "");
-}
-
-function normalizePlate(value: unknown) {
-  return String(value || "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
-}
-
-function extractPlateCandidate(value: unknown, options?: { allowLoose?: boolean }) {
-  const text = String(value || "").toUpperCase();
-  if (!text.trim()) return "";
-
-  const compact = text.replace(/[^A-Z0-9]/g, "");
-
-  const mercosul = compact.match(/[A-Z]{3}[0-9][A-Z][0-9]{2}/);
-  if (mercosul) return mercosul[0];
-
-  const antigo = compact.match(/[A-Z]{3}[0-9]{4}/);
-  if (antigo) return antigo[0];
-
-  if (options?.allowLoose) {
-    const hasLetters = /[A-Z]/.test(compact);
-    const hasNumbers = /[0-9]/.test(compact);
-    if (hasLetters && hasNumbers && compact.length >= 7 && compact.length <= 8) {
-      return compact;
-    }
-  }
-
-  return "";
-}
-
-function findVehicleByPlateCandidate(vehicles: Vehicle[], candidate: string) {
-  const normalizedCandidate = normalizePlate(candidate);
-  if (!normalizedCandidate) return undefined;
-
-  return vehicles.find((item) => {
-    const normalizedVehiclePlate = normalizePlate(item.plate);
-    if (!normalizedVehiclePlate) return false;
-    return (
-      normalizedVehiclePlate === normalizedCandidate ||
-      normalizedVehiclePlate.includes(normalizedCandidate) ||
-      normalizedCandidate.includes(normalizedVehiclePlate)
-    );
-  });
-}
-
-function isSummaryRow(rowMap: Map<string, unknown>) {
-  const values = [...rowMap.values()].map((value) =>
-    String(value || "").trim().toLowerCase(),
-  );
-  return values.some((value) => value === "total" || value.startsWith("total "));
-}
-
 function findLinkedDriverByVehicleId(drivers: Driver[], vehicleId: string) {
   const active = drivers.find(
     (item) => item.vehicleId === vehicleId && String(item.status || "").toUpperCase() === "ACTIVE",
   );
   if (active) return active;
   return drivers.find((item) => item.vehicleId === vehicleId) || null;
-}
-
-function parseNumberValue(value: unknown) {
-  if (typeof value === "number") return value;
-  const normalized = String(value || "")
-    .trim()
-    .replace(/\./g, "")
-    .replace(",", ".");
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : Number.NaN;
-}
-
-function parseFuelDateValue(dateValue: unknown, timeValue?: unknown) {
-  if (dateValue instanceof Date && !Number.isNaN(dateValue.getTime())) {
-    const y = dateValue.getFullYear();
-    const m = String(dateValue.getMonth() + 1).padStart(2, "0");
-    const d = String(dateValue.getDate()).padStart(2, "0");
-    const { hour, minute } = parseTimeParts(timeValue);
-    return `${y}-${m}-${d}T${hour}:${minute}:00`;
-  }
-
-  if (typeof dateValue === "number") {
-    const parsed = XLSX.SSF.parse_date_code(dateValue);
-    if (parsed) {
-      const y = String(parsed.y).padStart(4, "0");
-      const m = String(parsed.m).padStart(2, "0");
-      const d = String(parsed.d).padStart(2, "0");
-      const { hour, minute } = parseTimeParts(timeValue);
-      return `${y}-${m}-${d}T${hour}:${minute}:00`;
-    }
-  }
-
-  const text = String(dateValue || "").trim();
-  if (!text) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    const { hour, minute } = parseTimeParts(timeValue);
-    return `${text}T${hour}:${minute}:00`;
-  }
-  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(text)) {
-    const normalized = text.replace(" ", "T");
-    return normalized.length === 16 ? `${normalized}:00` : normalized;
-  }
-
-  const brMatch = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (brMatch) {
-    const { hour, minute } = parseTimeParts(timeValue);
-    return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}T${hour}:${minute}:00`;
-  }
-
-  const date = new Date(text);
-  if (Number.isNaN(date.getTime())) return "";
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  const { hour, minute } = parseTimeParts(timeValue);
-  return `${y}-${m}-${d}T${hour}:${minute}:00`;
-}
-
-function parseTimeParts(value: unknown) {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return {
-      hour: String(value.getHours()).padStart(2, "0"),
-      minute: String(value.getMinutes()).padStart(2, "0"),
-    };
-  }
-  if (typeof value === "number") {
-    const parsed = XLSX.SSF.parse_date_code(value);
-    if (parsed) {
-      return {
-        hour: String(parsed.H || 0).padStart(2, "0"),
-        minute: String(parsed.M || 0).padStart(2, "0"),
-      };
-    }
-  }
-  const text = String(value || "").trim();
-  const match = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-  if (match) {
-    return {
-      hour: String(Number(match[1])).padStart(2, "0"),
-      minute: match[2],
-    };
-  }
-  return { hour: "00", minute: "00" };
 }
 
 function toDateTimeLocalInput(value?: string) {
@@ -294,19 +147,6 @@ function toDateTimeLocalInput(value?: string) {
   const hh = String(date.getHours()).padStart(2, "0");
   const mm = String(date.getMinutes()).padStart(2, "0");
   return `${y}-${m}-${d}T${hh}:${mm}`;
-}
-
-function mapFuelType(value: unknown): FuelFormData["fuelType"] {
-  const text = normalizeHeader(value);
-  if (!text) return "";
-  if (text.includes("diesel")) return "DIESEL";
-  if (text.includes("gasolina")) return "GASOLINE";
-  if (text.includes("etanol") || text.includes("alcool")) return "ETHANOL";
-  if (text.includes("flex")) return "FLEX";
-  if (text.includes("eletric")) return "ELECTRIC";
-  if (text.includes("hibrid")) return "HYBRID";
-  if (text.includes("gnv") || text.includes("cng")) return "CNG";
-  return "";
 }
 
 function formatXmlProcessingStatus(status?: string | null) {
@@ -376,7 +216,6 @@ export function FuelRecordsPage() {
   const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
   const [deletingSelectedRecords, setDeletingSelectedRecords] = useState(false);
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
-  const [importingXls, setImportingXls] = useState(false);
   const [isXmlImportModalOpen, setIsXmlImportModalOpen] = useState(false);
   const [xmlImportFile, setXmlImportFile] = useState<File | null>(null);
   const [xmlImportBranchId, setXmlImportBranchId] = useState("");
@@ -397,7 +236,6 @@ export function FuelRecordsPage() {
   const [xmlProcessingInvoiceId, setXmlProcessingInvoiceId] = useState<string | null>(null);
   const [form, setForm] = useState<FuelFormData>(initialForm);
   const [anomalyRefreshSeed, setAnomalyRefreshSeed] = useState(0);
-  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   function notifyHeaderNotifications() {
     window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
@@ -734,11 +572,6 @@ export function FuelRecordsPage() {
     }
   }
 
-  function openImportXlsPicker() {
-    if (importingXls) return;
-    importInputRef.current?.click();
-  }
-
   function openXmlImportModal() {
     setXmlInvoicesMessage("");
     setXmlInvoicesError("");
@@ -839,336 +672,6 @@ export function FuelRecordsPage() {
       setXmlProcessingInvoiceId(null);
     }
   }
-
-  async function handleImportXls(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setImportingXls(true);
-      setPageErrorMessage("");
-
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const firstSheetName = workbook.SheetNames[0];
-      if (!firstSheetName) {
-        setPageErrorMessage("Arquivo XLS sem planilhas válidas.");
-        return;
-      }
-
-      const sheet = workbook.Sheets[firstSheetName];
-      const matrix = XLSX.utils.sheet_to_json<(string | number | Date)[]>(sheet, {
-        header: 1,
-        defval: "",
-        raw: true,
-      });
-
-      if (matrix.length === 0) {
-        setPageErrorMessage("Nenhuma linha encontrada no arquivo XLS.");
-        return;
-      }
-
-      const detectedHeaderIndex = matrix.findIndex((row) => {
-        const normalized = row.map((cell) => normalizeHeader(cell));
-        return (
-          normalized.includes("hora") &&
-          normalized.includes("placa") &&
-          (normalized.includes("odometro") || normalized.includes("odometro"))
-        );
-      });
-
-      let rows: Array<Record<string, unknown>> = [];
-
-      if (detectedHeaderIndex >= 0) {
-        const headerRow = matrix[detectedHeaderIndex];
-        const indexByHeader = new Map<string, number>();
-        headerRow.forEach((cell, cellIndex) => {
-          const key = normalizeHeader(cell);
-          if (!key) return;
-          indexByHeader.set(key, cellIndex);
-        });
-
-        const hourIndex = indexByHeader.get("hora") ?? -1;
-        const dateHeaderIndex = indexByHeader.get("data") ?? -1;
-        let inferredDateIndex = dateHeaderIndex;
-        if (inferredDateIndex < 0 && hourIndex >= 0) {
-          const sampleDataRow = matrix[detectedHeaderIndex + 1] || [];
-          for (let i = 0; i < hourIndex; i += 1) {
-            if (String(sampleDataRow[i] || "").trim()) {
-              inferredDateIndex = i;
-              break;
-            }
-          }
-        }
-
-        rows = matrix
-          .slice(detectedHeaderIndex + 1)
-          .map((row, rowIndex) => ({ row, rowIndex }))
-          .filter(({ row }) =>
-            row.some((cell) => String(cell || "").trim().length > 0),
-          )
-          .map(({ row, rowIndex }) => ({
-            __line: detectedHeaderIndex + 2 + rowIndex,
-            data:
-              inferredDateIndex >= 0
-                ? row[inferredDateIndex]
-                : "",
-            hora: hourIndex >= 0 ? row[hourIndex] : "",
-            nota:
-              (indexByHeader.get("nota") ?? -1) >= 0
-                ? row[indexByHeader.get("nota") as number]
-                : "",
-            nome:
-              (indexByHeader.get("nome") ?? -1) >= 0
-                ? row[indexByHeader.get("nome") as number]
-                : "",
-            valor:
-              (indexByHeader.get("valor") ?? -1) >= 0
-                ? row[indexByHeader.get("valor") as number]
-                : "",
-            litros:
-              (indexByHeader.get("litros") ?? -1) >= 0
-                ? row[indexByHeader.get("litros") as number]
-                : "",
-            motorista:
-              (indexByHeader.get("motorista") ?? -1) >= 0
-                ? row[indexByHeader.get("motorista") as number]
-                : "",
-            placa:
-              (indexByHeader.get("placa") ?? -1) >= 0
-                ? row[indexByHeader.get("placa") as number]
-                : "",
-            odometro:
-              (indexByHeader.get("odometro") ?? -1) >= 0
-                ? row[indexByHeader.get("odometro") as number]
-                : "",
-          }));
-      } else {
-        rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-          defval: "",
-        }).map((row, rowIndex) => ({ ...row, __line: rowIndex + 2 }));
-      }
-
-      if (rows.length === 0) {
-        setPageErrorMessage("Nenhum registro válido encontrado no arquivo XLS.");
-        return;
-      }
-
-      let createdCount = 0;
-      let ignoredCount = 0;
-      const failures: string[] = [];
-      const missingPlates = new Set<string>();
-      const vehiclesByPlate = new Map(
-        vehicles.map((item) => [normalizePlate(item.plate), item]),
-      );
-
-      for (let index = 0; index < rows.length; index += 1) {
-        const row = rows[index];
-        const lineNumber = Number(row.__line) || index + 2;
-        const rowMap = new Map<string, unknown>();
-        for (const [key, value] of Object.entries(row)) {
-          rowMap.set(normalizeHeader(key), value);
-        }
-
-        if (isSummaryRow(rowMap)) {
-          ignoredCount += 1;
-          continue;
-        }
-
-        const plateRaw =
-          rowMap.get("placa") ||
-          rowMap.get("veiculo") ||
-          rowMap.get("veiculoid") ||
-          rowMap.get("vehicle") ||
-          rowMap.get("carro");
-        const plate = extractPlateCandidate(plateRaw, { allowLoose: true });
-
-        let fallbackDetectedPlate = "";
-        if (!plate) {
-          for (const value of rowMap.values()) {
-            const candidate = extractPlateCandidate(value, { allowLoose: false });
-            if (candidate) {
-              fallbackDetectedPlate = candidate;
-              break;
-            }
-          }
-        }
-        const normalizedPlate = normalizePlate(plate || fallbackDetectedPlate);
-        const preFuelDate = parseFuelDateValue(
-          rowMap.get("data") || rowMap.get("fueldate") || rowMap.get("dataabastecimento"),
-          rowMap.get("hora"),
-        );
-        if (!preFuelDate) {
-          ignoredCount += 1;
-          continue;
-        }
-
-        const driverNameRaw =
-          rowMap.get("motorista") || rowMap.get("driver") || rowMap.get("condutor");
-        const driverName = String(driverNameRaw || "").trim();
-        const driver = driverName
-          ? drivers.find(
-              (item) =>
-                item.name.trim().toLowerCase() === driverName.toLowerCase(),
-            )
-          : null;
-
-        const liters = parseNumberValue(
-          rowMap.get("litros") || rowMap.get("litro"),
-        );
-        const totalValue = parseNumberValue(
-          rowMap.get("valortotal") ||
-            rowMap.get("valor") ||
-            rowMap.get("total") ||
-            rowMap.get("valorabastecido"),
-        );
-        const km = parseNumberValue(
-          rowMap.get("km") ||
-            rowMap.get("odometro") ||
-            rowMap.get("quilometragem"),
-        );
-        const fuelDate = preFuelDate;
-        const fuelType = mapFuelType(
-          rowMap.get("combustivel") || rowMap.get("tipocombustivel") || rowMap.get("fueltype"),
-        );
-        const invoiceNumber = String(
-          rowMap.get("nota") ||
-            rowMap.get("notafiscal") ||
-            rowMap.get("numeronota") ||
-            "",
-        )
-          .trim()
-          .toUpperCase();
-
-        if (!normalizedPlate) {
-          ignoredCount += 1;
-          continue;
-        }
-
-        const vehicle =
-          vehiclesByPlate.get(normalizedPlate) ||
-          findVehicleByPlateCandidate(vehicles, normalizedPlate) ||
-          vehicles.find((item) =>
-            formatVehicleLabel(item)
-              .toUpperCase()
-              .includes((plate || fallbackDetectedPlate).toUpperCase()),
-          );
-
-        if (!vehicle) {
-          if (normalizedPlate) missingPlates.add(normalizedPlate);
-          failures.push(`Linha ${lineNumber}: veículo/placa não encontrado.`);
-          continue;
-        }
-        const linkedDriver = !driver ? findLinkedDriverByVehicleId(drivers, vehicle.id) : null;
-        const resolvedFuelType =
-          (vehicle.fuelType as FuelFormData["fuelType"]) ||
-          fuelType;
-
-        if (!resolvedFuelType) {
-          failures.push(`Linha ${lineNumber}: combustível inválido.`);
-          continue;
-        }
-        if (!fuelDate) {
-          const hasCoreValues =
-            Number.isFinite(liters) &&
-            liters > 0 &&
-            Number.isFinite(totalValue) &&
-            totalValue > 0;
-          if (!hasCoreValues) {
-            ignoredCount += 1;
-            continue;
-          }
-          failures.push(`Linha ${lineNumber}: data inválida.`);
-          continue;
-        }
-        if (Number.isNaN(liters) || liters < 0) {
-          failures.push(`Linha ${lineNumber}: litros inválidos.`);
-          continue;
-        }
-        if (liters === 0) {
-          ignoredCount += 1;
-          continue;
-        }
-        if (Number.isNaN(totalValue) || totalValue <= 0) {
-          failures.push(`Linha ${lineNumber}: valor total inválido.`);
-          continue;
-        }
-        if (Number.isNaN(km) || km < 0) {
-          failures.push(`Linha ${lineNumber}: KM inválido.`);
-          continue;
-        }
-
-        try {
-          await createFuelRecord({
-            invoiceNumber: invoiceNumber || null,
-            liters,
-            totalValue,
-            km,
-            fuelDate,
-            fuelType: resolvedFuelType,
-            vehicleId: vehicle.id,
-            driverId: driver?.id || linkedDriver?.id || null,
-            station:
-              String(rowMap.get("nome") || "").trim() || getBranchNameByVehicleId(vehicle.id),
-          });
-          createdCount += 1;
-        } catch (error: any) {
-          const apiMessage =
-            error?.response?.data?.message ||
-            error?.response?.data?.error ||
-            error?.message ||
-            "falha ao importar";
-          const text = Array.isArray(apiMessage)
-            ? apiMessage.join(", ")
-            : String(apiMessage);
-          failures.push(`Linha ${lineNumber}: ${text}`);
-        }
-      }
-
-      await loadData();
-      notifyHeaderNotifications();
-
-      if (createdCount > 0 && failures.length === 0) {
-        setPageErrorMessage(
-          `Importação concluída com sucesso. ${createdCount} abastecimento(s) cadastrado(s).${
-            ignoredCount > 0 ? ` ${ignoredCount} linha(s) ignorada(s).` : ""
-          }`,
-        );
-        return;
-      }
-
-      if (createdCount > 0 && failures.length > 0) {
-        setPageErrorMessage(
-          `Importação parcial. Sucesso: ${createdCount}. Falhas: ${failures.length}. ${failures
-            .slice(0, 3)
-            .join(" | ")}${ignoredCount > 0 ? ` ${ignoredCount} linha(s) ignorada(s).` : ""}`,
-        );
-        return;
-      }
-
-      if (createdCount === 0 && missingPlates.size > 0) {
-        setPageErrorMessage(
-          `Nenhum abastecimento importado. Placas não encontradas no cadastro da empresa atual: ${[...missingPlates]
-            .slice(0, 5)
-            .join(", ")}.`,
-        );
-        return;
-      }
-
-      setPageErrorMessage(
-        `Nenhum abastecimento importado. ${failures.slice(0, 3).join(" | ")}${
-          ignoredCount > 0 ? ` ${ignoredCount} linha(s) ignorada(s).` : ""
-        }`,
-      );
-    } catch (error) {
-      console.error("Erro ao importar XLS:", error);
-      setPageErrorMessage("Não foi possível processar o arquivo XLS.");
-    } finally {
-      setImportingXls(false);
-      if (importInputRef.current) importInputRef.current.value = "";
-    }
-  }
-
 
   const availableVehicles = useMemo(() => {
     const sorted = [...vehicles].sort((a, b) =>
@@ -1437,15 +940,6 @@ export function FuelRecordsPage() {
             Importar XML de abastecimentos
           </button>
           <button
-            type="button"
-            onClick={openImportXlsPicker}
-            disabled={importingXls}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
-          >
-            <FileSpreadsheet size={16} />
-            {importingXls ? "Importando..." : "Importar XLS"}
-          </button>
-          <button
             onClick={openCreateModal}
             className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
           >
@@ -1453,14 +947,6 @@ export function FuelRecordsPage() {
           </button>
         </div>
       </div>
-
-      <input
-        ref={importInputRef}
-        type="file"
-        accept=".xls,.xlsx"
-        className="hidden"
-        onChange={handleImportXls}
-      />
 
       {xmlInvoicesMessage ? (
         <div
