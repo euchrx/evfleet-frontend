@@ -82,6 +82,36 @@ export type UpdateFuelRecordInput = Partial<
   CreateFuelRecordInput
 >;
 
+export type FuelXmlImportSummary = {
+  batchId: string;
+  totalFiles: number;
+  importedFiles: number;
+  duplicateFiles: number;
+  errorFiles: number;
+  eligibleDomainInvoices: number;
+  ignoredByDomainFilter: number;
+};
+
+export type FuelImportedXmlInvoice = {
+  id: string;
+  issuerName?: string | null;
+  number?: string | null;
+  issuedAt?: string | null;
+  totalAmount?: string | number | null;
+  processingStatus?: string | null;
+  processingType?: string | null;
+  invoiceKey: string;
+};
+
+export type FuelImportedXmlFilters = {
+  period?: string;
+  issuerName?: string;
+  number?: string;
+  processingStatus?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
 export async function getFuelRecords() {
   const response = await api.get("/fuel-records");
 
@@ -90,6 +120,58 @@ export async function getFuelRecords() {
   if (Array.isArray(response.data?.data)) return response.data.data;
 
   return [];
+}
+
+export async function importFuelXml(
+  file: File,
+  branchId?: string,
+  periodLabel?: string,
+) {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (branchId?.trim()) formData.append("branchId", branchId.trim());
+  if (periodLabel?.trim()) formData.append("periodLabel", periodLabel.trim());
+
+  const response = await api.post<FuelXmlImportSummary>(
+    "/fuel-records/import-xml",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    },
+  );
+  return response.data;
+}
+
+export async function getFuelImportedXml(
+  filters: FuelImportedXmlFilters = {},
+) {
+  const response = await api.get<FuelImportedXmlInvoice[]>(
+    "/fuel-records/imported-xml",
+    {
+      params: {
+        ...(filters.period?.trim() ? { period: filters.period.trim() } : {}),
+        ...(filters.issuerName?.trim()
+          ? { issuerName: filters.issuerName.trim() }
+          : {}),
+        ...(filters.number?.trim() ? { number: filters.number.trim() } : {}),
+        ...(filters.processingStatus?.trim()
+          ? { processingStatus: filters.processingStatus.trim() }
+          : {}),
+        ...(filters.dateFrom?.trim() ? { dateFrom: filters.dateFrom.trim() } : {}),
+        ...(filters.dateTo?.trim() ? { dateTo: filters.dateTo.trim() } : {}),
+      },
+    },
+  );
+  return Array.isArray(response.data) ? response.data : [];
+}
+
+export async function processImportedFuelXmlInvoice(invoiceId: string) {
+  const response = await api.post<{ createdRecordId: string; processingStatus: string }>(
+    `/xml-import/invoices/${invoiceId}/process/fuel`,
+  );
+  return response.data;
 }
 
 export async function getFuelInsights() {

@@ -121,9 +121,9 @@ export function XmlRetailProductsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Produtos importados por XML</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Importação XML de produtos</h1>
           <p className="text-sm text-slate-500">
-            Acompanhe as notas classificadas como produtos de loja/perfumaria/conveniência.
+            Produtos &gt; Importação XML. Acompanhe notas classificadas como loja/perfumaria/conveniência.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -131,7 +131,7 @@ export function XmlRetailProductsPage() {
             to="/xml-import"
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
-            Voltar para central XML
+            Voltar para Central XML (auditoria)
           </Link>
           <button
             type="button"
@@ -295,12 +295,11 @@ export function XmlRetailProductsPage() {
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <FileArchive size={16} />
           <span>
-            Fluxo dedicado para RETAIL_PRODUCT: notas de loja/perfumaria/conveniência
-            ficam separadas do processamento de frota.
+            Importar XML de produtos é um fluxo contextual: notas de loja/perfumaria/conveniência
+            ficam separadas do processamento operacional de frota.
           </span>
         </div>
       </section>
     </div>
   );
 }
-

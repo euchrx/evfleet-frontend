@@ -186,18 +186,6 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
-      name: "Importação XML NF-e",
-      path: "/xml-import",
-      icon: FileArchive,
-      roles: ["ADMIN", "FLEET_MANAGER"],
-    },
-    {
-      name: "Produtos XML",
-      path: "/xml-import/retail-products",
-      icon: PackageSearch,
-      roles: ["ADMIN", "FLEET_MANAGER"],
-    },
-    {
       name: "Veículos",
       path: "/vehicles",
       icon: Truck,
@@ -254,12 +242,26 @@ export function AppLayout() {
       icon: ShieldCheck,
       roles: ["ADMIN"],
     },
+    {
+      name: "Central XML (auditoria)",
+      path: "/xml-import",
+      icon: FileArchive,
+      roles: ["ADMIN"],
+    },
+    {
+      name: "Importação XML de produtos",
+      path: "/xml-import/retail-products",
+      icon: PackageSearch,
+      roles: ["ADMIN"],
+    },
   ];
 
   const administrativePaths = new Set([
     "/companies",
     "/finance",
     "/users",
+    "/xml-import",
+    "/xml-import/retail-products",
     "/administration",
   ]);
   const isAdminWithoutCompanyScope =
@@ -928,8 +930,6 @@ export function AppLayout() {
                 className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-orange-500 text-[0px] font-bold text-white shadow-sm transition hover:brightness-95"
               >
                 <span className="text-sm leading-none">{initial}</span>
-
-                      {user?.name || "Usuário"}
               </button>
 
               {isProfileMenuOpen ? (

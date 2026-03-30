@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { LayoutGrid, Table2 } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { FileCode2, LayoutGrid, Table2, Upload } from "lucide-react";
 import { useBranch } from "../../contexts/BranchContext";
 import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import { getVehicles } from "../../services/vehicles";
 import {
   createMaintenanceRecord,
   deleteMaintenanceRecord,
+  getMaintenanceImportedXml,
   getMaintenanceRecords,
+  importMaintenanceXml,
   updateMaintenanceRecord,
   type CreateMaintenanceRecordInput,
+  type MaintenanceImportedXmlInvoice,
+  type MaintenanceXmlImportSummary,
 } from "../../services/maintenanceRecords";
 import {
   createMaintenancePlan,
@@ -29,6 +33,10 @@ import {
   type CreateTireInput,
   type CreateTireReadingInput,
 } from "../../services/tires";
+import {
+  ignoreXmlInvoice,
+  processXmlInvoiceMaintenance,
+} from "../../services/xmlImport";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
 import type { Vehicle } from "../../types/vehicle";
@@ -238,6 +246,46 @@ function planDueLabel(plan: MaintenancePlan) {
   return "-";
 }
 
+function xmlMaintenanceTypeLabel(type?: string | null) {
+  if (type === "PRODUCT") return "Peças / Insumos";
+  if (type === "SERVICE") return "Serviços";
+  return "Não classificada";
+}
+
+function xmlMaintenanceTypeClass(type?: string | null) {
+  if (type === "PRODUCT") return "status-pill status-pending";
+  if (type === "SERVICE") return "status-pill status-anomaly";
+  return "status-pill";
+}
+
+function xmlProcessingStatusLabel(status?: string | null) {
+  if (status === "PENDING") return "Pendente";
+  if (status === "SUGGESTED") return "Sugerida";
+  if (status === "PROCESSED") return "Processada";
+  if (status === "IGNORED") return "Ignorada";
+  if (status === "ERROR") return "Erro";
+  return "Não definido";
+}
+
+function xmlProcessingStatusClass(status?: string | null) {
+  if (status === "PROCESSED") return "status-pill status-active";
+  if (status === "SUGGESTED") return "status-pill status-pending";
+  if (status === "IGNORED") return "status-pill";
+  if (status === "ERROR") return "status-pill status-inactive";
+  return "status-pill status-pending";
+}
+
+function xmlMoney(value?: string | number | null) {
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(String(value).replace(",", "."))
+        : Number.NaN;
+  if (!Number.isFinite(numeric)) return "-";
+  return numeric.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 const TABLE_PAGE_SIZE = 10;
 
 type TireVisualSlot = {
@@ -373,7 +421,7 @@ function createHeavyTireSlots(axles = 9): TireVisualSlot[] {
 
 export function MaintenanceRecordsPage() {
   const location = useLocation();
-  const { selectedBranchId } = useBranch();
+  const { selectedBranchId, branches } = useBranch();
   const { selectedCompanyId } = useCompanyScope();
 
   const [tab, setTab] = useState<Tab>("records");
@@ -438,6 +486,23 @@ export function MaintenanceRecordsPage() {
   const [tireToDelete, setTireToDelete] = useState<Tire | null>(null);
   const [deleteAllTiresConfirmOpen, setDeleteAllTiresConfirmOpen] = useState(false);
 
+  const [xmlImportModalOpen, setXmlImportModalOpen] = useState(false);
+  const [xmlImportFile, setXmlImportFile] = useState<File | null>(null);
+  const [xmlImportBranchId, setXmlImportBranchId] = useState("");
+  const [xmlImportPeriodLabel, setXmlImportPeriodLabel] = useState("");
+  const [xmlImporting, setXmlImporting] = useState(false);
+  const [xmlImportSummary, setXmlImportSummary] = useState<MaintenanceXmlImportSummary | null>(null);
+  const [xmlInvoices, setXmlInvoices] = useState<MaintenanceImportedXmlInvoice[]>([]);
+  const [xmlInvoicesLoading, setXmlInvoicesLoading] = useState(false);
+  const [xmlInvoicesSearch, setXmlInvoicesSearch] = useState("");
+  const [xmlInvoicesStatusFilter, setXmlInvoicesStatusFilter] = useState("ALL");
+  const [xmlInvoicesDateFrom, setXmlInvoicesDateFrom] = useState("");
+  const [xmlInvoicesDateTo, setXmlInvoicesDateTo] = useState("");
+  const [xmlProcessingInvoiceId, setXmlProcessingInvoiceId] = useState<string | null>(null);
+  const [xmlIgnoringInvoiceId, setXmlIgnoringInvoiceId] = useState<string | null>(null);
+  const [xmlMessage, setXmlMessage] = useState("");
+  const [xmlMessageType, setXmlMessageType] = useState<"success" | "error">("success");
+
   async function loadData() {
     try {
       setLoading(true);
@@ -462,9 +527,34 @@ export function MaintenanceRecordsPage() {
     }
   }
 
+  async function loadImportedMaintenanceXml() {
+    try {
+      setXmlInvoicesLoading(true);
+      const invoices = await getMaintenanceImportedXml({
+        processingStatus:
+          xmlInvoicesStatusFilter !== "ALL"
+            ? xmlInvoicesStatusFilter
+            : undefined,
+        dateFrom: xmlInvoicesDateFrom || undefined,
+        dateTo: xmlInvoicesDateTo || undefined,
+      });
+      setXmlInvoices(Array.isArray(invoices) ? invoices : []);
+    } catch (error) {
+      console.error("Erro ao carregar notas XML de manutenção:", error);
+      setXmlMessageType("error");
+      setXmlMessage("Não foi possível carregar as notas importadas para manutenção.");
+    } finally {
+      setXmlInvoicesLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadData();
   }, [selectedCompanyId]);
+
+  useEffect(() => {
+    loadImportedMaintenanceXml();
+  }, [selectedCompanyId, xmlInvoicesStatusFilter, xmlInvoicesDateFrom, xmlInvoicesDateTo]);
 
   useEffect(() => {
     const query = new URLSearchParams(location.search);
@@ -1513,6 +1603,145 @@ export function MaintenanceRecordsPage() {
     }
   }
 
+  function openXmlImportModal() {
+    setXmlMessage("");
+    setXmlImportFile(null);
+    setXmlImportBranchId("");
+    setXmlImportPeriodLabel("");
+    setXmlImportModalOpen(true);
+  }
+
+  function closeXmlImportModal(force = false) {
+    if (xmlImporting && !force) return;
+    setXmlImportModalOpen(false);
+    setXmlImportFile(null);
+    setXmlImportBranchId("");
+    setXmlImportPeriodLabel("");
+  }
+
+  async function handleImportMaintenanceXml() {
+    if (!xmlImportFile) {
+      setXmlMessageType("error");
+      setXmlMessage("Selecione um arquivo ZIP para importar.");
+      return;
+    }
+
+    if (!xmlImportFile.name.toLowerCase().endsWith(".zip")) {
+      setXmlMessageType("error");
+      setXmlMessage("Arquivo inválido. Selecione um arquivo .zip.");
+      return;
+    }
+
+    try {
+      setXmlImporting(true);
+      setXmlMessage("");
+      const summary = await importMaintenanceXml(
+        xmlImportFile,
+        xmlImportBranchId || undefined,
+        xmlImportPeriodLabel || undefined,
+      );
+      setXmlImportSummary(summary);
+      setXmlMessageType("success");
+      setXmlMessage(
+        `Foram encontradas ${summary.eligibleDomainInvoices} nota(s) de manutenção. ${summary.ignoredByDomainFilter} nota(s) foram ignoradas por não pertencerem a este domínio.`,
+      );
+      await Promise.all([loadImportedMaintenanceXml(), loadData()]);
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      closeXmlImportModal(true);
+    } catch (error) {
+      console.error("Erro ao importar XML de manutenção:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Não foi possível importar XML de manutenção.";
+      setXmlMessageType("error");
+      setXmlMessage(message);
+    } finally {
+      setXmlImporting(false);
+    }
+  }
+
+  async function handleProcessMaintenanceInvoice(invoiceId: string) {
+    const confirmed = window.confirm(
+      "Deseja criar manutenção com base nesta nota importada?",
+    );
+    if (!confirmed) return;
+
+    try {
+      setXmlProcessingInvoiceId(invoiceId);
+      setXmlMessage("");
+      await processXmlInvoiceMaintenance(invoiceId);
+      setXmlInvoices((prev) =>
+        prev.map((invoice) =>
+          invoice.id === invoiceId
+            ? { ...invoice, processingStatus: "PROCESSED" }
+            : invoice,
+        ),
+      );
+      setXmlMessageType("success");
+      setXmlMessage("Nota processada com sucesso como manutenção.");
+      await Promise.all([loadImportedMaintenanceXml(), loadData()]);
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+    } catch (error) {
+      console.error("Erro ao processar nota XML de manutenção:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Não foi possível processar a nota.";
+      setXmlMessageType("error");
+      setXmlMessage(message);
+    } finally {
+      setXmlProcessingInvoiceId(null);
+    }
+  }
+
+  async function handleIgnoreMaintenanceInvoice(invoiceId: string) {
+    const confirmed = window.confirm("Deseja ignorar esta nota importada?");
+    if (!confirmed) return;
+
+    try {
+      setXmlIgnoringInvoiceId(invoiceId);
+      setXmlMessage("");
+      await ignoreXmlInvoice(invoiceId);
+      setXmlInvoices((prev) =>
+        prev.map((invoice) =>
+          invoice.id === invoiceId
+            ? { ...invoice, processingStatus: "IGNORED" }
+            : invoice,
+        ),
+      );
+      setXmlMessageType("success");
+      setXmlMessage("Nota marcada como ignorada com sucesso.");
+      await loadImportedMaintenanceXml();
+    } catch (error) {
+      console.error("Erro ao ignorar nota XML de manutenção:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Não foi possível ignorar a nota.";
+      setXmlMessageType("error");
+      setXmlMessage(message);
+    } finally {
+      setXmlIgnoringInvoiceId(null);
+    }
+  }
+
+  const filteredMaintenanceXmlInvoices = useMemo(() => {
+    const term = xmlInvoicesSearch.trim().toLowerCase();
+    if (!term) return xmlInvoices;
+    return xmlInvoices.filter((invoice) => {
+      const content = [
+        invoice.issuerName || "",
+        invoice.number || "",
+        invoice.invoiceKey || "",
+        xmlMaintenanceTypeLabel(invoice.processingType),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return content.includes(term);
+    });
+  }, [xmlInvoices, xmlInvoicesSearch]);
+
   function handleRecordSort(column: RecordSortBy) {
     if (recordSortBy === column) {
       setRecordSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -1547,13 +1776,25 @@ export function MaintenanceRecordsPage() {
             <h1 className="text-3xl font-bold text-slate-900">Manutenções</h1>
             <p className="text-sm text-slate-500">Gestão de manutenção preventiva, corretiva, planos e pneus.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => (tab === "records" ? openCreateRecord() : tab === "plans" ? openCreatePlan() : openCreateTire())}
-            className="w-full cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 md:w-auto"
-          >
-            + {actionLabel}
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            {tab === "records" ? (
+              <button
+                type="button"
+                onClick={openXmlImportModal}
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 sm:w-auto"
+              >
+                <Upload size={16} />
+                Importar XML de manutenções
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => (tab === "records" ? openCreateRecord() : tab === "plans" ? openCreatePlan() : openCreateTire())}
+              className="w-full cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
+            >
+              + {actionLabel}
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1.5">
@@ -1564,6 +1805,17 @@ export function MaintenanceRecordsPage() {
       </section>
 
       {errorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div> : null}
+      {xmlMessage ? (
+        <div
+          className={`rounded-xl px-4 py-3 text-sm ${
+            xmlMessageType === "success"
+              ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {xmlMessage}
+        </div>
+      ) : null}
 
       {tab === "records" ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1572,6 +1824,17 @@ export function MaintenanceRecordsPage() {
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Concluídas</p><p className="mt-1 text-2xl font-bold text-emerald-800">{maintenanceMetrics.done}</p></div>
           <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Custo total</p><p className="mt-1 text-2xl font-bold text-blue-900">{toMoney(maintenanceMetrics.cost)}</p></div>
         </div>
+      ) : null}
+
+      {tab === "records" && xmlImportSummary ? (
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total arquivos</p><p className="mt-1 text-2xl font-bold text-slate-900">{xmlImportSummary.totalFiles}</p></div>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Importados</p><p className="mt-1 text-2xl font-bold text-emerald-900">{xmlImportSummary.importedFiles}</p></div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Duplicados</p><p className="mt-1 text-2xl font-bold text-amber-900">{xmlImportSummary.duplicateFiles}</p></div>
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Erros</p><p className="mt-1 text-2xl font-bold text-rose-900">{xmlImportSummary.errorFiles}</p></div>
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Elegíveis</p><p className="mt-1 text-2xl font-bold text-blue-900">{xmlImportSummary.eligibleDomainInvoices}</p></div>
+          <div className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Ignoradas por não pertencer ao domínio</p><p className="mt-1 text-2xl font-bold text-slate-900">{xmlImportSummary.ignoredByDomainFilter}</p></div>
+        </section>
       ) : null}
 
       {tab === "plans" ? (
@@ -1645,6 +1908,133 @@ export function MaintenanceRecordsPage() {
           ) : null}
         </div>
       </section>
+
+      {tab === "records" ? (
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Notas importadas para manutenção</h2>
+              <p className="text-sm text-slate-500">Manutenções &gt; Importação XML. Triagem contextual das notas classificadas como peças/insumos e serviços.</p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="date"
+                value={xmlInvoicesDateFrom}
+                onChange={(event) => setXmlInvoicesDateFrom(event.target.value)}
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              />
+              <input
+                type="date"
+                value={xmlInvoicesDateTo}
+                onChange={(event) => setXmlInvoicesDateTo(event.target.value)}
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              />
+              <select
+                value={xmlInvoicesStatusFilter}
+                onChange={(event) => setXmlInvoicesStatusFilter(event.target.value)}
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              >
+                <option value="ALL">Todas as situações</option>
+                <option value="SUGGESTED">Sugeridas</option>
+                <option value="PROCESSED">Processadas</option>
+                <option value="IGNORED">Ignoradas</option>
+                <option value="PENDING">Pendentes</option>
+                <option value="ERROR">Erro</option>
+              </select>
+            </div>
+          </div>
+          <div className="border-b border-slate-200 px-4 py-3">
+            <input
+              type="text"
+              value={xmlInvoicesSearch}
+              onChange={(event) => setXmlInvoicesSearch(event.target.value)}
+              placeholder="Buscar por emitente, número, chave ou tipo"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Emitente</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Número</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Data</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Valor</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Tipo</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Situação</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {xmlInvoicesLoading ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">
+                      Carregando notas importadas...
+                    </td>
+                  </tr>
+                ) : filteredMaintenanceXmlInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">
+                      Nenhuma nota importada para manutenção encontrada.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredMaintenanceXmlInvoices.map((invoice) => (
+                    <tr key={invoice.id} className="border-t border-slate-200">
+                      <td className="px-6 py-4 text-sm text-slate-700">{invoice.issuerName || "-"}</td>
+                      <td className="px-6 py-4 text-sm text-slate-700">{invoice.number || "-"}</td>
+                      <td className="px-6 py-4 text-sm text-slate-700">{toDateBR(invoice.issuedAt)}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-slate-900">{xmlMoney(invoice.totalAmount)}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={xmlMaintenanceTypeClass(invoice.processingType)}>
+                          {xmlMaintenanceTypeLabel(invoice.processingType)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={xmlProcessingStatusClass(invoice.processingStatus)}>
+                          {xmlProcessingStatusLabel(invoice.processingStatus)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            to={`/xml-import/invoices/${invoice.id}`}
+                            className="btn-ui btn-ui-neutral"
+                          >
+                            Ver detalhes
+                          </Link>
+                          {invoice.processingStatus === "SUGGESTED" ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleProcessMaintenanceInvoice(invoice.id)}
+                                disabled={xmlProcessingInvoiceId === invoice.id}
+                                className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {xmlProcessingInvoiceId === invoice.id ? "Processando..." : "Criar manutenção"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleIgnoreMaintenanceInvoice(invoice.id)}
+                                disabled={xmlIgnoringInvoiceId === invoice.id}
+                                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {xmlIgnoringInvoiceId === invoice.id ? "Ignorando..." : "Ignorar"}
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-slate-500">Sem ações adicionais</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       {loading ? <section className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Carregando...</section> : null}
 
@@ -2160,6 +2550,84 @@ export function MaintenanceRecordsPage() {
                   </div>
                 </div>
               ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {xmlImportModalOpen ? (
+        <div className="fixed inset-0 z-[65] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Importar XML de manutenções</h2>
+                <p className="text-sm text-slate-500">Manutenções &gt; Importação XML. Envie um .zip para importar notas de peças e serviços.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => closeXmlImportModal()}
+                className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-4 p-6">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Arquivo ZIP</label>
+                <input
+                  type="file"
+                  accept=".zip,application/zip,application/x-zip-compressed"
+                  onChange={(event) => setXmlImportFile(event.target.files?.[0] || null)}
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-slate-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Filial (opcional)</label>
+                  <select
+                    value={xmlImportBranchId}
+                    onChange={(event) => setXmlImportBranchId(event.target.value)}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  >
+                    <option value="">Sem filial específica</option>
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Competência (opcional)</label>
+                  <input
+                    type="text"
+                    value={xmlImportPeriodLabel}
+                    onChange={(event) => setXmlImportPeriodLabel(event.target.value)}
+                    placeholder="Ex: 2026/03"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => closeXmlImportModal()}
+                className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleImportMaintenanceXml}
+                disabled={xmlImporting}
+                className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                <FileCode2 size={16} />
+                {xmlImporting ? "Importando..." : "Importar XML de manutenções"}
+              </button>
             </div>
           </div>
         </div>
