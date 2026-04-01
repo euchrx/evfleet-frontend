@@ -82,6 +82,12 @@ function parseDateSafe(value?: string) {
   return parsed;
 }
 
+function isStarterPlan(plan?: Pick<SubscriptionPlan, "code" | "name"> | null) {
+  const code = String(plan?.code || "").trim().toUpperCase();
+  const name = String(plan?.name || "").trim().toUpperCase();
+  return code === "STA" || code === "STARTER" || name.includes("STARTER");
+}
+
 export function SubscriptionPage() {
   const location = useLocation();
   const { user } = useAuth();
@@ -172,6 +178,22 @@ export function SubscriptionPage() {
         )}.`
       : "Pagamento deste ciclo ja confirmado. Aguarde a proxima janela de cobranca."
     : "";
+  const trialEnded = overview?.status === "PAST_DUE";
+
+  function canStartTrialForPlan(plan?: SubscriptionPlan | null) {
+    if (!plan) return false;
+    if (!isStarterPlan(plan)) return false;
+    return !overview || overview.status === "TRIALING";
+  }
+
+  function getSuggestedActivationStatus(plan?: SubscriptionPlan | null) {
+    return canStartTrialForPlan(plan) ? "TRIALING" : "ACTIVE";
+  }
+
+  function requiresCheckoutOnSelection(plan?: SubscriptionPlan | null) {
+    if (!plan || plan.isCurrent) return false;
+    return getSuggestedActivationStatus(plan) === "ACTIVE";
+  }
 
   function redirectToCheckout(checkoutUrl: string) {
     const normalizedUrl = String(checkoutUrl || "").trim();
@@ -262,10 +284,6 @@ export function SubscriptionPage() {
       setErrorMessage(paymentWindowBlockedMessage || "Pagamento ja confirmado para o ciclo atual.");
       return;
     }
-    if (!canManagePlans) {
-      setErrorMessage("Somente administrador pode alterar o plano.");
-      return;
-    }
     if (!data?.companyId) {
       setErrorMessage("Selecione uma empresa no escopo para continuar.");
       return;
@@ -277,7 +295,7 @@ export function SubscriptionPage() {
       await selectCompanyPlan(
         data.companyId,
         selectedPlanForCheckout.id,
-        selectedPlanActivationStatus,
+        selectedPlanActivationStatus || getSuggestedActivationStatus(selectedPlanForCheckout),
       );
       const refreshed = await getSubscriptionPageData();
       setData(refreshed);
@@ -303,12 +321,17 @@ export function SubscriptionPage() {
   function getPlanActionLabel(plan: SubscriptionPlan) {
     if (canManagePlans && !hasCompanyScope) return "Selecione empresa";
     if (plan.isCurrent && overview) return "Ver assinatura";
-    return "Selecionar plano";
+    return requiresCheckoutOnSelection(plan) ? "Selecionar e pagar" : "Selecionar plano";
   }
 
   function getSelfServicePlanStatus(): Extract<SubscriptionStatus, "ACTIVE" | "TRIALING"> {
-    return overview?.status === "TRIALING" ? "TRIALING" : "ACTIVE";
+    return getSuggestedActivationStatus(selectedPlanForCheckout);
   }
+
+  const selectedPlanAllowsTrial = canStartTrialForPlan(selectedPlanForCheckout);
+  const selectedPlanRequiresCheckout = requiresCheckoutOnSelection(
+    selectedPlanForCheckout,
+  );
 
   async function handlePayNow() {
     if (!overview?.subscriptionId) return;
@@ -629,7 +652,7 @@ export function SubscriptionPage() {
                   type="button"
                   onClick={() => {
                     setSelectedPlanForCheckout(plan);
-                    setSelectedPlanActivationStatus("TRIALING");
+                    setSelectedPlanActivationStatus(getSuggestedActivationStatus(plan));
                   }}
                   disabled={(canManagePlans && !hasCompanyScope) || isSubmitting || redirectingToCheckout}
                   className={`mt-4 w-full rounded-xl px-4 py-2 text-sm font-semibold transition ${
@@ -658,7 +681,7 @@ export function SubscriptionPage() {
                 type="button"
                 onClick={() => {
                   setSelectedPlanForCheckout(null);
-                  setSelectedPlanActivationStatus("TRIALING");
+                  setSelectedPlanActivationStatus("ACTIVE");
                 }}
                 className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100"
               >
@@ -713,7 +736,7 @@ export function SubscriptionPage() {
                 </div>
               </div>
 
-              {canManagePlans ? (
+              {canManagePlans && selectedPlanAllowsTrial ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-sm font-semibold text-slate-800">
                     Tipo de ativação ao vincular o plano
@@ -745,6 +768,14 @@ export function SubscriptionPage() {
                 </div>
               ) : null}
 
+              {!selectedPlanAllowsTrial ? (
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                  {trialEnded
+                    ? "O período de teste já foi encerrado. Para continuar com este plano, o checkout será iniciado na próxima etapa."
+                    : "O período de teste é permitido apenas para o plano Starter. Este plano seguirá diretamente para pagamento."}
+                </div>
+              ) : null}
+
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-sm font-semibold text-slate-800">O que este plano oferece</p>
                 <ul className="mt-3 space-y-2">
@@ -758,7 +789,7 @@ export function SubscriptionPage() {
             </div>
 
             <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 px-6 py-4">
-              {canManagePlans ? (
+              {canManagePlans && selectedPlanAllowsTrial ? (
                 <button
                   type="button"
                   onClick={async () => {
@@ -768,7 +799,7 @@ export function SubscriptionPage() {
                       selectedPlanActivationStatus,
                     );
                     setSelectedPlanForCheckout(null);
-                    setSelectedPlanActivationStatus("TRIALING");
+                    setSelectedPlanActivationStatus("ACTIVE");
                   }}
                   disabled={redirectingToCheckout}
                   className="cursor-pointer rounded-xl border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -776,12 +807,12 @@ export function SubscriptionPage() {
                   Selecionar sem pagar
                 </button>
               ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedPlanForCheckout(null);
-                  setSelectedPlanActivationStatus("TRIALING");
-                }}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPlanForCheckout(null);
+                    setSelectedPlanActivationStatus("ACTIVE");
+                  }}
                 disabled={redirectingToCheckout}
                 className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -794,7 +825,11 @@ export function SubscriptionPage() {
                   disabled={redirectingToCheckout}
                   className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {redirectingToCheckout ? "Redirecionando..." : "Ir para pagamento"}
+                  {redirectingToCheckout
+                    ? "Redirecionando..."
+                    : selectedPlanAllowsTrial
+                      ? "Ir para pagamento"
+                      : "Selecionar plano e pagar"}
                 </button>
               ) : selectedPlanForCheckout.isCurrent ? (
                 <button
@@ -808,18 +843,24 @@ export function SubscriptionPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (!selectedPlanForCheckout?.id) return;
-                    await handleSelectPlan(
-                      selectedPlanForCheckout.id,
-                      getSelfServicePlanStatus(),
-                    );
-                    setSelectedPlanForCheckout(null);
-                    setSelectedPlanActivationStatus("TRIALING");
-                  }}
+                  onClick={
+                    selectedPlanRequiresCheckout
+                      ? handleSelectPlanAndPay
+                      : async () => {
+                          if (!selectedPlanForCheckout?.id) return;
+                          await handleSelectPlan(
+                            selectedPlanForCheckout.id,
+                            getSelfServicePlanStatus(),
+                          );
+                          setSelectedPlanForCheckout(null);
+                          setSelectedPlanActivationStatus("ACTIVE");
+                        }
+                  }
                   className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
                 >
-                  Selecionar plano
+                  {selectedPlanRequiresCheckout
+                    ? "Selecionar plano e pagar"
+                    : "Selecionar plano"}
                 </button>
               )}
             </div>

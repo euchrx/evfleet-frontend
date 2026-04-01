@@ -263,7 +263,7 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
 export async function selectCompanyPlan(
   companyId: string,
   planId: string,
-  initialStatus: Extract<SubscriptionStatus, "ACTIVE" | "TRIALING"> = "TRIALING",
+  initialStatus?: Extract<SubscriptionStatus, "ACTIVE" | "TRIALING">,
 ) {
   const context = getUserContext();
   if (context.isAdmin) {
@@ -274,14 +274,14 @@ export async function selectCompanyPlan(
 
     await api.post(`/billing/companies/${targetCompanyId}/subscription`, {
       planId,
-      initialStatus,
+      ...(initialStatus ? { initialStatus } : {}),
     });
     return;
   }
 
   await api.post("/billing/me/subscription", {
     planId,
-    initialStatus,
+    ...(initialStatus ? { initialStatus } : {}),
   });
 }
 
