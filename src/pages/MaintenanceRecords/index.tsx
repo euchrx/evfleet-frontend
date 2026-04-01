@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { LayoutGrid, Table2 } from "lucide-react";
 import { useBranch } from "../../contexts/BranchContext";
@@ -1153,6 +1153,7 @@ export function MaintenanceRecordsPage() {
       setRecordModalOpen(false);
       await loadData();
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
     } catch {
       setRecordFieldErrors((prev) => ({
         ...prev,
@@ -1229,6 +1230,7 @@ export function MaintenanceRecordsPage() {
       setPlanModalOpen(false);
       await loadData();
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
     } catch {
       setPlanFieldErrors((prev) => ({
         ...prev,
@@ -1407,6 +1409,7 @@ export function MaintenanceRecordsPage() {
       setTireWheelInput("");
       await loadData();
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
     } catch (error) {
       setTireFieldErrors((prev) => ({
         ...prev,
@@ -1427,6 +1430,7 @@ export function MaintenanceRecordsPage() {
     setRecordToDelete(null);
     await loadData();
     window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
   }
 
   async function confirmRemovePlan() {
@@ -1435,6 +1439,7 @@ export function MaintenanceRecordsPage() {
     setPlanToDelete(null);
     await loadData();
     window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
   }
 
   async function confirmRemoveTire() {
@@ -1443,6 +1448,7 @@ export function MaintenanceRecordsPage() {
     setTireToDelete(null);
     await loadData();
     window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
   }
 
   async function confirmRemoveAllTires() {
@@ -1456,6 +1462,7 @@ export function MaintenanceRecordsPage() {
     setDeleteAllTiresConfirmOpen(false);
     await loadData();
     window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
   }
 
   async function openReadingModal(tire: Tire) {
@@ -1504,6 +1511,7 @@ export function MaintenanceRecordsPage() {
       await loadData();
       setReadingForm(initialReadingForm);
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
     } catch {
       setReadingFieldErrors((prev) => ({
         ...prev,
@@ -2570,5 +2578,7 @@ export function MaintenanceRecordsPage() {
     </div>
   );
 }
+
+
 
 

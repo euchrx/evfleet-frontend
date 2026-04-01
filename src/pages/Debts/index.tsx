@@ -979,3 +979,4 @@ export function DebtsPage() {
     </div>
   );
 }
+

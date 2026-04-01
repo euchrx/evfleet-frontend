@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+ï»¿import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowUpRight,
   CarFront,
@@ -40,9 +40,9 @@ function formatDatePtBr(date: Date) {
 
 function maintenanceTypePtBr(value?: string) {
   if (value === "PREVENTIVE") return "Preventiva";
-  if (value === "PERIODIC") return "Periódica";
+  if (value === "PERIODIC") return "PeriÃ³dica";
   if (value === "CORRECTIVE") return "Corretiva";
-  return value || "Serviço";
+  return value || "ServiÃ§o";
 }
 
 type CostPeriod = "CURRENT_MONTH" | "LAST_30_DAYS" | "CURRENT_YEAR" | "ALL";
@@ -167,7 +167,7 @@ export function DashboardPage() {
       setTrips(Array.isArray(tripsData) ? tripsData : []);
     } catch (error) {
       console.error("Erro ao carregar dashboard:", error);
-      setErrorMessage("Não foi possível carregar os indicadores do dashboard.");
+      setErrorMessage("NÃ£o foi possÃ­vel carregar os indicadores do dashboard.");
     } finally {
       setLoading(false);
     }
@@ -396,7 +396,7 @@ export function DashboardPage() {
         const vehicle = toLabel.get(vehicleId);
         const label = vehicle
           ? formatVehicleLabel(vehicle)
-          : `Veículo ${vehicleId.slice(0, 8)}`;
+          : `VeÃ­culo ${vehicleId.slice(0, 8)}`;
         const vehicleType = vehicle?.vehicleType;
         return { vehicleId, label, value: total, vehicleType };
       });
@@ -459,21 +459,21 @@ export function DashboardPage() {
         description: `${(item.liters || 0).toLocaleString("pt-BR", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
-        })} L • KM ${item.km}`,
+        })} L â€¢ KM ${item.km}`,
       })),
       ...maintenance.map((item) => ({
         id: `maintenance-${item.id}`,
         date: item.maintenanceDate,
-        type: "Manutenção",
+        type: "ManutenÃ§Ã£o",
         value: item.cost || 0,
-        description: `${maintenanceTypePtBr(item.type)} • KM ${item.km}`,
+        description: `${maintenanceTypePtBr(item.type)} â€¢ KM ${item.km}`,
       })),
       ...debts.map((item) => ({
         id: `debt-${item.id}`,
         date: item.debtDate,
-        type: "Débito/Multa",
+        type: "DÃ©bito/Multa",
         value: item.amount || 0,
-        description: `${item.description || "Registro"} • ${item.points || 0} pontos`,
+        description: `${item.description || "Registro"} â€¢ ${item.points || 0} pontos`,
       })),
     ].sort((a, b) => parseDateSafe(b.date).getTime() - parseDateSafe(a.date).getTime());
 
@@ -651,7 +651,7 @@ export function DashboardPage() {
     costDetails.fuel.forEach((record) => {
       const key = record.vehicleId;
       const plate = record.vehicle?.plate || "";
-      const label = record.vehicle ? formatVehicleLabel(record.vehicle) : "Veículo não identificado";
+      const label = record.vehicle ? formatVehicleLabel(record.vehicle) : "VeÃ­culo nÃ£o identificado";
       const current = fuelByVehicle.get(key) || {
         label,
         plate,
@@ -672,7 +672,7 @@ export function DashboardPage() {
     costDetails.maintenance.forEach((record) => {
       const key = record.vehicleId;
       const plate = record.vehicle?.plate || "";
-      const label = record.vehicle ? formatVehicleLabel(record.vehicle) : "Veículo não identificado";
+      const label = record.vehicle ? formatVehicleLabel(record.vehicle) : "VeÃ­culo nÃ£o identificado";
       const current = maintenanceByVehicle.get(key) || {
         label,
         plate,
@@ -693,7 +693,7 @@ export function DashboardPage() {
     costDetails.debts.forEach((debt) => {
       const key = debt.vehicleId;
       const plate = debt.vehicle?.plate || "";
-      const label = debt.vehicle ? formatVehicleLabel(debt.vehicle) : "Veículo não identificado";
+      const label = debt.vehicle ? formatVehicleLabel(debt.vehicle) : "VeÃ­culo nÃ£o identificado";
       const current = debtsByVehicle.get(key) || {
         label,
         plate,
@@ -718,10 +718,10 @@ export function DashboardPage() {
     costPeriod === "CURRENT_YEAR"
       ? "Ano atual"
       : costPeriod === "CURRENT_MONTH"
-        ? "Mês atual"
+        ? "MÃªs atual"
         : costPeriod === "LAST_30_DAYS"
-          ? "Últimos 30 dias"
-          : "Todo o período";
+          ? "Ãšltimos 30 dias"
+          : "Todo o perÃ­odo";
 
   const selectedVehicleLabel =
     selectedVehicleCategory === "ALL"
@@ -741,7 +741,7 @@ export function DashboardPage() {
         month: "long",
         year: "numeric",
       });
-      return `Mês referente: ${monthYear}`;
+      return `MÃªs referente: ${monthYear}`;
     }
 
     if (costPeriod === "LAST_30_DAYS") {
@@ -768,14 +768,14 @@ export function DashboardPage() {
     ].filter((date) => !Number.isNaN(date.getTime()));
 
     if (allDates.length === 0) {
-      return "Todo o período: sem registros";
+      return "Todo o perÃ­odo: sem registros";
     }
 
     const timestamps = allDates.map((date) => date.getTime());
     const minDate = new Date(Math.min(...timestamps));
     const maxDate = new Date(Math.max(...timestamps));
 
-    return `Todo o período: desde ${formatDatePtBr(minDate)} até ${formatDatePtBr(maxDate)}`;
+    return `Todo o perÃ­odo: desde ${formatDatePtBr(minDate)} atÃ© ${formatDatePtBr(maxDate)}`;
   }, [
     costPeriod,
     selectedVehicleCategory,
@@ -792,7 +792,7 @@ export function DashboardPage() {
           Dashboard Executivo
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Visão operacional e financeira da frota
+          VisÃ£o operacional e financeira da frota
         </p>
       </div>
 
@@ -809,9 +809,9 @@ export function DashboardPage() {
           className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
         >
           <option value="CURRENT_YEAR">Ano atual</option>
-          <option value="CURRENT_MONTH">Mês atual</option>
-          <option value="LAST_30_DAYS">Últimos 30 dias</option>
-          <option value="ALL">Todo o período</option>
+          <option value="CURRENT_MONTH">MÃªs atual</option>
+          <option value="LAST_30_DAYS">Ãšltimos 30 dias</option>
+          <option value="ALL">Todo o perÃ­odo</option>
         </select>
 
         <select
@@ -837,7 +837,7 @@ export function DashboardPage() {
           className="cursor-pointer rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md"
         >
           <div className="flex items-center justify-between">
-            <p className="text-lg font-semibold text-slate-900">Custo com combustível</p>
+            <p className="text-lg font-semibold text-slate-900">Custo com combustÃ­vel</p>
             <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700">
               <Fuel size={16} />
             </div>
@@ -860,7 +860,7 @@ export function DashboardPage() {
           className="cursor-pointer rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md"
         >
           <div className="flex items-center justify-between">
-            <p className="text-lg font-semibold text-slate-900">Custo com manutenção</p>
+            <p className="text-lg font-semibold text-slate-900">Custo com manutenÃ§Ã£o</p>
             <div className="rounded-xl bg-orange-100 p-2 text-orange-700">
               <Wrench size={16} />
             </div>
@@ -883,7 +883,7 @@ export function DashboardPage() {
           className="cursor-pointer rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md"
         >
           <div className="flex items-center justify-between">
-            <p className="text-lg font-semibold text-slate-900">Custo com débitos e multas</p>
+            <p className="text-lg font-semibold text-slate-900">Custo com dÃ©bitos e multas</p>
             <div className="rounded-xl bg-red-100 p-2 text-red-700">
               <CircleAlert size={16} />
             </div>
@@ -915,7 +915,7 @@ export function DashboardPage() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <DashboardCard
-          title="Ranking veículos por custo"
+          title="Ranking veÃ­culos por custo"
           icon={
             <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700">
               <CarFront size={16} />
@@ -926,7 +926,7 @@ export function DashboardPage() {
             <p className="text-sm text-slate-500">Carregando...</p>
           ) : topVehiclesByCostByType.LIGHT.length === 0 &&
             topVehiclesByCostByType.HEAVY.length === 0 ? (
-            <p className="text-sm text-slate-500">Sem dados de custo por veículo.</p>
+            <p className="text-sm text-slate-500">Sem dados de custo por veÃ­culo.</p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {[
@@ -1107,7 +1107,7 @@ export function DashboardPage() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <DashboardCard
-          title="Veículos da frota"
+          title="VeÃ­culos da frota"
           icon={
             <div className="rounded-xl bg-blue-100 p-2 text-blue-700">
               <CarFront size={16} />
@@ -1120,7 +1120,7 @@ export function DashboardPage() {
               Ativos: {loading ? "..." : metrics.vehiclesActive}
             </span>
             <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-700">
-              Manutenção: {loading ? "..." : metrics.vehiclesMaintenance}
+              ManutenÃ§Ã£o: {loading ? "..." : metrics.vehiclesMaintenance}
             </span>
           </div>
           <p className="mt-3 text-xs text-slate-500">Total no escopo</p>
@@ -1147,7 +1147,7 @@ export function DashboardPage() {
         </DashboardCard>
 
         <DashboardCard
-          title="Manutenções"
+          title="ManutenÃ§Ãµes"
           icon={
             <div className="rounded-xl bg-orange-100 p-2 text-orange-700">
               <Wrench size={16} />
@@ -1177,7 +1177,7 @@ export function DashboardPage() {
               Abertas: {loading ? "..." : metrics.tripsOpen}
             </span>
             <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
-              Concluídas: {loading ? "..." : metrics.tripsCompleted}
+              ConcluÃ­das: {loading ? "..." : metrics.tripsCompleted}
             </span>
           </div>
           <p className="mt-3 text-xs text-slate-500">Total no escopo</p>
@@ -1194,12 +1194,12 @@ export function DashboardPage() {
           <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.fuelTotal}</p>
           <div className="mt-3 flex items-center justify-between text-xs">
             <span className="text-slate-500">Registros totais</span>
-            <span className="font-semibold text-emerald-700">No período: {loading ? "..." : metrics.fuelOperationsPeriod}</span>
+            <span className="font-semibold text-emerald-700">No perÃ­odo: {loading ? "..." : metrics.fuelOperationsPeriod}</span>
           </div>
         </DashboardCard>
 
         <DashboardCard
-          title="Débitos e Multas"
+          title="DÃ©bitos e Multas"
           icon={
             <div className="rounded-xl bg-red-100 p-2 text-red-700">
               <CircleAlert size={16} />
@@ -1223,10 +1223,10 @@ export function DashboardPage() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-xl font-bold text-slate-900">
-                  Detalhes de custo do veículo
+                  Detalhes de custo do veÃ­culo
                 </h3>
                 <p className="text-sm text-slate-500">
-                  {vehicleCostModal.label} •{" "}
+                  {vehicleCostModal.label} â€¢{" "}
                   {vehicleCostModal.category === "LIGHT" ? "Categoria Leve" : "Categoria Pesada"}
                 </p>
               </div>
@@ -1241,19 +1241,19 @@ export function DashboardPage() {
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                <p className="text-xs font-semibold uppercase text-emerald-700">Combustível</p>
+                <p className="text-xs font-semibold uppercase text-emerald-700">CombustÃ­vel</p>
                 <p className="mt-1 text-xl font-bold text-emerald-800">
                   {toCurrency(vehicleCostModalData.fuelTotal)}
                 </p>
               </div>
               <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
-                <p className="text-xs font-semibold uppercase text-orange-700">Manutenção</p>
+                <p className="text-xs font-semibold uppercase text-orange-700">ManutenÃ§Ã£o</p>
                 <p className="mt-1 text-xl font-bold text-orange-800">
                   {toCurrency(vehicleCostModalData.maintenanceTotal)}
                 </p>
               </div>
               <div className="rounded-xl border border-red-200 bg-red-50 p-3">
-                <p className="text-xs font-semibold uppercase text-red-700">Débitos e multas</p>
+                <p className="text-xs font-semibold uppercase text-red-700">DÃ©bitos e multas</p>
                 <p className="mt-1 text-xl font-bold text-red-800">
                   {toCurrency(vehicleCostModalData.debtsTotal)}
                 </p>
@@ -1268,7 +1268,7 @@ export function DashboardPage() {
 
             <div className="mt-5 rounded-2xl border border-slate-200">
               <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                <h4 className="text-sm font-semibold text-slate-800">Histórico de custos</h4>
+                <h4 className="text-sm font-semibold text-slate-800">HistÃ³rico de custos</h4>
               </div>
               <div className="max-h-[46vh] overflow-y-auto">
                 {vehicleCostModalData.history.length === 0 ? (
@@ -1390,13 +1390,13 @@ export function DashboardPage() {
               <div>
                 <h3 className="text-xl font-bold text-slate-900">
                   {costModal === "FUEL"
-                    ? "Detalhamento - Custo com combustível"
+                    ? "Detalhamento - Custo com combustÃ­vel"
                     : costModal === "MAINTENANCE"
-                      ? "Detalhamento - Custo com manutenção"
-                      : "Detalhamento - Custo com débitos e multas"}
+                      ? "Detalhamento - Custo com manutenÃ§Ã£o"
+                      : "Detalhamento - Custo com dÃ©bitos e multas"}
                 </h3>
                 <p className="text-sm text-slate-500">
-                  {periodLabel} • {selectedVehicleLabel}
+                  {periodLabel} â€¢ {selectedVehicleLabel}
                 </p>
               </div>
               <button
@@ -1411,14 +1411,14 @@ export function DashboardPage() {
             {costModal === "FUEL" ? (
               <div>
                 <p className="mb-3 text-sm text-slate-700">
-                  Total: <span className="font-semibold">{toCurrency(metrics.fuelCostPeriod)}</span> • Registros:{" "}
+                  Total: <span className="font-semibold">{toCurrency(metrics.fuelCostPeriod)}</span> â€¢ Registros:{" "}
                   <span className="font-semibold">{costDetails.fuel.length}</span>
                 </p>
                 <div className="overflow-x-auto rounded-2xl border border-slate-200">
                   <table className="min-w-full">
                     <thead className="bg-slate-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Veículo</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">VeÃ­culo</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Total de litros</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Valor total</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Abastecimentos</th>
@@ -1467,16 +1467,16 @@ export function DashboardPage() {
             {costModal === "MAINTENANCE" ? (
               <div>
                 <p className="mb-3 text-sm text-slate-700">
-                  Total: <span className="font-semibold">{toCurrency(metrics.maintenanceCostPeriod)}</span> • Registros:{" "}
+                  Total: <span className="font-semibold">{toCurrency(metrics.maintenanceCostPeriod)}</span> â€¢ Registros:{" "}
                   <span className="font-semibold">{costDetails.maintenance.length}</span>
                 </p>
                 <div className="overflow-x-auto rounded-2xl border border-slate-200">
                   <table className="min-w-full">
                     <thead className="bg-slate-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Veículo</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">VeÃ­culo</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Custo total</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Manutenções</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">ManutenÃ§Ãµes</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">KM acumulado</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Ir para modulo</th>
                       </tr>
@@ -1500,7 +1500,7 @@ export function DashboardPage() {
                             <td className="px-4 py-3 text-sm text-slate-600">
                               <button
                                 type="button"
-                                title="Abrir manutenções filtrado por placa"
+                                title="Abrir manutenÃ§Ãµes filtrado por placa"
                                 onClick={() => {
                                   if (!item.plate) return;
                                   setCostModal(null);
@@ -1523,16 +1523,16 @@ export function DashboardPage() {
             {costModal === "DEBTS" ? (
               <div>
                 <p className="mb-3 text-sm text-slate-700">
-                  Total: <span className="font-semibold">{toCurrency(metrics.debtsCostPeriod)}</span> • Registros:{" "}
+                  Total: <span className="font-semibold">{toCurrency(metrics.debtsCostPeriod)}</span> â€¢ Registros:{" "}
                   <span className="font-semibold">{costDetails.debts.length}</span>
                 </p>
                 <div className="overflow-x-auto rounded-2xl border border-slate-200">
                   <table className="min-w-full">
                     <thead className="bg-slate-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Veículo</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">VeÃ­culo</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Valor total</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Débitos</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">DÃ©bitos</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Pontos totais</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Ir para modulo</th>
                       </tr>
@@ -1554,7 +1554,7 @@ export function DashboardPage() {
                             <td className="px-4 py-3 text-sm text-slate-600">
                               <button
                                 type="button"
-                                title="Abrir débitos e multas filtrado por placa"
+                                title="Abrir dÃ©bitos e multas filtrado por placa"
                                 onClick={() => {
                                   if (!item.plate) return;
                                   setCostModal(null);
@@ -1580,6 +1580,9 @@ export function DashboardPage() {
     </div>
   );
 }
+
+
+
 
 
 

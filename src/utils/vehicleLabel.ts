@@ -1,4 +1,4 @@
-type VehicleLike = {
+﻿type VehicleLike = {
   brand?: string | null;
   model?: string | null;
   plate?: string | null;
@@ -21,3 +21,4 @@ export function formatVehicleLabel(vehicle?: VehicleLike | null) {
   if (modelLabel) return modelLabel;
   return "Veículo não identificado";
 }
+
