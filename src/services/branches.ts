@@ -10,8 +10,13 @@ export type CreateBranchInput = {
 
 export type UpdateBranchInput = CreateBranchInput;
 
-export async function getBranches() {
-  const response = await api.get("/branches");
+export async function getBranches(companyScopeId?: string) {
+  const normalizedCompanyScopeId = String(companyScopeId || "").trim();
+  const response = await api.get("/branches", {
+    headers: normalizedCompanyScopeId
+      ? { "x-company-scope": normalizedCompanyScopeId }
+      : undefined,
+  });
 
   if (Array.isArray(response.data)) return response.data as Branch[];
   if (Array.isArray(response.data?.items)) return response.data.items as Branch[];

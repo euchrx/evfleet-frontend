@@ -26,7 +26,7 @@ const TABLE_PAGE_SIZE = 10;
 
 export function BranchesPage() {
   type BranchSortBy = "name" | "city" | "state" | "createdAt";
-  const { canSelectCompanyScope, selectedCompanyId } = useCompanyScope();
+  const { canSelectCompanyScope, selectedCompanyId, currentCompany } = useCompanyScope();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,9 +41,10 @@ export function BranchesPage() {
   const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
   const [deletingBranch, setDeletingBranch] = useState(false);
   const [form, setForm] = useState<BranchFormData>(initialForm);
+  const effectiveCompanyId = String(selectedCompanyId || currentCompany?.id || "").trim();
 
   async function loadBranchesData() {
-    if (canSelectCompanyScope && !selectedCompanyId) {
+    if (canSelectCompanyScope && !effectiveCompanyId) {
       setBranches([]);
       setLoading(false);
       setPageErrorMessage("Selecione uma empresa no escopo para carregar as filiais.");
@@ -53,8 +54,15 @@ export function BranchesPage() {
     try {
       setLoading(true);
       setPageErrorMessage("");
-      const data = await getBranches();
-      setBranches(Array.isArray(data) ? data : []);
+      const data = await getBranches(effectiveCompanyId || undefined);
+      const nextBranches = Array.isArray(data) ? data : [];
+      setBranches(
+        effectiveCompanyId
+          ? nextBranches.filter(
+              (branch) => String(branch.companyId || "").trim() === effectiveCompanyId,
+            )
+          : nextBranches,
+      );
     } catch (error) {
       console.error("Erro ao carregar filiais:", error);
       setPageErrorMessage("Não foi possível carregar as filiais.");
@@ -65,10 +73,10 @@ export function BranchesPage() {
 
   useEffect(() => {
     loadBranchesData();
-  }, [selectedCompanyId]);
+  }, [effectiveCompanyId]);
 
   function openCreateModal() {
-    if (canSelectCompanyScope && !selectedCompanyId) {
+    if (canSelectCompanyScope && !effectiveCompanyId) {
       setPageErrorMessage("Selecione uma empresa no escopo para cadastrar filial.");
       return;
     }
@@ -123,7 +131,7 @@ export function BranchesPage() {
         name: form.name.trim(),
         city: form.city.trim(),
         state: form.state.trim().toUpperCase(),
-        companyId: selectedCompanyId || undefined,
+        companyId: effectiveCompanyId || undefined,
       };
 
       const nextErrors: BranchFieldErrors = {};
