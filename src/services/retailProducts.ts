@@ -46,10 +46,61 @@ export type RetailProductFilters = {
   category?: "" | RetailProductCategory;
 };
 
+export type ProductXmlPreviewItem = {
+  lineIndex: number;
+  productCode?: string | null;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  detectedType: "PRODUCT";
+  importable: boolean;
+  duplicate: boolean;
+  duplicateReason?: string | null;
+  category: RetailProductCategory;
+};
+
+export type ProductXmlPreviewInvoice = {
+  fileName: string;
+  invoiceKey: string;
+  invoiceNumber?: string;
+  issuedAt?: string;
+  supplierName?: string;
+  supplierDocument?: string;
+  items: ProductXmlPreviewItem[];
+};
+
+export type ProductXmlPreviewResponse = {
+  summary: {
+    totalInvoices: number;
+    totalItems: number;
+    importableItems: number;
+    duplicateItems: number;
+    ignoredFuelItems: number;
+  };
+  invoices: ProductXmlPreviewInvoice[];
+};
+
+export type ProductXmlConfirmItem = ProductXmlPreviewItem & {
+  selected: boolean;
+};
+
+export type ProductXmlConfirmInvoice = Omit<ProductXmlPreviewInvoice, "items"> & {
+  items: ProductXmlConfirmItem[];
+};
+
+export type ProductXmlConfirmResponse = {
+  totalInvoicesRead: number;
+  totalItemsDetected: number;
+  totalImported: number;
+  totalIgnored: number;
+  totalDuplicated: number;
+};
+
 export async function getRetailProducts(
   filters: RetailProductFilters = {},
 ) {
-  const response = await api.get<RetailProductItem[]>("/retail-products", {
+  const response = await api.get<RetailProductItem[]>("/products", {
     params: {
       ...(filters.dateFrom?.trim() ? { dateFrom: filters.dateFrom.trim() } : {}),
       ...(filters.dateTo?.trim() ? { dateTo: filters.dateTo.trim() } : {}),
@@ -65,4 +116,32 @@ export async function getRetailProducts(
   });
 
   return Array.isArray(response.data) ? response.data : [];
+}
+
+export async function previewProductXml(files: File[]) {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file));
+
+  const response = await api.post<ProductXmlPreviewResponse>(
+    "/products/xml/preview",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    },
+  );
+
+  return response.data;
+}
+
+export async function confirmProductXmlImports(
+  invoices: ProductXmlConfirmInvoice[],
+) {
+  const response = await api.post<ProductXmlConfirmResponse>(
+    "/products/xml/confirm",
+    { invoices },
+  );
+
+  return response.data;
 }

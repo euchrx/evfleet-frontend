@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Package, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import { ProductXmlImportButton } from "../../components/ProductXmlImportButton";
 import { TablePagination } from "../../components/TablePagination";
 import {
   getRetailProducts,
@@ -60,6 +61,7 @@ function categoryLabel(category: RetailProductCategory) {
 export function RetailProductsPage() {
   const { selectedCompanyId } = useCompanyScope();
   const [items, setItems] = useState<RetailProductItem[]>([]);
+  const [lastSuccessfulItems, setLastSuccessfulItems] = useState<RetailProductItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -80,9 +82,11 @@ export function RetailProductsPage() {
       setErrorMessage("");
       const data = await getRetailProducts(nextFilters);
       setItems(data);
+      setLastSuccessfulItems(data);
     } catch (error) {
       console.error("Erro ao carregar produtos:", error);
       setErrorMessage("Não foi possível carregar os produtos importados.");
+      setItems(lastSuccessfulItems);
     } finally {
       if (manualRefresh) setRefreshing(false);
       else setLoading(false);
@@ -123,20 +127,11 @@ export function RetailProductsPage() {
   const summary = useMemo(() => {
     const totalValue = items.reduce((acc, item) => acc + toNumber(item.totalValue), 0);
     const totalQuantity = items.reduce((acc, item) => acc + toNumber(item.quantity), 0);
-    const invoices = new Set(
-      items
-        .map((item) => String(item.retailProductImport.xmlInvoice.invoiceKey || "").trim())
-        .filter(Boolean),
-    );
 
     return {
       totalItems: items.length,
       totalValue,
       totalQuantity,
-      invoices: invoices.size,
-      perfumaria: items.filter((item) => item.category === "PERFUMARIA").length,
-      cosmeticos: items.filter((item) => item.category === "COSMETICOS").length,
-      lubrificantes: items.filter((item) => item.category === "LUBRIFICANTES").length,
     };
   }, [items]);
 
@@ -160,21 +155,24 @@ export function RetailProductsPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Produtos</h1>
           <p className="text-sm text-slate-500">
-            Controle de produtos comprados para o veículo, organizados por categorias como perfumaria, cosméticos, lubrificantes e outros grupos.
+            Controle de itens comprados para o veículo, organizados por categoria e nota fiscal.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => loadData(filters, true)}
-          disabled={refreshing}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-          Atualizar dados
-        </button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <ProductXmlImportButton onImported={() => loadData(filters, true)} />
+          <button
+            type="button"
+            onClick={() => loadData(filters, true)}
+            disabled={refreshing}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+            Atualizar dados
+          </button>
+        </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Itens</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">{summary.totalItems}</p>
@@ -191,25 +189,6 @@ export function RetailProductsPage() {
             {formatQuantity(summary.totalQuantity)}
           </p>
         </div>
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Notas lidas</p>
-          <p className="mt-1 text-2xl font-bold text-amber-800">{summary.invoices}</p>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-fuchsia-700">Perfumaria</p>
-          <p className="mt-1 text-2xl font-bold text-fuchsia-800">{summary.perfumaria}</p>
-        </div>
-        <div className="rounded-2xl border border-pink-200 bg-pink-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-pink-700">Cosméticos</p>
-          <p className="mt-1 text-2xl font-bold text-pink-800">{summary.cosmeticos}</p>
-        </div>
-        <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">Lubrificantes</p>
-          <p className="mt-1 text-2xl font-bold text-cyan-800">{summary.lubrificantes}</p>
-        </div>
       </div>
 
       {errorMessage ? (
@@ -218,8 +197,8 @@ export function RetailProductsPage() {
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-4">
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 p-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             <input
               type="date"
@@ -287,13 +266,8 @@ export function RetailProductsPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3 text-sm text-slate-600">
-          <Package size={16} className="text-orange-600" />
-          <span>Produtos importados para acompanhamento de categorias e valores por nota fiscal.</span>
-        </div>
-
         <div className="overflow-x-auto">
-          <table className="min-w-[1200px] w-full">
+          <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
@@ -362,12 +336,7 @@ export function RetailProductsPage() {
                       {formatMoney(item.totalValue)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      <p className="font-medium text-slate-900">
-                        {item.retailProductImport.supplierName || "-"}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {item.retailProductImport.supplierDocument || "-"}
-                      </p>
+                      {item.retailProductImport.supplierName || "-"}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {item.retailProductImport.invoiceNumber || "-"}
@@ -396,7 +365,7 @@ export function RetailProductsPage() {
             onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
           />
         ) : null}
-      </section>
+      </div>
     </div>
   );
 }
