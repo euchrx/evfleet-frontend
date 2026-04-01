@@ -20,11 +20,11 @@ export type Trip = {
     plate: string;
     model: string;
     brand: string;
-    branchId: string;
-    branch: {
+    branchId?: string | null;
+    branch?: {
       id: string;
       name: string;
-    };
+    } | null;
   };
   driver?: {
     id: string;
