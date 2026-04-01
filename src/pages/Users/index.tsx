@@ -29,7 +29,7 @@ const initialForm: UserFormData = {
 const TABLE_PAGE_SIZE = 10;
 
 export function UsersPage() {
-  type UserSortBy = "name" | "email" | "role" | "createdAt";
+  type UserSortBy = "name" | "email" | "company" | "role" | "createdAt";
   const { canSelectCompanyScope, selectedCompanyId, options } = useCompanyScope();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +46,10 @@ export function UsersPage() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState(false);
   const [form, setForm] = useState<UserFormData>(initialForm);
+  const companyNameById = useMemo(
+    () => new Map(options.map((company) => [company.id, company.name])),
+    [options],
+  );
 
   async function loadUsersData() {
     try {
@@ -74,7 +78,7 @@ export function UsersPage() {
     setEditingUser(null);
     setForm({
       ...initialForm,
-      companyId: selectedCompanyId || "",
+      companyId: "",
     });
     setFieldErrors({});
     setIsModalOpen(true);
@@ -104,8 +108,17 @@ export function UsersPage() {
     field: K,
     value: UserFormData[K]
   ) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === "role" && value === "ADMIN") {
+        next.companyId = "";
+      }
+      return next;
+    });
     setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+    if (field === "role" && value === "ADMIN") {
+      setFieldErrors((prev) => ({ ...prev, companyId: undefined }));
+    }
   }
 
   function inputClass(field: keyof UserFormData) {
@@ -133,7 +146,9 @@ export function UsersPage() {
       if (!basePayload.name) nextErrors.name = "Informe o nome.";
       if (!basePayload.email) nextErrors.email = "Informe o e-mail.";
       if (!basePayload.role) nextErrors.role = "Selecione o perfil.";
-      if (!basePayload.companyId) nextErrors.companyId = "Selecione uma empresa.";
+      if (basePayload.role !== "ADMIN" && !basePayload.companyId) {
+        nextErrors.companyId = "Selecione uma empresa.";
+      }
       if (!editingUser && !form.password.trim()) nextErrors.password = "Informe a senha.";
       if (Object.keys(nextErrors).length > 0) {
         setFieldErrors(nextErrors);
@@ -212,6 +227,7 @@ export function UsersPage() {
           const haystack = [
             user.name,
             user.email,
+            companyNameById.get(user.companyId || "") || "sem empresa vinculada",
             user.role,
             roleLabel,
             new Date(user.createdAt).toLocaleDateString("pt-BR"),
@@ -229,13 +245,18 @@ export function UsersPage() {
       if (sortBy === "email") {
         return a.email.localeCompare(b.email, "pt-BR", { sensitivity: "base" }) * direction;
       }
+      if (sortBy === "company") {
+        const companyA = companyNameById.get(a.companyId || "") || "";
+        const companyB = companyNameById.get(b.companyId || "") || "";
+        return companyA.localeCompare(companyB, "pt-BR", { sensitivity: "base" }) * direction;
+      }
       if (sortBy === "role") return a.role.localeCompare(b.role, "pt-BR") * direction;
       if (sortBy === "createdAt") {
         return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction;
       }
       return a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }) * direction;
     });
-  }, [users, roleFilter, search, sortBy, sortDirection]);
+  }, [companyNameById, users, roleFilter, search, sortBy, sortDirection]);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredUsers.length / TABLE_PAGE_SIZE)),
@@ -333,6 +354,7 @@ export function UsersPage() {
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("name")} className="cursor-pointer">Nome {getSortArrow("name")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("email")} className="cursor-pointer">E-mail {getSortArrow("email")}</button></th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("company")} className="cursor-pointer">Empresa {getSortArrow("company")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("role")} className="cursor-pointer">Perfil {getSortArrow("role")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("createdAt")} className="cursor-pointer">Criado em {getSortArrow("createdAt")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ações</th>
@@ -342,13 +364,13 @@ export function UsersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
                     Carregando usuários...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
                     Nenhum usuário encontrado.
                   </td>
                 </tr>
@@ -357,6 +379,9 @@ export function UsersPage() {
                   <tr key={user.id} className="border-t border-slate-200">
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">{user.name}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{user.email}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      {companyNameById.get(user.companyId || "") || "Sem empresa vinculada"}
+                    </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
                       {user.role === "ADMIN" ? "Administrador" : "Gestor"}
                     </td>
@@ -423,14 +448,18 @@ export function UsersPage() {
             <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto p-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700">Empresa</label>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Empresa {form.role === "ADMIN" ? <span className="text-slate-400">(opcional)</span> : null}
+                  </label>
                   <select
                     value={form.companyId}
                     onChange={(e) => handleChange("companyId", e.target.value)}
                     className={inputClass("companyId")}
-                    disabled={!canSelectCompanyScope}
+                    disabled={!canSelectCompanyScope || form.role === "ADMIN"}
                   >
-                    <option value="">Selecione uma empresa</option>
+                    <option value="">
+                      {form.role === "ADMIN" ? "Sem empresa vinculada" : "Selecione uma empresa"}
+                    </option>
                     {options.map((company) => (
                       <option key={company.id} value={company.id}>
                         {company.name}
@@ -438,6 +467,11 @@ export function UsersPage() {
                     ))}
                   </select>
                   {fieldErrors.companyId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.companyId}</p> : null}
+                  {form.role === "ADMIN" ? (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Administradores podem ser cadastrados sem vínculo com uma empresa.
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="md:col-span-2">
