@@ -236,7 +236,6 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     { name: "Empresas", path: "/companies", icon: Building2, roles: ["ADMIN"] },
-    { name: "Filiais", path: "/branches", icon: Building2, roles: ["ADMIN"] },
     { name: "UsuÃ¡rios", path: "/users", icon: Users, roles: ["ADMIN"] },
     {
       name: "AdministraÃ§Ã£o",
@@ -248,7 +247,6 @@ export function AppLayout() {
 
   const administrativePaths = new Set([
     "/companies",
-    "/branches",
     "/users",
     "/administration",
   ]);
