@@ -516,34 +516,26 @@ export function DashboardPage() {
       vehicleTypeById.get(vehicleId) === selectedVehicleCategory;
 
     const kmsDrivenByDriver = new Map<string, number>();
-    const kmGroups = new Map<string, Array<{ km: number; date: string }>>();
 
-    filteredData.fuel
+    filteredData.trips
       .filter(
-        (record) =>
-          isInPeriod(record.fuelDate, costPeriod) &&
-          isVehicleMatch(record.vehicleId) &&
-          typeof record.km === "number" &&
-          record.km > 0
+        (trip) =>
+          trip.status === "COMPLETED" &&
+          Boolean(trip.driverId) &&
+          isVehicleMatch(trip.vehicleId) &&
+          isInPeriod(trip.returnAt || trip.departureAt, costPeriod) &&
+          typeof trip.departureKm === "number" &&
+          typeof trip.returnKm === "number" &&
+          trip.returnKm >= trip.departureKm
       )
-      .forEach((record) => {
-        const driverId = record.driverId || "NO_DRIVER";
-        const groupKey = `${driverId}::${record.vehicleId}`;
-        const current = kmGroups.get(groupKey) || [];
-        current.push({ km: record.km, date: record.fuelDate });
-        kmGroups.set(groupKey, current);
+      .forEach((trip) => {
+        const driverId = trip.driverId as string;
+        const traveledKm = Math.max(trip.returnKm! - trip.departureKm, 0);
+        kmsDrivenByDriver.set(
+          driverId,
+          (kmsDrivenByDriver.get(driverId) ?? 0) + traveledKm
+        );
       });
-
-    kmGroups.forEach((records, groupKey) => {
-      const [driverId] = groupKey.split("::");
-      const ordered = [...records].sort(
-        (a, b) => parseDateSafe(a.date).getTime() - parseDateSafe(b.date).getTime()
-      );
-      const first = ordered[0]?.km ?? 0;
-      const last = ordered[ordered.length - 1]?.km ?? 0;
-      const delta = Math.max(last - first, 0);
-      kmsDrivenByDriver.set(driverId, (kmsDrivenByDriver.get(driverId) ?? 0) + delta);
-    });
 
     const byDriver = {
       LIGHT: new Map<
@@ -626,7 +618,7 @@ export function DashboardPage() {
       LIGHT: normalize([...byDriver.LIGHT.values()]),
       HEAVY: normalize([...byDriver.HEAVY.values()]),
     };
-  }, [filteredData.fuel, costPeriod, selectedVehicleCategory, vehicleTypeById]);
+  }, [filteredData.fuel, filteredData.trips, costPeriod, selectedVehicleCategory, vehicleTypeById]);
 
   const costDetails = useMemo(() => {
     const isVehicleMatch = (vehicleId: string) =>
@@ -1357,7 +1349,7 @@ export function DashboardPage() {
                   </p>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
-                  <p className="text-xs font-semibold uppercase text-slate-500">Consumo medio</p>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Consumo médio</p>
                   <p className="mt-1 text-2xl font-bold text-cyan-700">
                     {bestDriverModal.averageKmPerLiter.toLocaleString("pt-BR", {
                       minimumFractionDigits: 2,
