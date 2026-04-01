@@ -58,8 +58,8 @@ export function CompanyDeletionResultModal({
 
   return (
     <div className="fixed inset-0 z-[96] flex items-start justify-center overflow-y-auto bg-slate-950/70 p-4 sm:items-center">
-      <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-emerald-200 bg-white shadow-2xl">
-        <div className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-cyan-50 px-6 py-5">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-emerald-200 bg-white shadow-2xl">
+        <div className="shrink-0 border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-cyan-50 px-6 py-5">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-xl font-bold text-emerald-700">
               OK
@@ -73,60 +73,62 @@ export function CompanyDeletionResultModal({
           </div>
         </div>
 
-        <div className="space-y-6 px-6 py-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Empresa excluída</p>
-              <p className="mt-1 text-lg font-semibold text-slate-900">{result.company.name}</p>
-              <p className="mt-1 text-sm text-slate-600">ID: {result.company.id}</p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Horário da operação</p>
-              <p className="mt-1 text-lg font-semibold text-slate-900">
-                {formatDateTime(result.backup.generatedAt)}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                O timestamp exibido corresponde à geração do backup.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-            <h3 className="text-sm font-semibold text-slate-900">Metadados do backup</h3>
-            <div className="mt-3 grid gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nome do backup</p>
-                <p className="mt-1 text-sm text-slate-800">{result.backup.fileName}</p>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Empresa excluída</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">{result.company.name}</p>
+                <p className="mt-1 text-sm text-slate-600">ID: {result.company.id}</p>
               </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Identificador</p>
-                <p className="mt-1 text-sm text-slate-800">{result.backup.identifier}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Caminho</p>
-                <p className="mt-1 break-all text-sm text-slate-800">{result.backup.filePath}</p>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Horário da operação</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  {formatDateTime(result.backup.generatedAt)}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  O timestamp exibido corresponde à geração do backup.
+                </p>
               </div>
             </div>
-          </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-            <h3 className="text-sm font-semibold text-slate-900">Resumo da exclusão</h3>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {deletedEntries.map(([key, value]) => (
-                <div
-                  key={key}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                >
-                  <span className="text-slate-700">{formatSummaryLabel(key)}</span>
-                  <span className="font-semibold text-slate-900">{value}</span>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+              <h3 className="text-sm font-semibold text-slate-900">Metadados do backup</h3>
+              <div className="mt-3 grid gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nome do backup</p>
+                  <p className="mt-1 text-sm text-slate-800">{result.backup.fileName}</p>
                 </div>
-              ))}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Identificador</p>
+                  <p className="mt-1 text-sm text-slate-800">{result.backup.identifier}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Caminho</p>
+                  <p className="mt-1 break-all text-sm text-slate-800">{result.backup.filePath}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+              <h3 className="text-sm font-semibold text-slate-900">Resumo da exclusão</h3>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {deletedEntries.map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                  >
+                    <span className="text-slate-700">{formatSummaryLabel(key)}</span>
+                    <span className="font-semibold text-slate-900">{value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+        <div className="shrink-0 flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}

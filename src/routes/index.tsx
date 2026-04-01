@@ -19,7 +19,6 @@ import { VehicleDocumentsPage } from "../pages/VehicleDocuments";
 import { HowToPage } from "../pages/HowTo";
 import { SubscriptionPage } from "../pages/Subscription";
 import { BillingSuccessPage } from "../pages/BillingSuccess";
-import { XmlInvoiceDetailPage } from "../pages/XmlImport/InvoiceDetail";
 import { PrivateRoute } from "./PrivateRoute";
 import { RoleRoute } from "./RoleRoute";
 
@@ -43,7 +42,6 @@ export function AppRoutes() {
             <Route path="/vehicle-documents" element={<VehicleDocumentsPage />} />
             <Route path="/debts" element={<DebtsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/xml-import/invoices/:id" element={<XmlInvoiceDetailPage />} />
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/billing/success" element={<BillingSuccessPage />} />
             <Route path="/how-to-use" element={<HowToPage />} />

@@ -3,17 +3,12 @@ import type { Vehicle } from "../../types/vehicle";
 import type { Driver } from "../../types/driver";
 import {
   acknowledgeFuelRecordAnomaly,
-  confirmFuelXmlImports,
   createFuelRecord,
   deleteFuelRecord,
   getFuelInsights,
   getFuelRecords,
-  previewFuelXml,
   updateFuelRecord,
   type FuelInsights,
-  type FuelXmlConfirmInput,
-  type FuelXmlPreviewItem,
-  type FuelXmlPreviewResponse,
   type FuelRecord,
 } from "../../services/fuelRecords";
 import {
@@ -27,9 +22,7 @@ import { useLocation } from "react-router-dom";
 import {
   AlertTriangle,
   CarFront,
-  FileCode2,
   Gauge,
-  Upload,
 } from "lucide-react";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
@@ -49,18 +42,6 @@ type FuelFormData = {
 };
 
 type FuelFieldErrors = Partial<Record<keyof FuelFormData, string>>;
-type FuelXmlPreviewField = "vehicleId" | "driverId" | "km" | "branchId";
-
-type FuelXmlPreviewBinding = {
-  vehicleId: string;
-  driverId: string;
-  km: string;
-  branchId: string;
-};
-
-type FuelXmlPreviewBindingsMap = Record<string, FuelXmlPreviewBinding>;
-type FuelXmlPreviewFieldErrorsMap = Record<string, Partial<Record<FuelXmlPreviewField, string>>>;
-
 const initialForm: FuelFormData = {
   invoiceNumber: "",
   liters: "",
@@ -160,24 +141,9 @@ function toDateTimeLocalInput(value?: string) {
   return `${y}-${m}-${d}T${hh}:${mm}`;
 }
 
-function formatXmlAmount(value?: string | number | null) {
-  const numeric =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number(String(value).replace(",", "."))
-        : Number.NaN;
-
-  if (!Number.isFinite(numeric)) return "-";
-  return numeric.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-}
-
 export function FuelRecordsPage() {
   const location = useLocation();
-  const { branches, selectedBranchId } = useBranch();
+  const { branches } = useBranch();
   const { selectedCompanyId } = useCompanyScope();
   type FuelSortBy =
     | "invoiceNumber"
@@ -210,23 +176,6 @@ export function FuelRecordsPage() {
   const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
   const [deletingSelectedRecords, setDeletingSelectedRecords] = useState(false);
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
-  const [isXmlImportModalOpen, setIsXmlImportModalOpen] = useState(false);
-  const [xmlImportFile, setXmlImportFile] = useState<File | null>(null);
-  const [xmlImportBranchId, setXmlImportBranchId] = useState("");
-  const [xmlImportPeriodLabel, setXmlImportPeriodLabel] = useState("");
-  const [xmlImporting, setXmlImporting] = useState(false);
-  const [xmlPreviewLoading, setXmlPreviewLoading] = useState(false);
-  const [xmlConfirming, setXmlConfirming] = useState(false);
-  const [xmlPreviewData, setXmlPreviewData] = useState<FuelXmlPreviewResponse | null>(null);
-  const [xmlPreviewItems, setXmlPreviewItems] = useState<FuelXmlPreviewItem[]>([]);
-  const [xmlSelectedInvoiceKeys, setXmlSelectedInvoiceKeys] = useState<string[]>([]);
-  const [xmlPreviewBindings, setXmlPreviewBindings] = useState<FuelXmlPreviewBindingsMap>({});
-  const [xmlPreviewFieldErrors, setXmlPreviewFieldErrors] = useState<FuelXmlPreviewFieldErrorsMap>({});
-  const [xmlInvoicesMessage, setXmlInvoicesMessage] = useState("");
-  const [xmlInvoicesMessageType, setXmlInvoicesMessageType] = useState<"success" | "error">(
-    "success",
-  );
-  const [xmlPreviewSearch, setXmlPreviewSearch] = useState("");
   const [form, setForm] = useState<FuelFormData>(initialForm);
   const [anomalyRefreshSeed, setAnomalyRefreshSeed] = useState(0);
 
@@ -540,270 +489,6 @@ export function FuelRecordsPage() {
     }
   }
 
-  function openXmlImportModal() {
-    setXmlInvoicesMessage("");
-    setXmlImportFile(null);
-    setXmlImportBranchId(selectedBranchId || "");
-    setXmlImportPeriodLabel("");
-    setXmlPreviewLoading(false);
-    setXmlConfirming(false);
-    setXmlPreviewData(null);
-    setXmlPreviewItems([]);
-    setXmlSelectedInvoiceKeys([]);
-    setXmlPreviewBindings({});
-    setXmlPreviewFieldErrors({});
-    setXmlPreviewSearch("");
-    setIsXmlImportModalOpen(true);
-  }
-
-  function closeXmlImportModal(force = false) {
-    if ((xmlImporting || xmlPreviewLoading || xmlConfirming) && !force) return;
-    setIsXmlImportModalOpen(false);
-    setXmlImportFile(null);
-    setXmlImportBranchId(selectedBranchId || "");
-    setXmlImportPeriodLabel("");
-    setXmlPreviewData(null);
-    setXmlPreviewItems([]);
-    setXmlSelectedInvoiceKeys([]);
-    setXmlPreviewBindings({});
-    setXmlPreviewFieldErrors({});
-    setXmlPreviewSearch("");
-  }
-
-  async function handleImportXml() {
-    if (!xmlImportFile) {
-      setXmlInvoicesMessageType("error");
-      setXmlInvoicesMessage("Selecione um arquivo ZIP para importar.");
-      return;
-    }
-
-    if (!xmlImportFile.name.toLowerCase().endsWith(".zip")) {
-      setXmlInvoicesMessageType("error");
-      setXmlInvoicesMessage("Arquivo inválido. Selecione um arquivo .zip.");
-      return;
-    }
-
-    try {
-      setXmlImporting(true);
-      setXmlPreviewLoading(true);
-      setXmlInvoicesMessage("");
-
-      const preview = await previewFuelXml(
-        xmlImportFile,
-        xmlImportBranchId || undefined,
-        xmlImportPeriodLabel || undefined,
-      );
-
-      setXmlPreviewData(preview);
-      const nextPreviewItems = Array.isArray(preview.previewItems) ? preview.previewItems : [];
-      setXmlPreviewItems(nextPreviewItems);
-
-      const defaultBranch = xmlImportBranchId || selectedBranchId || "";
-      const bindings: FuelXmlPreviewBindingsMap = {};
-      for (const item of nextPreviewItems) {
-        const invoiceKey = String(item.invoiceKey || "").trim();
-        if (!invoiceKey) continue;
-        bindings[invoiceKey] = {
-          vehicleId: "",
-          driverId: "",
-          km: "",
-          branchId: String(item.suggestedBranchId || defaultBranch || ""),
-        };
-      }
-      setXmlPreviewBindings(bindings);
-      setXmlSelectedInvoiceKeys(
-        nextPreviewItems.map((item) => String(item.invoiceKey || "").trim()).filter(Boolean),
-      );
-
-      if (nextPreviewItems.length === 0) {
-        setXmlInvoicesMessageType("success");
-        setXmlInvoicesMessage(
-          `Leitura concluída: ${preview.totalFiles} XML(s). Nenhum novo abastecimento elegível encontrado. Duplicidade/ja processadas: ${preview.ignoredDuplicates}. Fora do domínio FUEL: ${preview.ignoredNonFuel}.`,
-        );
-      } else {
-        setXmlInvoicesMessageType("success");
-        setXmlInvoicesMessage(
-          `Leitura concluída: ${preview.totalFiles} XML(s). Elegíveis para importação: ${preview.eligibleCount}. Duplicidade/ja processadas: ${preview.ignoredDuplicates}. Fora do domínio FUEL: ${preview.ignoredNonFuel}.`,
-        );
-      }
-    } catch (error) {
-      console.error("Erro ao importar XML de abastecimentos:", error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Não foi possível importar o arquivo XML.";
-      setXmlInvoicesMessageType("error");
-      setXmlInvoicesMessage(message);
-    } finally {
-      setXmlImporting(false);
-      setXmlPreviewLoading(false);
-    }
-  }
-
-  function updateXmlPreviewBinding(
-    invoiceKey: string,
-    field: FuelXmlPreviewField,
-    value: string,
-  ) {
-    setXmlPreviewBindings((prev) => ({
-      ...prev,
-      [invoiceKey]: {
-        vehicleId: prev[invoiceKey]?.vehicleId || "",
-        driverId: prev[invoiceKey]?.driverId || "",
-        km: prev[invoiceKey]?.km || "",
-        branchId: prev[invoiceKey]?.branchId || "",
-        [field]: value,
-      },
-    }));
-
-    setXmlPreviewFieldErrors((prev) => ({
-      ...prev,
-      [invoiceKey]: {
-        ...prev[invoiceKey],
-        [field]: undefined,
-      },
-    }));
-  }
-
-  function handleXmlPreviewVehicleChange(invoiceKey: string, vehicleId: string) {
-    const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
-    const latestKm = latestKmByVehicle.get(vehicleId);
-    const latestDriverId = latestDriverIdByVehicle.get(vehicleId) || "";
-
-    setXmlPreviewBindings((prev) => ({
-      ...prev,
-      [invoiceKey]: {
-        vehicleId,
-        driverId: latestDriverId,
-        km: typeof latestKm === "number" ? String(latestKm) : prev[invoiceKey]?.km || "",
-        branchId:
-          selectedVehicle?.branchId ||
-          prev[invoiceKey]?.branchId ||
-          xmlImportBranchId ||
-          selectedBranchId ||
-          "",
-      },
-    }));
-
-    setXmlPreviewFieldErrors((prev) => ({
-      ...prev,
-      [invoiceKey]: {
-        ...prev[invoiceKey],
-        vehicleId: undefined,
-      },
-    }));
-  }
-
-  function toggleXmlPreviewSelection(invoiceKey: string) {
-    setXmlSelectedInvoiceKeys((prev) =>
-      prev.includes(invoiceKey)
-        ? prev.filter((item) => item !== invoiceKey)
-        : [...prev, invoiceKey],
-    );
-  }
-
-  function toggleXmlPreviewSelectAll(items: FuelXmlPreviewItem[]) {
-    const pageKeys = items.map((item) => String(item.invoiceKey || "").trim()).filter(Boolean);
-    const allSelected = pageKeys.every((key) => xmlSelectedInvoiceKeys.includes(key));
-    if (allSelected) {
-      setXmlSelectedInvoiceKeys((prev) => prev.filter((key) => !pageKeys.includes(key)));
-      return;
-    }
-    setXmlSelectedInvoiceKeys((prev) => Array.from(new Set([...prev, ...pageKeys])));
-  }
-
-  async function handleConfirmXmlImports() {
-    const selectedItems = filteredXmlPreviewItems.filter((item) =>
-      xmlSelectedInvoiceKeys.includes(String(item.invoiceKey || "").trim()),
-    );
-
-    if (selectedItems.length === 0) {
-      setXmlInvoicesMessageType("error");
-      setXmlInvoicesMessage("Selecione ao menos um abastecimento para importar.");
-      return;
-    }
-
-    const nextFieldErrors: FuelXmlPreviewFieldErrorsMap = {};
-    const payload: FuelXmlConfirmInput[] = [];
-
-    for (const item of selectedItems) {
-      const invoiceKey = String(item.invoiceKey || "").trim();
-      if (!invoiceKey) continue;
-
-      const binding = xmlPreviewBindings[invoiceKey] || {
-        vehicleId: "",
-        driverId: "",
-        km: "",
-        branchId: "",
-      };
-
-      const vehicleId = String(binding.vehicleId || "").trim();
-      if (!vehicleId) {
-        nextFieldErrors[invoiceKey] = {
-          ...(nextFieldErrors[invoiceKey] || {}),
-          vehicleId: "Selecione o veículo.",
-        };
-        continue;
-      }
-
-      const kmNumber = Number(String(binding.km || "").replace(/\D/g, ""));
-      if (!Number.isFinite(kmNumber) || kmNumber < 0) {
-        nextFieldErrors[invoiceKey] = {
-          ...(nextFieldErrors[invoiceKey] || {}),
-          km: "Informe um KM válido.",
-        };
-        continue;
-      }
-
-      payload.push({
-        invoiceKey,
-        vehicleId,
-        ...(String(binding.driverId || "").trim()
-          ? { driverId: String(binding.driverId || "").trim() }
-          : {}),
-        km: kmNumber,
-        ...(String(binding.branchId || "").trim()
-          ? { branchId: String(binding.branchId || "").trim() }
-          : {}),
-      });
-    }
-
-    if (Object.keys(nextFieldErrors).length > 0) {
-      setXmlPreviewFieldErrors(nextFieldErrors);
-      setXmlInvoicesMessageType("error");
-      setXmlInvoicesMessage("Revise os campos obrigatórios das linhas selecionadas.");
-      return;
-    }
-
-    try {
-      setXmlConfirming(true);
-      setXmlInvoicesMessage("");
-      setXmlPreviewFieldErrors({});
-
-      const result = await confirmFuelXmlImports(payload);
-
-      await loadData();
-      notifyHeaderNotifications();
-
-      setXmlInvoicesMessageType("success");
-      setXmlInvoicesMessage(
-        `Importação concluída: ${result.createdCount} criado(s), ${result.ignoredCount} ignorado(s).`,
-      );
-
-      closeXmlImportModal(true);
-    } catch (error) {
-      console.error("Erro ao confirmar importação XML de abastecimentos:", error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Não foi possível concluir a importação dos abastecimentos.";
-      setXmlInvoicesMessageType("error");
-      setXmlInvoicesMessage(message);
-    } finally {
-      setXmlConfirming(false);
-    }
-  }
-
   const availableVehicles = useMemo(() => {
     const sorted = [...vehicles].sort((a, b) =>
       a.plate.localeCompare(b.plate, "pt-BR", { sensitivity: "base" })
@@ -1021,30 +706,6 @@ export function FuelRecordsPage() {
     };
   }, [filteredRecords, detectedAnomalies]);
 
-  const filteredXmlPreviewItems = useMemo(() => {
-    const searchText = xmlPreviewSearch.trim().toLowerCase();
-    if (!searchText) return xmlPreviewItems;
-
-    return xmlPreviewItems.filter((invoice) => {
-      const haystack = [
-        invoice.issuerName || "",
-        invoice.number || "",
-        invoice.invoiceKey || "",
-        invoice.items.map((item) => item.description || "").join(" "),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(searchText);
-    });
-  }, [xmlPreviewItems, xmlPreviewSearch]);
-
-  const allXmlPreviewSelected = useMemo(() => {
-    if (filteredXmlPreviewItems.length === 0) return false;
-    return filteredXmlPreviewItems.every((item) =>
-      xmlSelectedInvoiceKeys.includes(String(item.invoiceKey || "").trim()),
-    );
-  }, [filteredXmlPreviewItems, xmlSelectedInvoiceKeys]);
-
   async function handleConfirmAnomaly(recordId: string) {
     try {
       await acknowledgeFuelRecordAnomaly(recordId);
@@ -1069,14 +730,6 @@ export function FuelRecordsPage() {
 
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <button
-            type="button"
-            onClick={openXmlImportModal}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 sm:w-auto"
-          >
-            <Upload size={16} />
-            Importar XML de abastecimentos
-          </button>
-          <button
             onClick={openCreateModal}
             className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
           >
@@ -1084,18 +737,6 @@ export function FuelRecordsPage() {
           </button>
         </div>
       </div>
-
-      {xmlInvoicesMessage ? (
-        <div
-          className={`rounded-xl px-4 py-3 text-sm ${
-            xmlInvoicesMessageType === "success"
-              ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border border-red-200 bg-red-50 text-red-700"
-          }`}
-        >
-          {xmlInvoicesMessage}
-        </div>
-      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -1303,307 +944,6 @@ export function FuelRecordsPage() {
           />
         ) : null}
       </div>
-
-      {isXmlImportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
-          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-7xl rounded-2xl bg-white shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Importar XML de abastecimentos</h2>
-                <p className="text-sm text-slate-500">
-                  Envie o ZIP, revise a prévia e confirme os abastecimentos selecionados.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => closeXmlImportModal()}
-                className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100"
-              >
-                Fechar
-              </button>
-            </div>
-
-            <div className="flex-1 space-y-4 overflow-y-auto p-6">
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="md:col-span-1">
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Arquivo ZIP</label>
-                  <input
-                    type="file"
-                    accept=".zip,application/zip,application/x-zip-compressed"
-                    onChange={(event) => setXmlImportFile(event.target.files?.[0] || null)}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-slate-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Filial padrão (opcional)
-                  </label>
-                  <select
-                    value={xmlImportBranchId}
-                    onChange={(event) => setXmlImportBranchId(event.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                  >
-                    <option value="">Sem filial específica</option>
-                    {branches.map((branch) => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Competência (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={xmlImportPeriodLabel}
-                    onChange={(event) => setXmlImportPeriodLabel(event.target.value)}
-                    placeholder="Ex: 2026/03"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <input
-                  type="text"
-                  value={xmlPreviewSearch}
-                  onChange={(event) => setXmlPreviewSearch(event.target.value)}
-                  placeholder="Buscar por emitente, número, chave ou item"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200 md:max-w-md"
-                  disabled={xmlImporting || xmlPreviewLoading || xmlConfirming}
-                />
-                <button
-                  type="button"
-                  onClick={handleImportXml}
-                  disabled={xmlImporting || xmlPreviewLoading || xmlConfirming}
-                  className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  <FileCode2 size={16} />
-                  {xmlImporting || xmlPreviewLoading ? "Gerando prévia..." : "Gerar prévia XML"}
-                </button>
-              </div>
-
-              {xmlPreviewData ? (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Arquivos no ZIP</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">{xmlPreviewData.totalFiles}</p>
-                  </div>
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase text-emerald-700">Elegíveis</p>
-                    <p className="mt-1 text-2xl font-bold text-emerald-900">{xmlPreviewData.eligibleCount}</p>
-                  </div>
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase text-amber-700">Ignoradas duplicadas</p>
-                    <p className="mt-1 text-2xl font-bold text-amber-900">{xmlPreviewData.ignoredDuplicates}</p>
-                  </div>
-                  <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase text-blue-700">Ignoradas não combustível</p>
-                    <p className="mt-1 text-2xl font-bold text-blue-900">{xmlPreviewData.ignoredNonFuel}</p>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">
-                          <input
-                            type="checkbox"
-                            checked={allXmlPreviewSelected}
-                            onChange={() => toggleXmlPreviewSelectAll(filteredXmlPreviewItems)}
-                            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-orange-500 focus:ring-orange-300"
-                          />
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Emitente</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Nota</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Data</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Valor</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Resumo itens</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Veículo</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Motorista</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">KM</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Filial</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {xmlPreviewLoading ? (
-                        <tr>
-                          <td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-500">
-                            Carregando prévia de abastecimentos...
-                          </td>
-                        </tr>
-                      ) : filteredXmlPreviewItems.length === 0 ? (
-                        <tr>
-                          <td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-500">
-                            Nenhum novo abastecimento elegível encontrado.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredXmlPreviewItems.map((item) => {
-                          const invoiceKey = String(item.invoiceKey || "").trim();
-                          const binding = xmlPreviewBindings[invoiceKey] || {
-                            vehicleId: "",
-                            driverId: "",
-                            km: "",
-                            branchId: "",
-                          };
-                          const lineErrors = xmlPreviewFieldErrors[invoiceKey] || {};
-                          const lineDrivers = availableDrivers.filter((driver) => {
-                            if (!binding.vehicleId) return true;
-                            return !driver.vehicleId || driver.vehicleId === binding.vehicleId;
-                          });
-
-                          return (
-                            <tr key={invoiceKey} className="border-t border-slate-200">
-                              <td className="px-4 py-3 align-top">
-                                <input
-                                  type="checkbox"
-                                  checked={xmlSelectedInvoiceKeys.includes(invoiceKey)}
-                                  onChange={() => toggleXmlPreviewSelection(invoiceKey)}
-                                  className="mt-2 h-4 w-4 cursor-pointer rounded border-slate-300 text-orange-500 focus:ring-orange-300"
-                                />
-                              </td>
-                              <td className="px-4 py-3 text-sm text-slate-700 align-top">{item.issuerName || "-"}</td>
-                              <td className="px-4 py-3 text-sm text-slate-700 align-top">
-                                {item.number || "-"}
-                                <p className="text-xs text-slate-500">{invoiceKey}</p>
-                              </td>
-                              <td className="px-4 py-3 text-sm text-slate-700 align-top">
-                                {item.issuedAt ? formatLocalDate(item.issuedAt) : "-"}
-                              </td>
-                              <td className="px-4 py-3 text-sm font-medium text-slate-900 align-top">
-                                {formatXmlAmount(item.totalAmount)}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-slate-700 align-top min-w-[220px]">
-                                {(item.items || []).slice(0, 2).map((row, idx) => (
-                                  <p key={`${invoiceKey}-item-${idx}`} className="truncate">
-                                    {row.description}
-                                  </p>
-                                ))}
-                                {(item.items || []).length > 2 ? (
-                                  <p className="text-xs text-slate-500">
-                                    + {(item.items || []).length - 2} item(ns)
-                                  </p>
-                                ) : null}
-                              </td>
-                              <td className="px-4 py-3 align-top min-w-[220px]">
-                                <select
-                                  value={binding.vehicleId}
-                                  onChange={(event) =>
-                                    handleXmlPreviewVehicleChange(invoiceKey, event.target.value)
-                                  }
-                                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200 ${
-                                    lineErrors.vehicleId ? "border-red-400 bg-red-50" : "border-slate-300"
-                                  }`}
-                                >
-                                  <option value="">Selecione um veículo</option>
-                                  {availableVehicles.map((vehicle) => (
-                                    <option key={vehicle.id} value={vehicle.id}>
-                                      {formatVehicleLabel(vehicle)}
-                                    </option>
-                                  ))}
-                                </select>
-                                {lineErrors.vehicleId ? (
-                                  <p className="mt-1 text-xs text-red-600">{lineErrors.vehicleId}</p>
-                                ) : null}
-                              </td>
-                              <td className="px-4 py-3 align-top min-w-[220px]">
-                                <select
-                                  value={binding.driverId}
-                                  onChange={(event) =>
-                                    updateXmlPreviewBinding(invoiceKey, "driverId", event.target.value)
-                                  }
-                                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                                >
-                                  <option value="">Sem motorista</option>
-                                  {lineDrivers.map((driver) => (
-                                    <option key={driver.id} value={driver.id}>
-                                      {driver.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </td>
-                              <td className="px-4 py-3 align-top min-w-[120px]">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={binding.km}
-                                  onChange={(event) =>
-                                    updateXmlPreviewBinding(invoiceKey, "km", event.target.value)
-                                  }
-                                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200 ${
-                                    lineErrors.km ? "border-red-400 bg-red-50" : "border-slate-300"
-                                  }`}
-                                  placeholder="Ex: 123000"
-                                />
-                                {lineErrors.km ? (
-                                  <p className="mt-1 text-xs text-red-600">{lineErrors.km}</p>
-                                ) : null}
-                              </td>
-                              <td className="px-4 py-3 align-top min-w-[220px]">
-                                <select
-                                  value={binding.branchId}
-                                  onChange={(event) =>
-                                    updateXmlPreviewBinding(invoiceKey, "branchId", event.target.value)
-                                  }
-                                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                                >
-                                  <option value="">Sem filial específica</option>
-                                  {branches.map((branch) => (
-                                    <option key={branch.id} value={branch.id}>
-                                      {branch.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-6 py-4">
-              <p className="text-sm text-slate-600">
-                {xmlSelectedInvoiceKeys.length > 0
-                  ? `${xmlSelectedInvoiceKeys.length} selecionado(s) para importação`
-                  : "Selecione os abastecimentos que deseja importar"}
-              </p>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => closeXmlImportModal()}
-                  className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmXmlImports}
-                  disabled={
-                    xmlConfirming ||
-                    xmlPreviewLoading ||
-                    xmlImporting ||
-                    filteredXmlPreviewItems.length === 0
-                  }
-                  className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  <Upload size={16} />
-                  {xmlConfirming ? "Importando selecionados..." : "Importar selecionados"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
