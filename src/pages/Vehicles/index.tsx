@@ -269,7 +269,7 @@ export function VehiclesPage() {
       setVehicles(v);
       setBranches(b);
     } catch {
-      setPageErrorMessage("NÃ£o foi possÃ­vel carregar os dados de veÃ­culos.");
+      setPageErrorMessage("Não foi possível carregar os dados de veículos.");
     } finally {
       setLoading(false);
     }
@@ -377,7 +377,7 @@ export function VehiclesPage() {
       setHistoryTotalPages(res.totalPages || 1);
       setHistoryTotal(res.total || 0);
     } catch {
-      setPageErrorMessage("NÃ£o foi possÃ­vel carregar o histÃ³rico do veÃ­culo.");
+      setPageErrorMessage("Não foi possível carregar o histórico do veículo.");
     } finally {
       setHistoryLoading(false);
     }
@@ -446,15 +446,15 @@ export function VehiclesPage() {
       if (!payload.model) nextFieldErrors.model = "Informe o modelo.";
       if (!payload.brand) nextFieldErrors.brand = "Informe a marca.";
       if (!form.vehicleType) nextFieldErrors.vehicleType = "Selecione o tipo de peso.";
-      if (!form.category) nextFieldErrors.category = "Selecione o tipo de veÃ­culo.";
-      if (!form.fuelType) nextFieldErrors.fuelType = "Selecione o combustÃ­vel.";
+      if (!form.category) nextFieldErrors.category = "Selecione o tipo de veículo.";
+      if (!form.fuelType) nextFieldErrors.fuelType = "Selecione o combustível.";
       if (form.category && form.fuelType && !isFuelAllowedForCategory(form.category, form.fuelType)) {
-        nextFieldErrors.fuelType = "CombustÃ­vel nÃ£o permitido para o tipo de veÃ­culo.";
+        nextFieldErrors.fuelType = "Combustível não permitido para o tipo de veículo.";
       }
       if (!payload.chassis) nextFieldErrors.chassis = "Informe o chassi.";
       if (!payload.renavam) nextFieldErrors.renavam = "Informe o renavam.";
       if (Number.isNaN(payload.year) || payload.year < 1900) {
-        nextFieldErrors.year = "Informe um ano vÃ¡lido.";
+        nextFieldErrors.year = "Informe um ano válido.";
       }
       if (Number.isNaN(payload.tankCapacity) || payload.tankCapacity <= 0) {
         nextFieldErrors.tankCapacity = "Informe capacidade de tanque valida.";
@@ -476,8 +476,8 @@ export function VehiclesPage() {
       if (hasConsumptionInput && (!minRaw || !maxRaw)) {
         setFieldErrors((prev) => ({
           ...prev,
-          consumptionMinKmPerLiter: "Preencha mÃ­nimo e mÃ¡ximo ou deixe ambos em branco.",
-          consumptionMaxKmPerLiter: "Preencha mÃ­nimo e mÃ¡ximo ou deixe ambos em branco.",
+          consumptionMinKmPerLiter: "Preencha mínimo e máximo ou deixe ambos em branco.",
+          consumptionMaxKmPerLiter: "Preencha mínimo e máximo ou deixe ambos em branco.",
         }));
         return;
       }
@@ -523,10 +523,10 @@ export function VehiclesPage() {
       setCurrentProfilePhotoUrl("");
       await loadData();
     } catch (e: any) {
-      const msg = e?.response?.data?.message || "NÃ£o foi possÃ­vel salvar o veÃ­culo.";
+      const msg = e?.response?.data?.message || "Não foi possível salvar o veículo.";
       const message = Array.isArray(msg) ? msg.join(", ") : String(msg);
       const duplicatedFieldErrors: VehicleFieldErrors = {};
-      const isDuplicateMessage = /(ja existe|jÃ¡ existe|cadastrado)/i.test(message);
+      const isDuplicateMessage = /(ja existe|já existe|cadastrado)/i.test(message);
 
       if (isDuplicateMessage && /placa/i.test(message)) {
         duplicatedFieldErrors.plate = "Placa ja cadastrada.";
@@ -538,11 +538,11 @@ export function VehiclesPage() {
         duplicatedFieldErrors.renavam = "Renavam ja cadastrado.";
       }
       if (
-        /chassi.+mÃ­nimo|mÃ­nimo.+chassi|chassi.+minimo|minimo.+chassi|chassis.+longer than or equal to/i.test(
+        /chassi.+mínimo|mínimo.+chassi|chassi.+minimo|minimo.+chassi|chassis.+longer than or equal to/i.test(
           message,
         )
       ) {
-        duplicatedFieldErrors.chassis = "Chassi deve ter no mÃ­nimo 8 caracteres.";
+        duplicatedFieldErrors.chassis = "Chassi deve ter no mínimo 8 caracteres.";
       }
 
       if (Object.keys(duplicatedFieldErrors).length > 0) {
@@ -632,8 +632,8 @@ export function VehiclesPage() {
   }
 
   function getSortArrow(column: "plate" | "vehicle" | "type" | "status") {
-    if (sortBy !== column) return "â†•";
-    return sortDirection === "asc" ? "â†‘" : "â†“";
+    if (sortBy !== column) return "↕";
+    return sortDirection === "asc" ? "↑" : "↓";
   }
 
   const filtered = useMemo(() => {
@@ -734,7 +734,7 @@ export function VehiclesPage() {
     <div className="min-w-0 space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">VeÃ­culos</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Veículos</h1>
           <p className="text-sm text-slate-500">Cadastro completo da frota.</p>
         </div>
         <button
@@ -749,7 +749,7 @@ export function VehiclesPage() {
               : "cursor-pointer bg-orange-500 hover:bg-orange-600"
           }`}
         >
-          + Cadastrar veÃ­culo
+          + Cadastrar veículo
         </button>
       </div>
 
@@ -839,7 +839,7 @@ export function VehiclesPage() {
                     onClick={() => toggleSort("vehicle")}
                     className="cursor-pointer inline-flex items-center gap-1 transition hover:text-slate-900"
                   >
-                    VeÃ­culo <span className="text-xs">{getSortArrow("vehicle")}</span>
+                    Veículo <span className="text-xs">{getSortArrow("vehicle")}</span>
                   </button>
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
@@ -860,7 +860,7 @@ export function VehiclesPage() {
                     Status <span className="text-xs">{getSortArrow("status")}</span>
                   </button>
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">AÃ§Ãµes</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -873,7 +873,7 @@ export function VehiclesPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
-                    Nenhum veÃ­culo encontrado.
+                    Nenhum veículo encontrado.
                   </td>
                 </tr>
               ) : (
@@ -906,7 +906,7 @@ export function VehiclesPage() {
                         {getStatusLabel(v.status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openHistory(v)} className="btn-ui btn-ui-neutral">HistÃ³rico</button><button onClick={() => openEdit(v)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => onDelete(v)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
+                    <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openHistory(v)} className="btn-ui btn-ui-neutral">Histórico</button><button onClick={() => openEdit(v)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => onDelete(v)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
                   </tr>
                 ))
               )}
@@ -919,7 +919,7 @@ export function VehiclesPage() {
             totalPages={totalPages}
             totalItems={filtered.length}
             pageSize={TABLE_PAGE_SIZE}
-            itemLabel="veÃ­culos"
+            itemLabel="veículos"
             onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
             onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
           />
@@ -932,10 +932,10 @@ export function VehiclesPage() {
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">
-                  {editingVehicle ? "Editar veÃ­culo" : "Cadastrar veÃ­culo"}
+                  {editingVehicle ? "Editar veículo" : "Cadastrar veículo"}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Preencha os dados operacionais e documentais do veÃ­culo.
+                  Preencha os dados operacionais e documentais do veículo.
                 </p>
               </div>
               <button
@@ -963,7 +963,7 @@ export function VehiclesPage() {
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Empresa</span>
                     <input
-                      value={currentCompany?.name || "Empresa nÃ£o selecionada"}
+                      value={currentCompany?.name || "Empresa não selecionada"}
                       disabled
                       className={`${getFieldClass("branchId")} cursor-not-allowed bg-slate-200 text-slate-500`}
                       placeholder="Empresa vinculada"
@@ -1032,17 +1032,17 @@ export function VehiclesPage() {
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Renavam</span>
-                    <input value={form.renavam} onChange={(e) => { setForm({ ...form, renavam: normalizeRenavam(e.target.value) }); clearFieldError("renavam"); }} className={getFieldClass("renavam")} placeholder="11 dÃ­gitos" />
+                    <input value={form.renavam} onChange={(e) => { setForm({ ...form, renavam: normalizeRenavam(e.target.value) }); clearFieldError("renavam"); }} className={getFieldClass("renavam")} placeholder="11 dígitos" />
                     {fieldErrors.renavam ? <p className="text-xs text-red-600">{fieldErrors.renavam}</p> : null}
                   </label>
                   <div className="space-y-2 md:col-span-2">
-                    <span className="text-sm font-medium text-slate-700">Foto de perfil do veÃ­culo</span>
+                    <span className="text-sm font-medium text-slate-700">Foto de perfil do veículo</span>
                     <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3">
                         {(selectedProfilePhotoPreview || currentProfilePhotoUrl || form.photoUrls[0]) ? (
                           <img
                             src={selectedProfilePhotoPreview || resolveApiMediaUrl(currentProfilePhotoUrl || form.photoUrls[0])}
-                            alt="Foto de perfil do veÃ­culo"
+                            alt="Foto de perfil do veículo"
                             className="h-14 w-14 rounded-xl border border-slate-200 object-cover"
                           />
                         ) : (
@@ -1050,7 +1050,7 @@ export function VehiclesPage() {
                             Sem foto
                           </div>
                         )}
-                        <p className="text-xs text-slate-500">Essa foto serÃ¡ usada na identificaÃ§Ã£o visual dos cards.</p>
+                        <p className="text-xs text-slate-500">Essa foto será usada na identificação visual dos cards.</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
@@ -1068,7 +1068,7 @@ export function VehiclesPage() {
                               }
                               if (!isSupportedVehicleProfileImage(file)) {
                                 setPhotoFiles([]);
-                                setFormErrorMessage("Formato nÃ£o suportado para foto de perfil. Use JPG, PNG ou WEBP.");
+                                setFormErrorMessage("Formato não suportado para foto de perfil. Use JPG, PNG ou WEBP.");
                                 e.currentTarget.value = "";
                                 return;
                               }
@@ -1095,7 +1095,7 @@ export function VehiclesPage() {
 
               <div className="rounded-xl border border-slate-200 p-4">
                 <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  OperaÃ§Ã£o
+                  Operação
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-1">
@@ -1115,7 +1115,7 @@ export function VehiclesPage() {
                     {fieldErrors.vehicleType ? <p className="text-xs text-red-600">{fieldErrors.vehicleType}</p> : null}
                   </label>
                   <label className="space-y-1">
-                    <span className="text-sm font-medium text-slate-700">Tipo de veÃ­culo</span>
+                    <span className="text-sm font-medium text-slate-700">Tipo de veículo</span>
                     <select
                       value={form.category}
                       onChange={(e) => {
@@ -1131,15 +1131,15 @@ export function VehiclesPage() {
                       }}
                       className={getFieldClass("category")}
                     >
-                      <option value="">Selecione o tipo de veÃ­culo</option>
+                      <option value="">Selecione o tipo de veículo</option>
                       <option value="CAR">Carro</option>
-                      <option value="TRUCK">CaminhÃ£o</option>
+                      <option value="TRUCK">Caminhão</option>
                       <option value="UTILITY">Utilitário</option>
                     </select>
                     {fieldErrors.category ? <p className="text-xs text-red-600">{fieldErrors.category}</p> : null}
                   </label>
                   <label className="space-y-1">
-                    <span className="text-sm font-medium text-slate-700">CombustÃ­vel</span>
+                    <span className="text-sm font-medium text-slate-700">Combustível</span>
                     <select
                       value={form.fuelType}
                       onChange={(e) => {
@@ -1148,7 +1148,7 @@ export function VehiclesPage() {
                       }}
                       className={getFieldClass("fuelType")}
                     >
-                      <option value="">Selecione o combustÃ­vel</option>
+                      <option value="">Selecione o combustível</option>
                       {allowedFuelOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
@@ -1211,7 +1211,7 @@ export function VehiclesPage() {
 
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white py-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{saving ? "Salvando..." : "Salvar veÃ­culo"}</button>
+                <button type="submit" disabled={saving} className="rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70">{saving ? "Salvando..." : "Salvar veículo"}</button>
               </div>
             </form>
 
@@ -1222,7 +1222,7 @@ export function VehiclesPage() {
       {historyOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
           <div className="max-h-[calc(100dvh-2rem)] w-full max-w-3xl rounded-2xl bg-white shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4"><h2 className="text-xl font-bold text-slate-900">HistÃ³rico - {historyVehicle?.plate}</h2><button onClick={closeHistory} className="rounded-lg px-3 py-2 text-slate-500">Fechar</button></div>
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4"><h2 className="text-xl font-bold text-slate-900">Histórico - {historyVehicle?.plate}</h2><button onClick={closeHistory} className="rounded-lg px-3 py-2 text-slate-500">Fechar</button></div>
             <div className="flex-1 overflow-y-auto p-6 space-y-3">
               {historyLoading ? (
                 <p className="text-sm text-slate-500">Carregando...</p>
@@ -1234,7 +1234,7 @@ export function VehiclesPage() {
             </div>
             <div className="sticky bottom-0 flex items-center justify-between border-t border-slate-200 bg-white px-6 py-4">
               <p className="text-xs text-slate-500">
-                Pagina {historyPage} de {historyTotalPages} â€¢ {historyTotal} evento(s)
+                Página {historyPage} de {historyTotalPages} • {historyTotal} evento(s)
               </p>
               <div className="flex gap-2">
                 <button
@@ -1260,10 +1260,10 @@ export function VehiclesPage() {
       )}
       <ConfirmDeleteModal
         isOpen={Boolean(vehicleToDelete)}
-        title="Excluir veÃ­culo"
+        title="Excluir veículo"
         description={
           vehicleToDelete
-            ? `Deseja excluir o veÃ­culo ${vehicleToDelete.brand} ${vehicleToDelete.model}?`
+            ? `Deseja excluir o veículo ${vehicleToDelete.brand} ${vehicleToDelete.model}?`
             : ""
         }
         loading={deletingVehicle}

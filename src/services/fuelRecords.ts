@@ -7,7 +7,7 @@ export type FuelRecord = {
   totalValue: number;
   km: number;
   station: string;
-  fuelType: "GASOLINE" | "ETHANOL" | "DIESEL" | "FLEX" | "ELECTRIC" | "HYBRID" | "CNG";
+  fuelType: "GASOLINE" | "ETHANOL" | "DIESEL" | "ARLA32" | "FLEX" | "ELECTRIC" | "HYBRID" | "CNG";
   averageConsumptionKmPerLiter?: number | null;
   isAnomaly?: boolean;
   anomalyReason?: string | null;
@@ -82,54 +82,54 @@ export type UpdateFuelRecordInput = Partial<
   CreateFuelRecordInput
 >;
 
-export type FuelXmlImportSummary = {
-  batchId: string;
-  totalFiles: number;
-  importedFiles: number;
-  duplicateFiles: number;
-  errorFiles: number;
-  eligibleDomainInvoices: number;
-  ignoredByDomainFilter: number;
+export type FuelXmlPreviewDetectedType = "FUEL" | "ARLA" | "OTHER";
+
+export type FuelXmlPreviewInvoiceItem = {
+  lineIndex: number;
+  productCode?: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  detectedType: FuelXmlPreviewDetectedType;
+  importable: boolean;
+  duplicate: boolean;
+  duplicateReason?: string;
+  detectedFuelType?: string;
+  fuelDateTime?: string;
+  nozzleNumber?: string;
+  pumpNumber?: string;
 };
 
-export type FuelXmlPreviewItem = {
+export type FuelXmlPreviewInvoice = {
+  fileName: string;
   invoiceKey: string;
-  issuerName?: string | null;
-  number?: string | null;
-  series?: string | null;
-  issuedAt?: string | null;
-  totalAmount?: string | number | null;
-  items: Array<{
-    description: string;
-    quantity?: number;
-    unitValue?: number;
-    totalValue?: number;
-  }>;
-  suggestedBranchId?: string | null;
-  xmlInvoiceId?: string | null;
-  alreadyExists?: boolean;
+  invoiceNumber?: string;
+  issuedAt?: string;
+  supplierName?: string;
+  supplierDocument?: string;
+  plate?: string;
+  odometer?: number;
+  items: FuelXmlPreviewInvoiceItem[];
 };
 
 export type FuelXmlPreviewResponse = {
-  totalFiles: number;
-  eligibleCount: number;
-  ignoredDuplicates: number;
-  ignoredNonFuel: number;
-  previewItems: FuelXmlPreviewItem[];
-};
-
-export type FuelXmlConfirmInput = {
-  invoiceKey: string;
-  vehicleId?: string;
-  driverId?: string;
-  km?: number;
-  branchId?: string;
+  summary: {
+    totalInvoices: number;
+    totalItems: number;
+    importableItems: number;
+    duplicateItems: number;
+    otherItems: number;
+  };
+  invoices: FuelXmlPreviewInvoice[];
 };
 
 export type FuelXmlConfirmResponse = {
-  createdCount: number;
-  ignoredCount: number;
-  createdIds: string[];
+  totalInvoicesRead: number;
+  totalItemsDetected: number;
+  totalImported: number;
+  totalIgnored: number;
+  totalDuplicated: number;
 };
 
 export type FuelImportedXmlInvoice = {
@@ -162,40 +162,12 @@ export async function getFuelRecords() {
   return [];
 }
 
-export async function importFuelXml(
-  file: File,
-  branchId?: string,
-  periodLabel?: string,
-) {
+export async function previewFuelXml(files: File[]) {
   const formData = new FormData();
-  formData.append("file", file);
-  if (branchId?.trim()) formData.append("branchId", branchId.trim());
-  if (periodLabel?.trim()) formData.append("periodLabel", periodLabel.trim());
-
-  const response = await api.post<FuelXmlImportSummary>(
-    "/fuel-records/import-xml",
-    formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    },
-  );
-  return response.data;
-}
-
-export async function previewFuelXml(
-  file: File,
-  branchId?: string,
-  periodLabel?: string,
-) {
-  const formData = new FormData();
-  formData.append("file", file);
-  if (branchId?.trim()) formData.append("branchId", branchId.trim());
-  if (periodLabel?.trim()) formData.append("periodLabel", periodLabel.trim());
+  files.forEach((file) => formData.append("files", file));
 
   const response = await api.post<FuelXmlPreviewResponse>(
-    "/fuel-records/import-xml/preview",
+    "/fuel-records/xml/preview",
     formData,
     {
       headers: {
@@ -206,10 +178,12 @@ export async function previewFuelXml(
   return response.data;
 }
 
-export async function confirmFuelXmlImports(imports: FuelXmlConfirmInput[]) {
+export async function confirmFuelXmlImports(
+  invoices: FuelXmlPreviewInvoice[],
+) {
   const response = await api.post<FuelXmlConfirmResponse>(
-    "/fuel-records/import-xml/confirm",
-    { imports },
+    "/fuel-records/xml/confirm",
+    { invoices },
   );
   return response.data;
 }

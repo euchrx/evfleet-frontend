@@ -8,6 +8,7 @@ export function formatFuelTypeLabel(value?: string | null) {
   if (fuelType === "GASOLINE") return "GASOLINA";
   if (fuelType === "ETHANOL") return "ETANOL";
   if (fuelType === "DIESEL") return "DIESEL";
+  if (fuelType === "ARLA32" || fuelType === "ARLA_32") return "ARLA 32";
   if (fuelType === "FLEX") return "FLEX";
   if (fuelType === "ELECTRIC") return "ELÉTRICO";
   if (fuelType === "HYBRID") return "HÍBRIDO";

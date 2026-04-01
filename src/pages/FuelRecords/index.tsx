@@ -25,6 +25,7 @@ import {
   Gauge,
 } from "lucide-react";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { FuelXmlImportButton } from "../../components/FuelXmlImportButton";
 import { TablePagination } from "../../components/TablePagination";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
@@ -36,7 +37,7 @@ type FuelFormData = {
   totalValue: string;
   km: string;
   fuelDate: string;
-  fuelType: "" | "GASOLINE" | "ETHANOL" | "DIESEL" | "FLEX" | "ELECTRIC" | "HYBRID" | "CNG";
+  fuelType: "" | "GASOLINE" | "ETHANOL" | "DIESEL" | "ARLA32" | "FLEX" | "ELECTRIC" | "HYBRID" | "CNG";
   vehicleId: string;
   driverId: string;
 };
@@ -731,6 +732,14 @@ export function FuelRecordsPage() {
         </div>
 
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <FuelXmlImportButton
+            onImported={async () => {
+              await loadData();
+              notifyHeaderNotifications();
+              window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
+              window.dispatchEvent(new CustomEvent("evfleet-fuel-anomalies-updated"));
+            }}
+          />
           <button
             onClick={openCreateModal}
             className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
@@ -1316,3 +1325,4 @@ export function FuelRecordsPage() {
     setSelectedRecordIds(Array.from(next));
   }
 }
+
