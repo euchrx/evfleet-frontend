@@ -43,6 +43,13 @@ export function BranchesPage() {
   const [form, setForm] = useState<BranchFormData>(initialForm);
 
   async function loadBranchesData() {
+    if (canSelectCompanyScope && !selectedCompanyId) {
+      setBranches([]);
+      setLoading(false);
+      setPageErrorMessage("Selecione uma empresa no escopo para carregar as filiais.");
+      return;
+    }
+
     try {
       setLoading(true);
       setPageErrorMessage("");
