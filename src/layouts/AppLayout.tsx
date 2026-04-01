@@ -232,7 +232,7 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     { name: "Empresas", path: "/companies", icon: Building2, roles: ["ADMIN"] },
-    { name: "Finanças", path: "/finance", icon: CreditCard, roles: ["ADMIN"] },
+    { name: "Filiais", path: "/branches", icon: Building2, roles: ["ADMIN"] },
     { name: "Usuários", path: "/users", icon: Users, roles: ["ADMIN"] },
     {
       name: "Administração",
@@ -244,7 +244,7 @@ export function AppLayout() {
 
   const administrativePaths = new Set([
     "/companies",
-    "/finance",
+    "/branches",
     "/users",
     "/administration",
   ]);
@@ -661,7 +661,6 @@ export function AppLayout() {
     if (isAdminWithoutCompanyScope) {
       const isAllowedPath =
         location.pathname === "/companies" ||
-        location.pathname === "/finance" ||
         location.pathname === "/users" ||
         location.pathname === "/administration";
       if (!isAllowedPath) {

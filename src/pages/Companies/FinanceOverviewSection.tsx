@@ -40,7 +40,7 @@ function cycleLabel(cycle?: string) {
   return "-";
 }
 
-export function FinancePage() {
+export function FinanceOverviewSection() {
   const [items, setItems] = useState<FinanceCompanyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -133,10 +133,10 @@ export function FinancePage() {
   );
 
   return (
-    <div className="space-y-6">
+    <section className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Finanças</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Empresas</h1>
           <p className="text-sm text-slate-500">
             Visão administrativa das empresas, assinaturas, status de cobrança e datas.
           </p>
@@ -303,6 +303,6 @@ export function FinancePage() {
           onNext={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
         />
       </div>
-    </div>
+    </section>
   );
 }

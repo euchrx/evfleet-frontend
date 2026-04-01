@@ -5,7 +5,7 @@ import { DashboardPage } from "../pages/Dashboard";
 import { LoginPage } from "../pages/Login";
 import { UsersPage } from "../pages/Users";
 import { CompaniesPage } from "../pages/Companies";
-import { FinancePage } from "../pages/Finance";
+import { BranchesPage } from "../pages/Branches";
 import { VehiclesPage } from "../pages/Vehicles";
 import { DriversPage } from "../pages/Drivers";
 import { MaintenanceRecordsPage } from "../pages/MaintenanceRecords";
@@ -50,7 +50,8 @@ export function AppRoutes() {
 
             <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
               <Route path="/companies" element={<CompaniesPage />} />
-              <Route path="/finance" element={<FinancePage />} />
+              <Route path="/branches" element={<BranchesPage />} />
+              <Route path="/finance" element={<Navigate to="/companies" replace />} />
               <Route path="/administration" element={<AdministrationPage />} />
               <Route path="/users" element={<UsersPage />} />
             </Route>

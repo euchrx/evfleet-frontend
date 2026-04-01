@@ -19,7 +19,7 @@ export const MENU_VISIBILITY_ITEMS: MenuVisibilityItem[] = [
   { label: "Gestão de Documentos", path: "/vehicle-documents" },
   { label: "Como usar", path: "/how-to-use" },
   { label: "Empresas", path: "/companies" },
-  { label: "Finanças", path: "/finance" },
+  { label: "Filiais", path: "/branches" },
   { label: "Usuários", path: "/users" },
   { label: "Administração", path: "/administration" },
 ];
