@@ -85,6 +85,10 @@ function getDeleteErrorMessage(error: any) {
     return "Não foi possível gerar o backup da empresa. Nenhum dado foi removido.";
   }
 
+  if (errorCode === "COMPANY_DELETE_IN_PROGRESS") {
+    return "Já existe uma exclusão definitiva em andamento para esta empresa. Aguarde a conclusão e tente novamente.";
+  }
+
   if (errorCode === "COMPANY_DELETE_RELATIONAL_INTEGRITY_FAILED") {
     return "A exclusão foi interrompida porque ainda existem vínculos relacionais ativos nos dados da empresa.";
   }
