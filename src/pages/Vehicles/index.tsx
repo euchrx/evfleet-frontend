@@ -285,19 +285,6 @@ export function VehiclesPage() {
     };
   }, [isModalOpen]);
 
-  useEffect(() => {
-    if (!isModalOpen) return;
-    if (editingVehicle) return;
-    if (form.branchId) return;
-    if (branches.length === 0) return;
-
-    const fallbackBranchId = selectedBranchId || branches[0]?.id || "";
-    if (!fallbackBranchId) return;
-
-    setForm((prev) => ({ ...prev, branchId: fallbackBranchId }));
-    clearFieldError("branchId");
-  }, [isModalOpen, editingVehicle, form.branchId, branches, selectedBranchId]);
-
   const allowedFuelOptions = useMemo(
     () => getAllowedFuelByCategory(form.category),
     [form.category]
@@ -337,7 +324,7 @@ export function VehiclesPage() {
   function openCreate() {
     setPageErrorMessage("");
     setEditingVehicle(null);
-    setForm({ ...initialForm, branchId: selectedBranchId || branches[0]?.id || "" });
+    setForm({ ...initialForm });
     setPhotoFiles([]);
     setDocumentFiles([]);
     setCurrentProfilePhotoUrl("");
@@ -368,7 +355,7 @@ export function VehiclesPage() {
       consumptionMaxKmPerLiter: currentRule ? String(currentRule.max) : "",
       photoUrls: vehicle.photoUrls || [],
       documentUrls: vehicle.documentUrls || [],
-      branchId: vehicle.branchId,
+      branchId: vehicle.branchId || "",
     });
     setPhotoFiles([]);
     setDocumentFiles([]);
@@ -442,10 +429,13 @@ export function VehiclesPage() {
         status: form.status,
         photoUrls: safeExistingPhotoUrls,
         documentUrls: Array.from(new Set([...safeExistingDocumentUrls, ...safeUploadedDocumentUrls])),
-        branchId: (() => {
-          const candidate = form.branchId || selectedBranchId || branches[0]?.id || "";
-          return isUuid(candidate) ? candidate : undefined;
-        })(),
+        branchId: editingVehicle
+          ? isUuid(form.branchId)
+            ? form.branchId
+            : null
+          : isUuid(form.branchId)
+          ? form.branchId
+          : undefined,
       };
 
       const nextFieldErrors: VehicleFieldErrors = {};
@@ -893,6 +883,28 @@ export function VehiclesPage() {
                     <span className="text-sm font-medium text-slate-700">Marca</span>
                     <input value={form.brand} onChange={(e) => { setForm({ ...form, brand: e.target.value }); clearFieldError("brand"); }} className={getFieldClass("brand")} placeholder="Volvo" />
                     {fieldErrors.brand ? <p className="text-xs text-red-600">{fieldErrors.brand}</p> : null}
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-sm font-medium text-slate-700">Filial</span>
+                    <select
+                      value={form.branchId}
+                      onChange={(e) => {
+                        setForm({ ...form, branchId: e.target.value });
+                        clearFieldError("branchId");
+                      }}
+                      className={getFieldClass("branchId")}
+                    >
+                      <option value="">Sem filial vinculada</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-500">
+                      Opcional. Use apenas se quiser organizar os veiculos por filial.
+                    </p>
+                    {fieldErrors.branchId ? <p className="text-xs text-red-600">{fieldErrors.branchId}</p> : null}
                   </label>
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Modelo</span>

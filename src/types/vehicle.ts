@@ -28,7 +28,8 @@ export type Vehicle = {
   profilePhotoUrl?: string;
   photoUrls?: string[];
   documentUrls?: string[];
-  branchId: string;
+  companyId?: string;
+  branchId?: string;
   createdAt?: string;
   updatedAt?: string;
 };

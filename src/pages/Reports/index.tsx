@@ -349,9 +349,12 @@ export function ReportsPage() {
       return !Number.isNaN(date.getTime()) && date >= start && date <= end;
     };
 
-    const baseVehicles = availableVehicles.filter((vehicle) =>
-      selectedBranchIds.length > 0 ? selectedBranchIds.includes(vehicle.branchId) : true
-    );
+    const baseVehicles = availableVehicles.filter((vehicle) => {
+      if (selectedBranchIds.length === 0) return true;
+      const branchId = vehicle.branchId;
+      if (!branchId) return false;
+      return selectedBranchIds.includes(branchId);
+    });
     const byType = baseVehicles.filter((vehicle) =>
       selectedVehicleTypes.length > 0
         ? selectedVehicleTypes.includes(vehicle.vehicleType as VehicleTypeFilter)

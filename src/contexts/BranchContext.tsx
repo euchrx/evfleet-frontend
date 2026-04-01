@@ -106,11 +106,7 @@ export function BranchProvider({ children }: BranchProviderProps) {
       return;
     }
 
-    setSelectedBranchIdState(firstBranchId);
-    if (firstBranchId) {
-      localStorage.setItem("selectedBranchId", firstBranchId);
-      return;
-    }
+    setSelectedBranchIdState("");
     localStorage.removeItem("selectedBranchId");
   }, [user, branches]);
 

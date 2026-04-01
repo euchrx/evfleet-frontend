@@ -16,10 +16,12 @@ export type CreateVehicleInput = {
   status: "ACTIVE" | "MAINTENANCE" | "SOLD";
   photoUrls?: string[];
   documentUrls?: string[];
-  branchId?: string;
+  branchId?: string | null;
 };
 
-export type UpdateVehicleInput = Partial<CreateVehicleInput>;
+export type UpdateVehicleInput = Partial<CreateVehicleInput> & {
+  branchId?: string | null;
+};
 
 export async function getVehicles() {
   const response = await api.get("/vehicles");
