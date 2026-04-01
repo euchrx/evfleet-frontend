@@ -144,7 +144,7 @@ function toDateTimeLocalInput(value?: string) {
 export function FuelRecordsPage() {
   const location = useLocation();
   const { branches } = useBranch();
-  const { selectedCompanyId } = useCompanyScope();
+  const { selectedCompanyId, currentCompany } = useCompanyScope();
   type FuelSortBy =
     | "invoiceNumber"
     | "branch"
@@ -266,10 +266,12 @@ export function FuelRecordsPage() {
 
   function getBranchNameByVehicleId(vehicleId: string) {
     const vehicle = vehicles.find((item) => item.id === vehicleId);
-    if (!vehicle) return "Filial";
+    if (!vehicle) return currentCompany?.name || "Empresa";
 
     return (
-      branches.find((branch) => branch.id === vehicle.branchId)?.name || "Filial"
+      branches.find((branch) => branch.id === vehicle.branchId)?.name ||
+      currentCompany?.name ||
+      "Empresa"
     );
   }
 

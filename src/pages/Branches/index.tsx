@@ -40,6 +40,9 @@ export function BranchesPage() {
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
   const [deletingBranch, setDeletingBranch] = useState(false);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [deletingSelectedBranches, setDeletingSelectedBranches] = useState(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [form, setForm] = useState<BranchFormData>(initialForm);
   const effectiveCompanyId = String(selectedCompanyId || currentCompany?.id || "").trim();
 
@@ -187,6 +190,7 @@ export function BranchesPage() {
       setDeletingBranch(true);
       setPageErrorMessage("");
       await deleteBranch(branchToDelete.id);
+      setSelectedBranchIds((prev) => prev.filter((id) => id !== branchToDelete.id));
       setBranchToDelete(null);
       await loadBranchesData();
     } catch (error: any) {
@@ -207,6 +211,54 @@ export function BranchesPage() {
       );
     } finally {
       setDeletingBranch(false);
+    }
+  }
+
+  function toggleBranchSelection(branchId: string) {
+    setSelectedBranchIds((prev) =>
+      prev.includes(branchId) ? prev.filter((id) => id !== branchId) : [...prev, branchId]
+    );
+  }
+
+  function toggleSelectAllBranchesOnPage() {
+    const pageIds = paginatedBranches.map((branch) => branch.id);
+    const allSelected =
+      pageIds.length > 0 && pageIds.every((id) => selectedBranchIds.includes(id));
+
+    setSelectedBranchIds((prev) => {
+      if (allSelected) return prev.filter((id) => !pageIds.includes(id));
+      return Array.from(new Set([...prev, ...pageIds]));
+    });
+  }
+
+  async function confirmDeleteSelectedBranches() {
+    if (selectedBranchIds.length === 0) return;
+
+    try {
+      setDeletingSelectedBranches(true);
+      setPageErrorMessage("");
+
+      const results = await Promise.allSettled(
+        selectedBranchIds.map((id) => deleteBranch(id))
+      );
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+
+      if (failedCount > 0) {
+        setPageErrorMessage(
+          failedCount === selectedBranchIds.length
+            ? "Não foi possível excluir as filiais selecionadas."
+            : `${failedCount} filial(is) não puderam ser excluídas.`
+        );
+      }
+
+      setSelectedBranchIds([]);
+      setIsBulkDeleteModalOpen(false);
+      await loadBranchesData();
+    } catch (error) {
+      console.error("Erro ao excluir filiais em lote:", error);
+      setPageErrorMessage("Não foi possível concluir a exclusão em lote das filiais.");
+    } finally {
+      setDeletingSelectedBranches(false);
     }
   }
 
@@ -245,9 +297,14 @@ export function BranchesPage() {
     return filteredBranches.slice(start, start + TABLE_PAGE_SIZE);
   }, [filteredBranches, currentPage]);
 
+  const allBranchesOnPageSelected =
+    paginatedBranches.length > 0 &&
+    paginatedBranches.every((branch) => selectedBranchIds.includes(branch.id));
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, sortBy, sortDirection]);
+    setSelectedBranchIds([]);
+  }, [search, sortBy, sortDirection, effectiveCompanyId]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -327,10 +384,36 @@ export function BranchesPage() {
       )}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">
+              {selectedBranchIds.length > 0
+                ? `${selectedBranchIds.length} filial(is) selecionada(s)`
+                : "Selecione registros para excluir em lote"}
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsBulkDeleteModalOpen(true)}
+              disabled={selectedBranchIds.length === 0}
+              className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Excluir selecionados
+            </button>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
+                <th className="w-12 px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={allBranchesOnPageSelected}
+                    onChange={toggleSelectAllBranchesOnPage}
+                    className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+                    aria-label="Selecionar filiais da página"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button type="button" onClick={() => handleSort("name")} className="cursor-pointer">Nome {getSortArrow("name")}</button>
                 </th>
@@ -353,7 +436,7 @@ export function BranchesPage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
                     Carregando filiais...
@@ -362,7 +445,7 @@ export function BranchesPage() {
               ) : filteredBranches.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
                     Nenhuma filial encontrada.
@@ -371,6 +454,15 @@ export function BranchesPage() {
               ) : (
                 paginatedBranches.map((branch) => (
                   <tr key={branch.id} className="border-t border-slate-200">
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={selectedBranchIds.includes(branch.id)}
+                        onChange={() => toggleBranchSelection(branch.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+                        aria-label={`Selecionar filial ${branch.name}`}
+                      />
+                    </td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">
                       {branch.name}
                     </td>
@@ -524,6 +616,14 @@ export function BranchesPage() {
         loading={deletingBranch}
         onCancel={() => setBranchToDelete(null)}
         onConfirm={confirmDeleteBranch}
+      />
+      <ConfirmDeleteModal
+        isOpen={isBulkDeleteModalOpen}
+        title="Excluir filiais selecionadas"
+        description={`Deseja excluir ${selectedBranchIds.length} filial(is) selecionada(s)?`}
+        loading={deletingSelectedBranches}
+        onCancel={() => setIsBulkDeleteModalOpen(false)}
+        onConfirm={confirmDeleteSelectedBranches}
       />
     </div>
   );

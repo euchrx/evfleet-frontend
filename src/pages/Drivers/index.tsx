@@ -84,6 +84,9 @@ export function DriversPage() {
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
   const [deletingDriver, setDeletingDriver] = useState(false);
+  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
+  const [deletingSelectedDrivers, setDeletingSelectedDrivers] = useState(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [form, setForm] = useState<DriverFormData>(initialForm);
 
   async function loadData() {
@@ -232,6 +235,7 @@ export function DriversPage() {
       setDeletingDriver(true);
       setPageErrorMessage("");
       await deleteDriver(driverToDelete.id);
+      setSelectedDriverIds((prev) => prev.filter((id) => id !== driverToDelete.id));
       setDriverToDelete(null);
       await loadData();
     } catch (error) {
@@ -239,6 +243,54 @@ export function DriversPage() {
       setPageErrorMessage("Não foi possível excluir o motorista.");
     } finally {
       setDeletingDriver(false);
+    }
+  }
+
+  function toggleDriverSelection(driverId: string) {
+    setSelectedDriverIds((prev) =>
+      prev.includes(driverId) ? prev.filter((id) => id !== driverId) : [...prev, driverId]
+    );
+  }
+
+  function toggleSelectAllDriversOnPage() {
+    const pageIds = paginatedDrivers.map((driver) => driver.id);
+    const allSelected =
+      pageIds.length > 0 && pageIds.every((id) => selectedDriverIds.includes(id));
+
+    setSelectedDriverIds((prev) => {
+      if (allSelected) return prev.filter((id) => !pageIds.includes(id));
+      return Array.from(new Set([...prev, ...pageIds]));
+    });
+  }
+
+  async function confirmDeleteSelectedDrivers() {
+    if (selectedDriverIds.length === 0) return;
+
+    try {
+      setDeletingSelectedDrivers(true);
+      setPageErrorMessage("");
+
+      const results = await Promise.allSettled(
+        selectedDriverIds.map((id) => deleteDriver(id))
+      );
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+
+      if (failedCount > 0) {
+        setPageErrorMessage(
+          failedCount === selectedDriverIds.length
+            ? "Não foi possível excluir os motoristas selecionados."
+            : `${failedCount} motorista(s) não puderam ser excluídos.`
+        );
+      }
+
+      setSelectedDriverIds([]);
+      setIsBulkDeleteModalOpen(false);
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao excluir motoristas em lote:", error);
+      setPageErrorMessage("Não foi possível concluir a exclusão em lote dos motoristas.");
+    } finally {
+      setDeletingSelectedDrivers(false);
     }
   }
 
@@ -312,8 +364,13 @@ export function DriversPage() {
     return filteredDrivers.slice(start, start + TABLE_PAGE_SIZE);
   }, [filteredDrivers, currentPage]);
 
+  const allDriversOnPageSelected =
+    paginatedDrivers.length > 0 &&
+    paginatedDrivers.every((driver) => selectedDriverIds.includes(driver.id));
+
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedDriverIds([]);
   }, [search, statusFilter, sortBy, sortDirection, selectedBranchId]);
 
   useEffect(() => {
@@ -365,24 +422,59 @@ export function DriversPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row">
-          <input type="text" placeholder="Buscar por nome, CPF ou CNH" value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
-            <option value="ALL">Todos os status</option>
-            <option value="ACTIVE">Ativo</option>
-            <option value="INACTIVE">Inativo</option>
-          </select>
-        </div>
-      </div>
-
       {pageErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{pageErrorMessage}</div> : null}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 p-4">
+          <div className="flex flex-col gap-3 md:flex-row">
+            <input
+              type="text"
+              placeholder="Buscar por nome, CPF ou CNH"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            >
+              <option value="ALL">Todos os status</option>
+              <option value="ACTIVE">Ativo</option>
+              <option value="INACTIVE">Inativo</option>
+            </select>
+          </div>
+        </div>
+        <div className="border-b border-slate-200 px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">
+              {selectedDriverIds.length > 0
+                ? `${selectedDriverIds.length} motorista(s) selecionado(s)`
+                : "Selecione registros para excluir em lote"}
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsBulkDeleteModalOpen(true)}
+              disabled={selectedDriverIds.length === 0}
+              className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Excluir selecionados
+            </button>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
+                <th className="w-12 px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={allDriversOnPageSelected}
+                    onChange={toggleSelectAllDriversOnPage}
+                    className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+                    aria-label="Selecionar motoristas da página"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("name")} className="cursor-pointer">Nome {getSortArrow("name")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("cpf")} className="cursor-pointer">CPF {getSortArrow("cpf")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("cnh")} className="cursor-pointer">CNH {getSortArrow("cnh")}</button></th>
@@ -394,12 +486,21 @@ export function DriversPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Carregando motoristas...</td></tr>
+                <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Carregando motoristas...</td></tr>
               ) : filteredDrivers.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum motorista encontrado.</td></tr>
+                <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum motorista encontrado.</td></tr>
               ) : (
                 paginatedDrivers.map((driver) => (
                   <tr key={driver.id} className="border-t border-slate-200">
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={selectedDriverIds.includes(driver.id)}
+                        onChange={() => toggleDriverSelection(driver.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+                        aria-label={`Selecionar motorista ${driver.name}`}
+                      />
+                    </td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">{driver.name}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{formatCpf(driver.cpf)}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{driver.cnh}</td>
@@ -472,6 +573,14 @@ export function DriversPage() {
         loading={deletingDriver}
         onCancel={() => setDriverToDelete(null)}
         onConfirm={confirmDeleteDriver}
+      />
+      <ConfirmDeleteModal
+        isOpen={isBulkDeleteModalOpen}
+        title="Excluir motoristas selecionados"
+        description={`Deseja excluir ${selectedDriverIds.length} motorista(s) selecionado(s)?`}
+        loading={deletingSelectedDrivers}
+        onCancel={() => setIsBulkDeleteModalOpen(false)}
+        onConfirm={confirmDeleteSelectedDrivers}
       />
     </div>
   );

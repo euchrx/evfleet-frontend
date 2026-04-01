@@ -52,6 +52,7 @@ import {
 } from "../services/adminSettings";
 import { api } from "../services/api";
 import type { SubscriptionStatus } from "../services/subscription";
+import { formatVehicleLabel } from "../utils/vehicleLabel";
 
 type AppNotification = {
   id: string;
@@ -79,7 +80,7 @@ function formatDateTime(iso: string) {
 }
 
 function formatDateOnly(iso: string) {
-  const date = new Date(iso);
+  const date = parseLocalDate(iso);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("pt-BR");
 }
@@ -406,9 +407,7 @@ export function AppLayout() {
       })
       .map((record) => {
         const daysUntil = getDaysUntil(record.maintenanceDate);
-        const vehicleLabel = record.vehicle
-          ? `${record.vehicle.brand} ${record.vehicle.model}`
-          : "Veículo";
+        const vehicleLabel = formatVehicleLabel(record.vehicle);
 
         return {
           id: `maintenance-schedule-${record.id}`,

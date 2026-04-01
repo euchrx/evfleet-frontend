@@ -45,6 +45,9 @@ export function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [deletingSelectedUsers, setDeletingSelectedUsers] = useState(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [form, setForm] = useState<UserFormData>(initialForm);
   const companyNameById = useMemo(
     () => new Map(options.map((company) => [company.id, company.name])),
@@ -201,6 +204,7 @@ export function UsersPage() {
     try {
       setDeletingUser(true);
       await deleteUser(userToDelete.id);
+      setSelectedUserIds((prev) => prev.filter((id) => id !== userToDelete.id));
       setUserToDelete(null);
       await loadUsersData();
     } catch (error) {
@@ -208,6 +212,54 @@ export function UsersPage() {
       setPageErrorMessage("Não foi possível excluir o usuário.");
     } finally {
       setDeletingUser(false);
+    }
+  }
+
+  function toggleUserSelection(userId: string) {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  }
+
+  function toggleSelectAllUsersOnPage() {
+    const pageIds = paginatedUsers.map((user) => user.id);
+    const allSelected =
+      pageIds.length > 0 && pageIds.every((id) => selectedUserIds.includes(id));
+
+    setSelectedUserIds((prev) => {
+      if (allSelected) return prev.filter((id) => !pageIds.includes(id));
+      return Array.from(new Set([...prev, ...pageIds]));
+    });
+  }
+
+  async function confirmDeleteSelectedUsers() {
+    if (selectedUserIds.length === 0) return;
+
+    try {
+      setDeletingSelectedUsers(true);
+      setPageErrorMessage("");
+
+      const results = await Promise.allSettled(
+        selectedUserIds.map((id) => deleteUser(id))
+      );
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+
+      if (failedCount > 0) {
+        setPageErrorMessage(
+          failedCount === selectedUserIds.length
+            ? "Não foi possível excluir os usuários selecionados."
+            : `${failedCount} usuário(s) não puderam ser excluídos.`
+        );
+      }
+
+      setSelectedUserIds([]);
+      setIsBulkDeleteModalOpen(false);
+      await loadUsersData();
+    } catch (error) {
+      console.error("Erro ao excluir usuários em lote:", error);
+      setPageErrorMessage("Não foi possível concluir a exclusão em lote dos usuários.");
+    } finally {
+      setDeletingSelectedUsers(false);
     }
   }
 
@@ -268,9 +320,14 @@ export function UsersPage() {
     return filteredUsers.slice(start, start + TABLE_PAGE_SIZE);
   }, [filteredUsers, currentPage]);
 
+  const allUsersOnPageSelected =
+    paginatedUsers.length > 0 &&
+    paginatedUsers.every((user) => selectedUserIds.includes(user.id));
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, roleFilter, sortBy, sortDirection]);
+    setSelectedUserIds([]);
+  }, [search, roleFilter, sortBy, sortDirection, selectedCompanyId]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -348,10 +405,36 @@ export function UsersPage() {
       )}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">
+              {selectedUserIds.length > 0
+                ? `${selectedUserIds.length} usuário(s) selecionado(s)`
+                : "Selecione registros para excluir em lote"}
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsBulkDeleteModalOpen(true)}
+              disabled={selectedUserIds.length === 0}
+              className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Excluir selecionados
+            </button>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
+                <th className="w-12 px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={allUsersOnPageSelected}
+                    onChange={toggleSelectAllUsersOnPage}
+                    className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+                    aria-label="Selecionar usuários da página"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("name")} className="cursor-pointer">Nome {getSortArrow("name")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("email")} className="cursor-pointer">E-mail {getSortArrow("email")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("company")} className="cursor-pointer">Empresa {getSortArrow("company")}</button></th>
@@ -364,19 +447,28 @@ export function UsersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">
                     Carregando usuários...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">
                     Nenhum usuário encontrado.
                   </td>
                 </tr>
               ) : (
                 paginatedUsers.map((user) => (
                   <tr key={user.id} className="border-t border-slate-200">
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.includes(user.id)}
+                        onChange={() => toggleUserSelection(user.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+                        aria-label={`Selecionar usuário ${user.name}`}
+                      />
+                    </td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">{user.name}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{user.email}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">
@@ -565,6 +657,14 @@ export function UsersPage() {
         loading={deletingUser}
         onCancel={() => setUserToDelete(null)}
         onConfirm={confirmDeleteUser}
+      />
+      <ConfirmDeleteModal
+        isOpen={isBulkDeleteModalOpen}
+        title="Excluir usuários selecionados"
+        description={`Deseja excluir ${selectedUserIds.length} usuário(s) selecionado(s)?`}
+        loading={deletingSelectedUsers}
+        onCancel={() => setIsBulkDeleteModalOpen(false)}
+        onConfirm={confirmDeleteSelectedUsers}
       />
     </div>
   );

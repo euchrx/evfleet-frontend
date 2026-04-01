@@ -257,6 +257,9 @@ export function VehiclesPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
   const [deletingVehicle, setDeletingVehicle] = useState(false);
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
+  const [deletingSelectedVehicles, setDeletingSelectedVehicles] = useState(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
 
   async function loadData() {
     try {
@@ -562,10 +565,59 @@ export function VehiclesPage() {
     try {
       setDeletingVehicle(true);
       await deleteVehicle(vehicleToDelete.id);
+      setSelectedVehicleIds((prev) => prev.filter((id) => id !== vehicleToDelete.id));
       setVehicleToDelete(null);
       await loadData();
     } finally {
       setDeletingVehicle(false);
+    }
+  }
+
+  function toggleVehicleSelection(vehicleId: string) {
+    setSelectedVehicleIds((prev) =>
+      prev.includes(vehicleId) ? prev.filter((id) => id !== vehicleId) : [...prev, vehicleId]
+    );
+  }
+
+  function toggleSelectAllVehiclesOnPage() {
+    const pageIds = paginatedVehicles.map((vehicle) => vehicle.id);
+    const allSelected =
+      pageIds.length > 0 && pageIds.every((id) => selectedVehicleIds.includes(id));
+
+    setSelectedVehicleIds((prev) => {
+      if (allSelected) return prev.filter((id) => !pageIds.includes(id));
+      return Array.from(new Set([...prev, ...pageIds]));
+    });
+  }
+
+  async function confirmDeleteSelectedVehicles() {
+    if (selectedVehicleIds.length === 0) return;
+
+    try {
+      setDeletingSelectedVehicles(true);
+      setPageErrorMessage("");
+
+      const results = await Promise.allSettled(
+        selectedVehicleIds.map((id) => deleteVehicle(id))
+      );
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+
+      if (failedCount > 0) {
+        setPageErrorMessage(
+          failedCount === selectedVehicleIds.length
+            ? "Não foi possível excluir os veículos selecionados."
+            : `${failedCount} veículo(s) não puderam ser excluídos.`
+        );
+      }
+
+      setSelectedVehicleIds([]);
+      setIsBulkDeleteModalOpen(false);
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao excluir veículos em lote:", error);
+      setPageErrorMessage("Não foi possível concluir a exclusão em lote dos veículos.");
+    } finally {
+      setDeletingSelectedVehicles(false);
     }
   }
 
@@ -647,9 +699,14 @@ export function VehiclesPage() {
     return filtered.slice(start, start + TABLE_PAGE_SIZE);
   }, [filtered, currentPage]);
 
+  const allVehiclesOnPageSelected =
+    paginatedVehicles.length > 0 &&
+    paginatedVehicles.every((vehicle) => selectedVehicleIds.includes(vehicle.id));
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, selectedBranchId, categoryFilter, statusFilter, sortBy, sortDirection]);
+    setSelectedVehicleIds([]);
+  }, [search, selectedBranchId, categoryFilter, statusFilter, sortBy, sortDirection, selectedCompanyId]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -719,8 +776,9 @@ export function VehiclesPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 p-4">
+          <div className="flex flex-col gap-3 md:flex-row">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por placa, modelo ou marca" className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
           <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as "ALL" | "LIGHT" | "HEAVY")} className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
             <option value="ALL">Todas as categorias</option>
@@ -734,15 +792,38 @@ export function VehiclesPage() {
             <option value="SOLD">Vendido</option>
           </select>
         </div>
-      </div>
-
-      {pageErrorMessage && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{pageErrorMessage}</div>}
-
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        </div>
+        <div className="border-b border-slate-200 px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">
+              {selectedVehicleIds.length > 0
+                ? `${selectedVehicleIds.length} veículo(s) selecionado(s)`
+                : "Selecione registros para excluir em lote"}
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsBulkDeleteModalOpen(true)}
+              disabled={selectedVehicleIds.length === 0}
+              className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Excluir selecionados
+            </button>
+          </div>
+        </div>
+        {pageErrorMessage && <div className="mx-4 my-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{pageErrorMessage}</div>}
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
+                <th className="w-12 px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={allVehiclesOnPageSelected}
+                    onChange={toggleSelectAllVehiclesOnPage}
+                    className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+                    aria-label="Selecionar veículos da página"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button
                     type="button"
@@ -785,19 +866,28 @@ export function VehiclesPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
                     Carregando...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
                     Nenhum veÃ­culo encontrado.
                   </td>
                 </tr>
               ) : (
                 paginatedVehicles.map((v) => (
                   <tr key={v.id} className="border-t border-slate-200">
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={selectedVehicleIds.includes(v.id)}
+                        onChange={() => toggleVehicleSelection(v.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+                        aria-label={`Selecionar veículo ${v.plate}`}
+                      />
+                    </td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">{v.plate}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{v.brand} {v.model}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">
@@ -1179,6 +1269,14 @@ export function VehiclesPage() {
         loading={deletingVehicle}
         onCancel={() => setVehicleToDelete(null)}
         onConfirm={confirmDeleteVehicle}
+      />
+      <ConfirmDeleteModal
+        isOpen={isBulkDeleteModalOpen}
+        title="Excluir veículos selecionados"
+        description={`Deseja excluir ${selectedVehicleIds.length} veículo(s) selecionado(s)?`}
+        loading={deletingSelectedVehicles}
+        onCancel={() => setIsBulkDeleteModalOpen(false)}
+        onConfirm={confirmDeleteSelectedVehicles}
       />
     </div>
   );
