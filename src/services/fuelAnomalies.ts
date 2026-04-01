@@ -43,13 +43,13 @@ export function detectFuelAnomalies(records: FuelRecord[], vehicles: Vehicle[]) 
       vehicle?.vehicleType === "HEAVY" && record.fuelType === "DIESEL";
 
     if (isHeavyDiesel) {
-      if (typeof avg === "number" && (avg < 1.5 || avg > 2.5)) {
+      if (typeof avg === "number" && (avg < 1.5 || avg > 3.0)) {
         anomalies.push({
           id: recordId,
           date: record.fuelDate,
           vehicle: formatVehicleLabel(vehicle || record.vehicle),
           driver: record.driver?.name || "Sem motorista",
-          reason: "Consumo fora da faixa esperada para pesado a diesel (1,5 a 2,5 km/L).",
+          reason: "Consumo fora da faixa esperada para pesado a diesel (1,5 a 3,0 km/L).",
         });
       }
       return;

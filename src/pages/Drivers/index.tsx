@@ -201,6 +201,7 @@ export function DriversPage() {
       if (editingDriver) await updateDriver(editingDriver.id, payload);
       else await createDriver(payload);
 
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
       closeModal();
       await loadData();
     } catch (error: any) {
@@ -237,6 +238,7 @@ export function DriversPage() {
       await deleteDriver(driverToDelete.id);
       setSelectedDriverIds((prev) => prev.filter((id) => id !== driverToDelete.id));
       setDriverToDelete(null);
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
       await loadData();
     } catch (error) {
       console.error("Erro ao excluir motorista:", error);
@@ -285,6 +287,7 @@ export function DriversPage() {
 
       setSelectedDriverIds([]);
       setIsBulkDeleteModalOpen(false);
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
       await loadData();
     } catch (error) {
       console.error("Erro ao excluir motoristas em lote:", error);

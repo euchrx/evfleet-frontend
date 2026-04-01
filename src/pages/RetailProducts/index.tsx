@@ -66,6 +66,7 @@ export function RetailProductsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [filters, setFilters] = useState<RetailProductFilters>({
     dateFrom: "",
     dateTo: "",
@@ -148,6 +149,32 @@ export function RetailProductsPage() {
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedItemIds([]);
+  }, [selectedCompanyId, filters.dateFrom, filters.dateTo, filters.supplier, filters.invoiceNumber, filters.itemDescription, filters.category]);
+
+  function toggleItemSelection(itemId: string) {
+    setSelectedItemIds((prev) =>
+      prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId],
+    );
+  }
+
+  function toggleSelectAllPage() {
+    const pageIds = paginatedItems.map((item) => item.id);
+    const allSelected =
+      pageIds.length > 0 && pageIds.every((id) => selectedItemIds.includes(id));
+
+    setSelectedItemIds((prev) => {
+      if (allSelected) return prev.filter((id) => !pageIds.includes(id));
+      return Array.from(new Set([...prev, ...pageIds]));
+    });
+  }
+
+  const allItemsOnPageSelected =
+    paginatedItems.length > 0 &&
+    paginatedItems.every((item) => selectedItemIds.includes(item.id));
 
   return (
     <div className="space-y-6">
@@ -266,10 +293,37 @@ export function RetailProductsPage() {
           </div>
         </div>
 
+        <div className="border-b border-slate-200 px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">
+              {selectedItemIds.length > 0
+                ? `${selectedItemIds.length} item(ns) selecionado(s)`
+                : "Selecione registros para excluir em lote"}
+            </p>
+            <button
+              type="button"
+              disabled
+              className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition disabled:cursor-not-allowed disabled:opacity-50"
+              title="A exclusão em lote de produtos ainda não está disponível."
+            >
+              Excluir selecionados
+            </button>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
+                <th className="w-12 px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={allItemsOnPageSelected}
+                    onChange={toggleSelectAllPage}
+                    className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+                    aria-label="Selecionar itens da página"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   Produto
                 </th>
@@ -302,19 +356,28 @@ export function RetailProductsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={10} className="px-6 py-8 text-center text-sm text-slate-500">
                     Carregando produtos...
                   </td>
                 </tr>
               ) : paginatedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={10} className="px-6 py-8 text-center text-sm text-slate-500">
                     Nenhum produto encontrado.
                   </td>
                 </tr>
               ) : (
                 paginatedItems.map((item) => (
                   <tr key={item.id} className="border-t border-slate-200">
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={selectedItemIds.includes(item.id)}
+                        onChange={() => toggleItemSelection(item.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+                        aria-label={`Selecionar produto ${item.description}`}
+                      />
+                    </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       <p className="font-medium text-slate-900">{item.description}</p>
                       <p className="mt-1 text-xs text-slate-500">

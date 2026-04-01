@@ -35,6 +35,7 @@ import {
   updateSystemLog,
   type SystemLogEntry,
 } from "../services/systemLogs";
+import { getDrivers } from "../services/drivers";
 import { getFuelRecords } from "../services/fuelRecords";
 import { getVehicles } from "../services/vehicles";
 import { detectFuelAnomalies } from "../services/fuelAnomalies";
@@ -368,12 +369,14 @@ export function AppLayout() {
 
   async function loadNotifications() {
     const [
+      driversResult,
       fuelRecordsResult,
       vehiclesResult,
       maintenanceRecordsResult,
       debtsResult,
       vehicleDocumentsResult,
     ] = await Promise.allSettled([
+      getDrivers(),
       getFuelRecords(),
       getVehicles(),
       getMaintenanceRecords(),
@@ -381,6 +384,7 @@ export function AppLayout() {
       getVehicleDocuments(),
     ]);
 
+    const drivers = driversResult.status === "fulfilled" ? driversResult.value : [];
     const fuelRecords =
       fuelRecordsResult.status === "fulfilled" ? fuelRecordsResult.value : [];
     const vehicles =
@@ -425,6 +429,59 @@ export function AppLayout() {
               : `Faltam ${daysUntil} dia(s) para a manutenção programada.`,
           date: record.maintenanceDate,
           link: `/maintenance-records?tab=records&highlight=${record.id}`,
+        };
+      });
+
+    const expiringCnhNotifications: AppNotification[] = drivers
+      .filter((driver) => {
+        if (String(driver.status || "").toUpperCase() !== "ACTIVE") return false;
+        if (!driver.cnhExpiresAt) return false;
+        const daysUntil = getDaysUntil(driver.cnhExpiresAt);
+        return daysUntil >= 0 && daysUntil <= 30;
+      })
+      .map((driver) => {
+        const daysUntil = getDaysUntil(driver.cnhExpiresAt);
+        const vehicleLabel = driver.vehicle ? formatVehicleLabel(driver.vehicle) : null;
+        const countdownText =
+          daysUntil === 0
+            ? "A CNH vence hoje."
+            : daysUntil === 1
+              ? "A CNH vence amanhã."
+              : `Faltam ${daysUntil} dia(s) para o vencimento da CNH.`;
+
+        return {
+          id: `driver-cnh-expiring-${driver.id}`,
+          title: `CNH vencendo - ${driver.name}`,
+          description: vehicleLabel
+            ? `${countdownText} Veículo vinculado: ${vehicleLabel}.`
+            : countdownText,
+          date: driver.cnhExpiresAt,
+          link: `/drivers`,
+        };
+      });
+
+    const expiredCnhNotifications: AppNotification[] = drivers
+      .filter((driver) => {
+        if (String(driver.status || "").toUpperCase() !== "ACTIVE") return false;
+        if (!driver.cnhExpiresAt) return false;
+        return getDaysUntil(driver.cnhExpiresAt) < 0;
+      })
+      .map((driver) => {
+        const overdueDays = Math.abs(getDaysUntil(driver.cnhExpiresAt));
+        const vehicleLabel = driver.vehicle ? formatVehicleLabel(driver.vehicle) : null;
+        const description =
+          overdueDays === 1
+            ? "A CNH está vencida há 1 dia."
+            : `A CNH está vencida há ${overdueDays} dia(s).`;
+
+        return {
+          id: `driver-cnh-expired-${driver.id}`,
+          title: `CNH vencida - ${driver.name}`,
+          description: vehicleLabel
+            ? `${description} Veículo vinculado: ${vehicleLabel}.`
+            : description,
+          date: driver.cnhExpiresAt,
+          link: `/drivers`,
         };
       });
 
@@ -524,9 +581,11 @@ export function AppLayout() {
 
     setNotifications(
       [
+        ...expiredCnhNotifications,
         ...overdueDebtNotifications,
         ...expiredDocumentNotifications,
         ...maintenanceNotifications,
+        ...expiringCnhNotifications,
         ...debtNotifications,
         ...expiringDocumentNotifications,
         ...anomalyNotifications,
