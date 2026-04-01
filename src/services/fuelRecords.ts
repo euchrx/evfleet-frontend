@@ -27,20 +27,20 @@ export type FuelRecord = {
     year: number;
     currentKm: number;
     createdAt: string;
-    branchId: string;
-    costCenterId: string;
-    branch: {
+    branchId?: string | null;
+    costCenterId?: string | null;
+    branch?: {
       id: string;
       name: string;
       city: string;
       state: string;
       createdAt: string;
-    };
+    } | null;
     costCenter?: {
       id: string;
       name: string;
-    };
-  };
+    } | null;
+  } | null;
 };
 
 export type FuelInsights = {

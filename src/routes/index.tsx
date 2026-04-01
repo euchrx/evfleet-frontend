@@ -45,10 +45,12 @@ export function AppRoutes() {
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/billing/success" element={<BillingSuccessPage />} />
             <Route path="/how-to-use" element={<HowToPage />} />
+            <Route element={<RoleRoute allowedRoles={["ADMIN", "FLEET_MANAGER"]} />}>
+              <Route path="/branches" element={<BranchesPage />} />
+            </Route>
 
             <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
               <Route path="/companies" element={<CompaniesPage />} />
-              <Route path="/branches" element={<BranchesPage />} />
               <Route path="/finance" element={<Navigate to="/companies" replace />} />
               <Route path="/administration" element={<AdministrationPage />} />
               <Route path="/users" element={<UsersPage />} />

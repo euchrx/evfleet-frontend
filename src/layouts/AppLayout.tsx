@@ -439,8 +439,8 @@ export function AppLayout() {
           title: `Débito vencendo - ${vehicleLabel}`,
           description:
             daysUntil === 0
-              ? "O dÃ©bito vence hoje."
-              : `Faltam ${daysUntil} dia(s) para o vencimento do dÃ©bito.`,
+              ? "O débito vence hoje."
+              : `Faltam ${daysUntil} dia(s) para o vencimento do débito.`,
           date: debt.dueDate || debt.debtDate,
           link: `/debts?highlight=${debt.id}`,
         };
@@ -696,7 +696,7 @@ export function AppLayout() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100">
         <p className="text-sm text-slate-500">
-          Carregando permissÃµes do sistema...
+          Carregando permissões do sistema...
         </p>
       </div>
     );
@@ -924,9 +924,11 @@ export function AppLayout() {
                     <p className="truncate text-lg font-semibold">
                       {user?.name || "Usuário"}
                     </p>
-                    <p className="text-sm text-slate-600">
-                      {selectedCompanyOption?.name || "Empresa selecionada"}
-                    </p>
+                    {user?.role !== "ADMIN" ? (
+                      <p className="text-sm text-slate-600">
+                        {selectedCompanyOption?.name || "Empresa selecionada"}
+                      </p>
+                    ) : null}
                     <span className="mt-2 inline-flex rounded-full border border-orange-300 bg-white px-2.5 py-0.5 text-xs font-semibold text-orange-700">
                       {String(formatRole(user?.role)).toUpperCase()}
                     </span>
@@ -1200,7 +1202,7 @@ export function AppLayout() {
             <div className="mt-4 max-h-[60vh] space-y-2 overflow-y-auto pr-1">
               {notifications.length === 0 ? (
                 <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                  Nenhuma notificaÃ§Ã£o no momento.
+                  Nenhuma notificação no momento.
                 </p>
               ) : (
                 notifications.map((notification) => (
@@ -1225,7 +1227,7 @@ export function AppLayout() {
                     </p>
                     {notification.link ? (
                       <p className="mt-2 text-xs font-semibold text-orange-600">
-                        Abrir notificaÃ§Ã£o
+                        Abrir notificação
                       </p>
                     ) : null}
                   </button>
@@ -1238,5 +1240,6 @@ export function AppLayout() {
     </div>
   );
 }
+
 
 

@@ -274,7 +274,7 @@ export function FuelRecordsPage() {
   }
 
   function getRecordBranchName(record: FuelRecord) {
-    if (record.vehicle?.branch.name) return record.vehicle.branch.name;
+    if (record.vehicle?.branch?.name) return record.vehicle.branch.name;
     return getBranchNameByVehicleId(record.vehicleId);
   }
 
