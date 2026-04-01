@@ -1,5 +1,6 @@
-import type { FuelRecord } from "./fuelRecords";
+﻿import type { FuelRecord } from "./fuelRecords";
 import type { Vehicle } from "../types/vehicle";
+import { formatVehicleLabel } from "../utils/vehicleLabel";
 
 type ConsumptionRule = { min: number; max: number };
 
@@ -46,7 +47,7 @@ export function detectFuelAnomalies(records: FuelRecord[], vehicles: Vehicle[]) 
         anomalies.push({
           id: recordId,
           date: record.fuelDate,
-          vehicle: vehicle?.plate || record.vehicle?.plate || "Veículo",
+          vehicle: formatVehicleLabel(vehicle || record.vehicle),
           driver: record.driver?.name || "Sem motorista",
           reason: "Consumo fora da faixa esperada para pesado a diesel (1,5 a 2,5 km/L).",
         });
@@ -60,7 +61,7 @@ export function detectFuelAnomalies(records: FuelRecord[], vehicles: Vehicle[]) 
         anomalies.push({
           id: recordId,
           date: record.fuelDate,
-          vehicle: vehicle?.plate || record.vehicle?.plate || "Veículo",
+          vehicle: formatVehicleLabel(vehicle || record.vehicle),
           driver: record.driver?.name || "Sem motorista",
           reason: `Consumo fora da faixa configurada (${customRule.min.toLocaleString(
             "pt-BR"
@@ -74,7 +75,7 @@ export function detectFuelAnomalies(records: FuelRecord[], vehicles: Vehicle[]) 
       anomalies.push({
         id: recordId,
         date: record.fuelDate,
-        vehicle: vehicle?.plate || record.vehicle?.plate || "Veículo",
+        vehicle: formatVehicleLabel(vehicle || record.vehicle),
         driver: record.driver?.name || "Sem motorista",
         reason: record.anomalyReason || "Anomalia detectada no consumo.",
       });
@@ -83,3 +84,4 @@ export function detectFuelAnomalies(records: FuelRecord[], vehicles: Vehicle[]) 
 
   return anomalies;
 }
+

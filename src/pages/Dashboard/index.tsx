@@ -34,6 +34,16 @@ function toCurrency(value: number) {
   });
 }
 
+function toSafeNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(/\./g, "").replace(",", ".");
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
 function formatDatePtBr(date: Date) {
   return date.toLocaleDateString("pt-BR");
 }
@@ -52,9 +62,10 @@ type VehicleCategoryFilter = "ALL" | "LIGHT" | "HEAVY";
 const MAX_RANKING_ITEMS = 10;
 
 function parseDateSafe(dateValue: string) {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-    const [year, month, day] = dateValue.split("-").map(Number);
-    return new Date(year, month - 1, day);
+  const dateMatch = String(dateValue || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (dateMatch) {
+    const [, year, month, day] = dateMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day), 12, 0, 0, 0);
   }
 
   return new Date(dateValue);
@@ -203,7 +214,9 @@ export function DashboardPage() {
 
   const filteredData = useMemo(() => {
     const vehiclesFiltered = selectedBranchId
-      ? vehicles.filter((vehicle) => vehicle.branchId === selectedBranchId)
+      ? vehicles.filter(
+          (vehicle) => !vehicle.branchId || vehicle.branchId === selectedBranchId
+        )
       : vehicles;
 
     const vehicleIds = new Set(vehiclesFiltered.map((vehicle) => vehicle.id));
@@ -212,6 +225,8 @@ export function DashboardPage() {
       ? drivers.filter(
           (driver) =>
             (driver.vehicle?.branchId && driver.vehicle.branchId === selectedBranchId) ||
+            (!driver.vehicle?.branchId &&
+              (driver.vehicleId ? vehicleIds.has(driver.vehicleId) : false)) ||
             (driver.vehicleId ? vehicleIds.has(driver.vehicleId) : false)
         )
       : drivers;
@@ -311,14 +326,17 @@ export function DashboardPage() {
     );
 
     const fuelCostPeriod = fuelInPeriod.reduce(
-      (sum, record) => sum + record.totalValue,
+      (sum, record) => sum + toSafeNumber(record.totalValue),
       0
     );
     const maintenanceCostPeriod = maintenanceInPeriod.reduce(
-      (sum, record) => sum + record.cost,
+      (sum, record) => sum + toSafeNumber(record.cost),
       0
     );
-    const debtsCostPeriod = debtsInPeriod.reduce((sum, debt) => sum + debt.amount, 0);
+    const debtsCostPeriod = debtsInPeriod.reduce(
+      (sum, debt) => sum + toSafeNumber(debt.amount),
+      0
+    );
     const totalCostPeriod = fuelCostPeriod + maintenanceCostPeriod + debtsCostPeriod;
 
     return {
@@ -365,7 +383,10 @@ export function DashboardPage() {
           isVehicleMatch(record.vehicleId)
       )
       .forEach((record) => {
-        costMap.set(record.vehicleId, (costMap.get(record.vehicleId) ?? 0) + record.cost);
+        costMap.set(
+          record.vehicleId,
+          (costMap.get(record.vehicleId) ?? 0) + toSafeNumber(record.cost)
+        );
       });
 
     filteredData.fuel
@@ -376,7 +397,7 @@ export function DashboardPage() {
       .forEach((record) => {
         costMap.set(
           record.vehicleId,
-          (costMap.get(record.vehicleId) ?? 0) + record.totalValue
+          (costMap.get(record.vehicleId) ?? 0) + toSafeNumber(record.totalValue)
         );
       });
 
@@ -386,7 +407,10 @@ export function DashboardPage() {
           isInPeriod(debt.debtDate, costPeriod) && isVehicleMatch(debt.vehicleId)
       )
       .forEach((debt) => {
-        costMap.set(debt.vehicleId, (costMap.get(debt.vehicleId) ?? 0) + debt.amount);
+        costMap.set(
+          debt.vehicleId,
+          (costMap.get(debt.vehicleId) ?? 0) + toSafeNumber(debt.amount)
+        );
       });
 
     const toLabel = new Map(filteredData.vehicles.map((vehicle) => [vehicle.id, vehicle]));
@@ -445,9 +469,9 @@ export function DashboardPage() {
       )
       .sort((a, b) => parseDateSafe(b.debtDate).getTime() - parseDateSafe(a.debtDate).getTime());
 
-    const fuelTotal = fuel.reduce((sum, item) => sum + (item.totalValue || 0), 0);
-    const maintenanceTotal = maintenance.reduce((sum, item) => sum + (item.cost || 0), 0);
-    const debtsTotal = debts.reduce((sum, item) => sum + (item.amount || 0), 0);
+    const fuelTotal = fuel.reduce((sum, item) => sum + toSafeNumber(item.totalValue), 0);
+    const maintenanceTotal = maintenance.reduce((sum, item) => sum + toSafeNumber(item.cost), 0);
+    const debtsTotal = debts.reduce((sum, item) => sum + toSafeNumber(item.amount), 0);
     const total = fuelTotal + maintenanceTotal + debtsTotal;
 
     const history = [
@@ -455,7 +479,7 @@ export function DashboardPage() {
         id: `fuel-${item.id}`,
         date: item.fuelDate,
         type: "Abastecimento",
-        value: item.totalValue || 0,
+        value: toSafeNumber(item.totalValue),
         description: `${(item.liters || 0).toLocaleString("pt-BR", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
@@ -465,14 +489,14 @@ export function DashboardPage() {
         id: `maintenance-${item.id}`,
         date: item.maintenanceDate,
         type: "Manutenção",
-        value: item.cost || 0,
+        value: toSafeNumber(item.cost),
         description: `${maintenanceTypePtBr(item.type)} • KM ${item.km}`,
       })),
       ...debts.map((item) => ({
         id: `debt-${item.id}`,
         date: item.debtDate,
         type: "Débito/Multa",
-        value: item.amount || 0,
+        value: toSafeNumber(item.amount),
         description: `${item.description || "Registro"} • ${item.points || 0} pontos`,
       })),
     ].sort((a, b) => parseDateSafe(b.date).getTime() - parseDateSafe(a.date).getTime());

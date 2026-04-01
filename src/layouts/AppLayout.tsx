@@ -429,9 +429,7 @@ export function AppLayout() {
       })
       .map((debt) => {
         const daysUntil = getDaysUntil(debt.dueDate || debt.debtDate);
-        const vehicleLabel = debt.vehicle
-          ? `${debt.vehicle.brand} ${debt.vehicle.model}`
-          : "Veículo";
+        const vehicleLabel = formatVehicleLabel(debt.vehicle);
 
         return {
           id: `debt-due-${debt.id}`,
@@ -452,9 +450,7 @@ export function AppLayout() {
         return daysUntil < 0;
       })
       .map((debt) => {
-        const vehicleLabel = debt.vehicle
-          ? `${debt.vehicle.brand} ${debt.vehicle.model}`
-          : "Veículo";
+        const vehicleLabel = formatVehicleLabel(debt.vehicle);
         const overdueDays = Math.abs(
           getDaysUntil(debt.dueDate || debt.debtDate),
         );
@@ -478,9 +474,7 @@ export function AppLayout() {
         const daysUntil = getDaysUntil(
           document.expiryDate || document.updatedAt || document.createdAt,
         );
-        const vehicleLabel = document.vehicle
-          ? `${document.vehicle.brand} ${document.vehicle.model}`
-          : "Veículo";
+        const vehicleLabel = formatVehicleLabel(document.vehicle);
 
         return {
           id: `document-expiring-${document.id}`,
@@ -505,9 +499,7 @@ export function AppLayout() {
         );
       })
       .map((document) => {
-        const vehicleLabel = document.vehicle
-          ? `${document.vehicle.brand} ${document.vehicle.model}`
-          : "Veículo";
+        const vehicleLabel = formatVehicleLabel(document.vehicle);
         const overdueDays = document.expiryDate
           ? Math.abs(getDaysUntil(document.expiryDate))
           : 0;
