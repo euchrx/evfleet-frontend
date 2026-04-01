@@ -1,5 +1,9 @@
 import { api } from "./api";
-import type { Company } from "../types/company";
+import type {
+  Company,
+  CompanyDeleteWithBackupInput,
+  CompanyDeleteWithBackupResult,
+} from "../types/company";
 
 export type CreateCompanyInput = {
   name: string;
@@ -50,8 +54,23 @@ export async function updateCompany(id: string, data: UpdateCompanyInput) {
   return response.data;
 }
 
-export async function deleteCompany(id: string) {
-  await api.delete(`/companies/${id}`, {
+export async function deleteCompanyWithBackup(
+  id: string,
+  data: CompanyDeleteWithBackupInput,
+) {
+  const response = await api.post<
+    | CompanyDeleteWithBackupResult
+    | {
+        success?: boolean;
+        data?: CompanyDeleteWithBackupResult;
+      }
+  >(`/companies/${id}/delete-with-backup`, data, {
     headers: { "x-company-scope": "__ALL__" },
   });
+
+  if ((response.data as { data?: CompanyDeleteWithBackupResult })?.data) {
+    return (response.data as { data: CompanyDeleteWithBackupResult }).data;
+  }
+
+  return response.data as CompanyDeleteWithBackupResult;
 }

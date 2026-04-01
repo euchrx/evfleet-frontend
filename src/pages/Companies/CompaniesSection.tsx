@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { DeleteCompanyWithBackupModal } from "../../components/DeleteCompanyWithBackupModal";
 import { TablePagination } from "../../components/TablePagination";
 import {
   createCompany,
-  deleteCompany,
+  deleteCompanyWithBackup,
   getCompanies,
   updateCompany,
 } from "../../services/companies";
-import type { Company } from "../../types/company";
+import type {
+  Company,
+  CompanyDeleteWithBackupInput,
+  CompanyDeleteWithBackupResult,
+  CompanyDeletionSummary,
+} from "../../types/company";
 import { formatDate } from "../../utils/formatters";
 
 type CompanyFormData = {
@@ -55,6 +60,76 @@ function applyCnpjMask(value: string) {
   return formatCnpj(value).replace("-", "");
 }
 
+function getDeleteErrorMessage(error: any) {
+  const response = error?.response?.data;
+  const errorCode = String(response?.errorCode || "").trim();
+  const apiMessage =
+    response?.message ||
+    response?.error ||
+    error?.message ||
+    "Não foi possível excluir a empresa no momento.";
+
+  if (errorCode === "COMPANY_DELETE_INVALID_PASSWORD") {
+    return "A senha informada está incorreta. Confirme a senha atual do administrador.";
+  }
+
+  if (errorCode === "COMPANY_DELETE_CONFIRMATION_TEXT_INVALID") {
+    return "Digite exatamente EXCLUIR EMPRESA no campo de confirmação.";
+  }
+
+  if (errorCode === "COMPANY_NOT_FOUND") {
+    return "A empresa selecionada não foi encontrada. Atualize a listagem e tente novamente.";
+  }
+
+  if (errorCode === "COMPANY_BACKUP_FAILED") {
+    return "Não foi possível gerar o backup da empresa. Nenhum dado foi removido.";
+  }
+
+  if (errorCode === "COMPANY_DELETE_RELATIONAL_INTEGRITY_FAILED") {
+    return "A exclusão foi interrompida porque ainda existem vínculos relacionais ativos nos dados da empresa.";
+  }
+
+  if (errorCode === "COMPANY_DELETE_FAILED") {
+    return "A exclusão definitiva falhou após a geração do backup. Revise os vínculos e tente novamente.";
+  }
+
+  return Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage);
+}
+
+function summarizeDeletedItems(summary: CompanyDeletionSummary) {
+  return Object.entries(summary).filter(([, value]) => Number(value) > 0);
+}
+
+function formatSummaryLabel(key: string) {
+  const labels: Record<string, string> = {
+    company: "empresa",
+    branches: "filiais",
+    users: "usuários",
+    subscriptions: "assinaturas",
+    payments: "pagamentos",
+    webhookEvents: "webhooks",
+    vehicles: "veículos",
+    vehicleProfilePhotos: "fotos de perfil",
+    vehicleChangeLogs: "históricos do veículo",
+    drivers: "motoristas",
+    maintenanceRecords: "manutenções",
+    maintenancePlans: "planos de manutenção",
+    debts: "débitos",
+    fuelRecords: "abastecimentos",
+    trips: "viagens",
+    vehicleDocuments: "documentos",
+    tires: "pneus",
+    tireReadings: "leituras de pneu",
+    xmlImportBatches: "lotes XML",
+    xmlInvoices: "notas XML",
+    xmlInvoiceItems: "itens XML",
+    retailProductImports: "importações de varejo",
+    retailProductImportItems: "itens de varejo",
+  };
+
+  return labels[key] || key;
+}
+
 export function CompaniesSection({
   title = "Empresas",
   description = "Cadastre, visualize, edite e remova empresas do sistema multiempresa.",
@@ -65,6 +140,8 @@ export function CompaniesSection({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
+  const [deleteResult, setDeleteResult] = useState<CompanyDeleteWithBackupResult | null>(null);
   const [fieldErrors, setFieldErrors] = useState<CompanyFieldErrors>({});
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
@@ -119,6 +196,12 @@ export function CompaniesSection({
     setEditingCompany(null);
     setForm(initialForm);
     setFieldErrors({});
+  }
+
+  function closeDeleteModal() {
+    if (deleting) return;
+    setCompanyToDelete(null);
+    setDeleteErrorMessage("");
   }
 
   function handleChange<K extends keyof CompanyFormData>(field: K, value: CompanyFormData[K]) {
@@ -187,20 +270,18 @@ export function CompaniesSection({
     }
   }
 
-  async function confirmDeleteCompany() {
+  async function confirmDeleteCompany(input: CompanyDeleteWithBackupInput) {
     if (!companyToDelete) return;
+
     try {
       setDeleting(true);
-      await deleteCompany(companyToDelete.id);
+      setDeleteErrorMessage("");
+      const result = await deleteCompanyWithBackup(companyToDelete.id, input);
+      setDeleteResult(result);
       setCompanyToDelete(null);
       await loadCompanies();
     } catch (error: any) {
-      const apiMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.error ||
-        error?.message ||
-        "Não foi possível excluir a empresa.";
-      setErrorMessage(Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage));
+      setDeleteErrorMessage(getDeleteErrorMessage(error));
     } finally {
       setDeleting(false);
     }
@@ -271,6 +352,11 @@ export function CompaniesSection({
     const start = (currentPage - 1) * TABLE_PAGE_SIZE;
     return filteredCompanies.slice(start, start + TABLE_PAGE_SIZE);
   }, [currentPage, filteredCompanies]);
+
+  const deletedSummaryItems = useMemo(
+    () => (deleteResult ? summarizeDeletedItems(deleteResult.deleted) : []),
+    [deleteResult],
+  );
 
   useEffect(() => {
     setCurrentPage(1);
@@ -343,6 +429,41 @@ export function CompaniesSection({
           </select>
         </div>
       </div>
+
+      {deleteResult ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-emerald-900">Exclusão concluída com backup gerado</h3>
+              <p className="mt-1 text-sm text-emerald-800">
+                A empresa <span className="font-semibold">{deleteResult.company.name}</span> foi removida com sucesso.
+              </p>
+              <p className="mt-1 text-sm text-emerald-800">
+                Backup: <span className="font-medium">{deleteResult.backup.fileName}</span>
+              </p>
+              <p className="mt-1 break-all text-xs text-emerald-700">{deleteResult.backup.filePath}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDeleteResult(null)}
+              className="self-start rounded-xl border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100"
+            >
+              Fechar resumo
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {deletedSummaryItems.map(([key, value]) => (
+              <span
+                key={key}
+                className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-medium text-emerald-800"
+              >
+                {formatSummaryLabel(key)}: {value}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {errorMessage ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -424,7 +545,10 @@ export function CompaniesSection({
                           Editar
                         </button>
                         <button
-                          onClick={() => setCompanyToDelete(company)}
+                          onClick={() => {
+                            setDeleteErrorMessage("");
+                            setCompanyToDelete(company);
+                          }}
                           className="btn-ui btn-ui-danger"
                         >
                           Excluir
@@ -552,16 +676,12 @@ export function CompaniesSection({
         </div>
       ) : null}
 
-      <ConfirmDeleteModal
+      <DeleteCompanyWithBackupModal
         isOpen={Boolean(companyToDelete)}
-        title="Excluir empresa"
-        description={
-          companyToDelete
-            ? `Deseja excluir a empresa ${companyToDelete.name}?`
-            : "Deseja excluir esta empresa?"
-        }
+        company={companyToDelete}
         loading={deleting}
-        onCancel={() => setCompanyToDelete(null)}
+        errorMessage={deleteErrorMessage}
+        onCancel={closeDeleteModal}
         onConfirm={confirmDeleteCompany}
       />
     </section>
