@@ -139,10 +139,29 @@ export function FuelXmlImportButton({
     if (selectedCount === 0) return;
 
     const payloadInvoices = previewInvoices.map((invoice) => ({
-      ...invoice,
+      invoiceKey: invoice.invoiceKey,
+      invoiceNumber: invoice.invoiceNumber,
+      issuedAt: invoice.issuedAt,
+      supplierName: invoice.supplierName,
+      supplierDocument: invoice.supplierDocument,
+      plate: invoice.plate,
+      odometer: invoice.odometer,
       items: invoice.items.map((item) => ({
-        ...item,
         selected: selectedKeys.has(getItemKey(invoice.invoiceKey, item.lineIndex)),
+        lineIndex: item.lineIndex,
+        productCode: item.productCode,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        detectedType: item.detectedType,
+        importable: item.importable,
+        duplicate: item.duplicate,
+        duplicateReason: item.duplicateReason,
+        detectedFuelType: item.detectedFuelType,
+        fuelDateTime: item.fuelDateTime,
+        nozzleNumber: item.nozzleNumber,
+        pumpNumber: item.pumpNumber,
       })),
     }));
 

@@ -113,6 +113,21 @@ export type FuelXmlPreviewInvoice = {
   items: FuelXmlPreviewInvoiceItem[];
 };
 
+export type FuelXmlConfirmInvoiceItem = FuelXmlPreviewInvoiceItem & {
+  selected: boolean;
+};
+
+export type FuelXmlConfirmInvoice = {
+  invoiceKey: string;
+  invoiceNumber?: string;
+  issuedAt?: string;
+  supplierName?: string;
+  supplierDocument?: string;
+  plate?: string;
+  odometer?: number;
+  items: FuelXmlConfirmInvoiceItem[];
+};
+
 export type FuelXmlPreviewResponse = {
   summary: {
     totalInvoices: number;
@@ -179,7 +194,7 @@ export async function previewFuelXml(files: File[]) {
 }
 
 export async function confirmFuelXmlImports(
-  invoices: FuelXmlPreviewInvoice[],
+  invoices: FuelXmlConfirmInvoice[],
 ) {
   const response = await api.post<FuelXmlConfirmResponse>(
     "/fuel-records/xml/confirm",
