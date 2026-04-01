@@ -18,6 +18,7 @@ import {
   Menu,
   LogOut,
   Route,
+  Sparkles,
   ShieldCheck,
   Truck,
   User,
@@ -210,6 +211,12 @@ export function AppLayout() {
       name: "Abastecimentos",
       path: "/fuel-records",
       icon: Fuel,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Perfumaria",
+      path: "/retail-products",
+      icon: Sparkles,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
