@@ -214,8 +214,8 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
-      name: "Perfumaria",
-      path: "/retail-products",
+      name: "Produtos",
+      path: "/products",
       icon: Sparkles,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },

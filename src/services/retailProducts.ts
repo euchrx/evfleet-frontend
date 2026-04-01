@@ -1,5 +1,13 @@
 import { api } from "./api";
 
+export type RetailProductCategory =
+  | "PERFUMARIA"
+  | "COSMETICOS"
+  | "LUBRIFICANTES"
+  | "CONVENIENCIA"
+  | "LIMPEZA"
+  | "OUTROS";
+
 export type RetailProductItem = {
   id: string;
   productCode?: string | null;
@@ -8,6 +16,7 @@ export type RetailProductItem = {
   unitValue?: string | number | null;
   totalValue?: string | number | null;
   createdAt: string;
+  category: RetailProductCategory;
   retailProductImport: {
     id: string;
     supplierName?: string | null;
@@ -34,6 +43,7 @@ export type RetailProductFilters = {
   supplier?: string;
   invoiceNumber?: string;
   itemDescription?: string;
+  category?: "" | RetailProductCategory;
 };
 
 export async function getRetailProducts(
@@ -50,6 +60,7 @@ export async function getRetailProducts(
       ...(filters.itemDescription?.trim()
         ? { itemDescription: filters.itemDescription.trim() }
         : {}),
+      ...(filters.category?.trim() ? { category: filters.category.trim() } : {}),
     },
   });
 

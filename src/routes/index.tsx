@@ -39,7 +39,8 @@ export function AppRoutes() {
             <Route path="/maintenance-records" element={<MaintenanceRecordsPage />} />
             <Route path="/maintenance-records/register" element={<MaintenanceRegisterPage />} />
             <Route path="/fuel-records" element={<FuelRecordsPage />} />
-            <Route path="/retail-products" element={<RetailProductsPage />} />
+            <Route path="/products" element={<RetailProductsPage />} />
+            <Route path="/retail-products" element={<Navigate to="/products" replace />} />
             <Route path="/trips" element={<TripsPage />} />
             <Route path="/vehicle-documents" element={<VehicleDocumentsPage />} />
             <Route path="/debts" element={<DebtsPage />} />

@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, Sparkles } from "lucide-react";
+import { Package, RefreshCw } from "lucide-react";
 import { TablePagination } from "../../components/TablePagination";
 import {
   getRetailProducts,
+  type RetailProductCategory,
   type RetailProductFilters,
   type RetailProductItem,
 } from "../../services/retailProducts";
 import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 
 const PAGE_SIZE = 10;
+
+const categoryOptions: Array<{ value: RetailProductCategory; label: string }> = [
+  { value: "PERFUMARIA", label: "Perfumaria" },
+  { value: "COSMETICOS", label: "Cosméticos" },
+  { value: "LUBRIFICANTES", label: "Lubrificantes" },
+  { value: "CONVENIENCIA", label: "Conveniência" },
+  { value: "LIMPEZA", label: "Limpeza" },
+  { value: "OUTROS", label: "Outros" },
+];
 
 function toNumber(value: string | number | null | undefined) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -43,6 +53,10 @@ function formatDate(value?: string | null) {
   return date.toLocaleDateString("pt-BR");
 }
 
+function categoryLabel(category: RetailProductCategory) {
+  return categoryOptions.find((item) => item.value === category)?.label || "Outros";
+}
+
 export function RetailProductsPage() {
   const { selectedCompanyId } = useCompanyScope();
   const [items, setItems] = useState<RetailProductItem[]>([]);
@@ -56,6 +70,7 @@ export function RetailProductsPage() {
     supplier: "",
     invoiceNumber: "",
     itemDescription: "",
+    category: "",
   });
 
   async function loadData(nextFilters = filters, manualRefresh = false) {
@@ -66,8 +81,8 @@ export function RetailProductsPage() {
       const data = await getRetailProducts(nextFilters);
       setItems(data);
     } catch (error) {
-      console.error("Erro ao carregar itens de perfumaria:", error);
-      setErrorMessage("Não foi possível carregar os itens de perfumaria.");
+      console.error("Erro ao carregar produtos:", error);
+      setErrorMessage("Não foi possível carregar os produtos importados.");
     } finally {
       if (manualRefresh) setRefreshing(false);
       else setLoading(false);
@@ -92,12 +107,13 @@ export function RetailProductsPage() {
   }
 
   async function handleClear() {
-    const emptyFilters = {
+    const emptyFilters: RetailProductFilters = {
       dateFrom: "",
       dateTo: "",
       supplier: "",
       invoiceNumber: "",
       itemDescription: "",
+      category: "",
     };
     setFilters(emptyFilters);
     setCurrentPage(1);
@@ -106,15 +122,7 @@ export function RetailProductsPage() {
 
   const summary = useMemo(() => {
     const totalValue = items.reduce((acc, item) => acc + toNumber(item.totalValue), 0);
-    const totalQuantity = items.reduce(
-      (acc, item) => acc + toNumber(item.quantity),
-      0,
-    );
-    const suppliers = new Set(
-      items
-        .map((item) => String(item.retailProductImport.supplierName || "").trim())
-        .filter(Boolean),
-    );
+    const totalQuantity = items.reduce((acc, item) => acc + toNumber(item.quantity), 0);
     const invoices = new Set(
       items
         .map((item) => String(item.retailProductImport.xmlInvoice.invoiceKey || "").trim())
@@ -125,8 +133,10 @@ export function RetailProductsPage() {
       totalItems: items.length,
       totalValue,
       totalQuantity,
-      suppliers: suppliers.size,
       invoices: invoices.size,
+      perfumaria: items.filter((item) => item.category === "PERFUMARIA").length,
+      cosmeticos: items.filter((item) => item.category === "COSMETICOS").length,
+      lubrificantes: items.filter((item) => item.category === "LUBRIFICANTES").length,
     };
   }, [items]);
 
@@ -148,9 +158,9 @@ export function RetailProductsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Perfumaria</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Produtos</h1>
           <p className="text-sm text-slate-500">
-            Itens de perfumaria e cosméticos importados via XML para controle de gastos do veículo.
+            Controle de produtos comprados para o veículo, organizados por categorias como perfumaria, cosméticos, lubrificantes e outros grupos.
           </p>
         </div>
         <button
@@ -187,6 +197,21 @@ export function RetailProductsPage() {
         </div>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-fuchsia-700">Perfumaria</p>
+          <p className="mt-1 text-2xl font-bold text-fuchsia-800">{summary.perfumaria}</p>
+        </div>
+        <div className="rounded-2xl border border-pink-200 bg-pink-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-pink-700">Cosméticos</p>
+          <p className="mt-1 text-2xl font-bold text-pink-800">{summary.cosmeticos}</p>
+        </div>
+        <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">Lubrificantes</p>
+          <p className="mt-1 text-2xl font-bold text-cyan-800">{summary.lubrificantes}</p>
+        </div>
+      </div>
+
       {errorMessage ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {errorMessage}
@@ -195,7 +220,7 @@ export function RetailProductsPage() {
 
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-4 py-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             <input
               type="date"
               value={filters.dateFrom || ""}
@@ -226,6 +251,23 @@ export function RetailProductsPage() {
               placeholder="Buscar item"
               className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
+            <select
+              value={filters.category || ""}
+              onChange={(event) =>
+                handleFilterChange(
+                  "category",
+                  (event.target.value || "") as RetailProductFilters["category"],
+                )
+              }
+              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            >
+              <option value="">Todas as categorias</option>
+              {categoryOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
@@ -246,16 +288,19 @@ export function RetailProductsPage() {
         </div>
 
         <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3 text-sm text-slate-600">
-          <Sparkles size={16} className="text-orange-600" />
-          <span>Itens importados para acompanhamento de valores e consumo por nota fiscal.</span>
+          <Package size={16} className="text-orange-600" />
+          <span>Produtos importados para acompanhamento de categorias e valores por nota fiscal.</span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full">
+          <table className="min-w-[1200px] w-full">
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   Produto
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  Categoria
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   Quantidade
@@ -283,14 +328,14 @@ export function RetailProductsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">
-                    Carregando itens de perfumaria...
+                  <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">
+                    Carregando produtos...
                   </td>
                 </tr>
               ) : paginatedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">
-                    Nenhum item de perfumaria encontrado.
+                  <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">
+                    Nenhum produto encontrado.
                   </td>
                 </tr>
               ) : (
@@ -301,6 +346,11 @@ export function RetailProductsPage() {
                       <p className="mt-1 text-xs text-slate-500">
                         Código: {item.productCode || "-"}
                       </p>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        {categoryLabel(item.category)}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {formatQuantity(item.quantity)}
@@ -341,7 +391,7 @@ export function RetailProductsPage() {
             totalPages={totalPages}
             totalItems={items.length}
             pageSize={PAGE_SIZE}
-            itemLabel="itens"
+            itemLabel="produtos"
             onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
             onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
           />
