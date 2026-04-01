@@ -190,21 +190,9 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
-      name: "Filiais",
-      path: "/branches",
-      icon: Building2,
-      roles: ["ADMIN", "FLEET_MANAGER"],
-    },
-    {
       name: "Motoristas",
       path: "/drivers",
       icon: Users,
-      roles: ["ADMIN", "FLEET_MANAGER"],
-    },
-    {
-      name: "Manutenções",
-      path: "/maintenance-records",
-      icon: Wrench,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
@@ -217,6 +205,12 @@ export function AppLayout() {
       name: "Produtos",
       path: "/products",
       icon: Sparkles,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Manutenções",
+      path: "/maintenance-records",
+      icon: Wrench,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
@@ -235,6 +229,12 @@ export function AppLayout() {
       name: "Gestão de Documentos",
       path: "/vehicle-documents",
       icon: FileText,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Filiais",
+      path: "/branches",
+      icon: Building2,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
