@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { CompanyDeletionResultModal } from "../../components/CompanyDeletionResultModal";
 import { DeleteCompanyWithBackupModal } from "../../components/DeleteCompanyWithBackupModal";
 import { StatusToast } from "../../components/StatusToast";
@@ -82,34 +82,34 @@ function getDeleteErrorMessage(error: any) {
     response?.message ||
     response?.error ||
     error?.message ||
-    "Não foi possível concluir a exclusão definitiva da empresa no momento.";
+    "NÃ£o foi possÃ­vel concluir a exclusÃ£o definitiva da empresa no momento.";
 
   if (errorCode === "COMPANY_DELETE_INVALID_PASSWORD") {
-    return "A senha informada está incorreta. Revise a senha atual do administrador e tente novamente.";
+    return "A senha informada estÃ¡ incorreta. Revise a senha atual do administrador e tente novamente.";
   }
 
   if (errorCode === "COMPANY_DELETE_CONFIRMATION_TEXT_INVALID") {
-    return "Digite exatamente EXCLUIR EMPRESA para confirmar a exclusão definitiva.";
+    return "Digite exatamente EXCLUIR EMPRESA para confirmar a exclusÃ£o definitiva.";
   }
 
   if (errorCode === "COMPANY_NOT_FOUND") {
-    return "A empresa selecionada não foi encontrada. Atualize a listagem antes de tentar novamente.";
+    return "A empresa selecionada nÃ£o foi encontrada. Atualize a listagem antes de tentar novamente.";
   }
 
   if (errorCode === "COMPANY_BACKUP_FAILED") {
-    return "Não foi possível gerar o backup da empresa. Nenhum dado foi removido.";
+    return "NÃ£o foi possÃ­vel gerar o backup da empresa. Nenhum dado foi removido.";
   }
 
   if (errorCode === "COMPANY_DELETE_IN_PROGRESS") {
-    return "Já existe uma exclusão definitiva em andamento para esta empresa. Aguarde a conclusão da operação atual.";
+    return "JÃ¡ existe uma exclusÃ£o definitiva em andamento para esta empresa. Aguarde a conclusÃ£o da operaÃ§Ã£o atual.";
   }
 
   if (errorCode === "COMPANY_DELETE_RELATIONAL_INTEGRITY_FAILED") {
-    return "A exclusão foi interrompida porque ainda existem vínculos relacionais ativos nos dados da empresa.";
+    return "A exclusÃ£o foi interrompida porque ainda existem vÃ­nculos relacionais ativos nos dados da empresa.";
   }
 
   if (errorCode === "COMPANY_DELETE_FAILED") {
-    return "A exclusão definitiva falhou após a geração do backup. Revise os vínculos e tente novamente.";
+    return "A exclusÃ£o definitiva falhou apÃ³s a geraÃ§Ã£o do backup. Revise os vÃ­nculos e tente novamente.";
   }
 
   return Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage);
@@ -141,6 +141,7 @@ export function CompaniesSection({
   const [form, setForm] = useState<CompanyFormData>(initialForm);
   const [toast, setToast] = useState<ToastState>(initialToastState);
   const toastTimerRef = useRef<number | null>(null);
+  const lastLoadedCompaniesRef = useRef<Company[]>([]);
 
   function hideToast() {
     if (toastTimerRef.current) {
@@ -186,20 +187,24 @@ export function CompaniesSection({
       }
 
       const data = await getCompanies();
-      setCompanies(Array.isArray(data) ? data : []);
+      const nextCompanies = Array.isArray(data) ? data : [];
+      setCompanies(nextCompanies);
+      lastLoadedCompaniesRef.current = nextCompanies;
       return true;
     } catch (error) {
       console.error("Erro ao carregar empresas:", error);
       if (options?.silent) {
         showToast(
           "error",
-          "Listagem não atualizada",
-          "A empresa foi removida, mas não foi possível sincronizar a listagem neste momento.",
+          "Listagem nÃ£o atualizada",
+          "A empresa foi removida, mas nÃ£o foi possÃ­vel sincronizar a listagem neste momento.",
           { autoHideMs: 5000 },
         );
       } else {
-        setErrorMessage("Não foi possível carregar as empresas.");
-        setCompanies([]);
+        setErrorMessage("NÃ£o foi possÃ­vel carregar as empresas.");
+        setCompanies((prev) =>
+          prev.length > 0 ? prev : lastLoadedCompaniesRef.current,
+        );
       }
       return false;
     } finally {
@@ -291,7 +296,7 @@ export function CompaniesSection({
         showToast(
           "success",
           "Empresa atualizada",
-          "As alterações foram salvas com sucesso.",
+          "As alteraÃ§Ãµes foram salvas com sucesso.",
           { autoHideMs: 3000 },
         );
       } else {
@@ -316,7 +321,7 @@ export function CompaniesSection({
         error?.response?.data?.message ||
         error?.response?.data?.error ||
         error?.message ||
-        "Não foi possível salvar a empresa.";
+        "NÃ£o foi possÃ­vel salvar a empresa.";
       const message = Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage);
       if (/slug/i.test(message)) {
         setFieldErrors((prev) => ({ ...prev, slug: message }));
@@ -343,7 +348,7 @@ export function CompaniesSection({
       setDeleteErrorMessage("");
       showToast(
         "loading",
-        "Exclusão em andamento",
+        "ExclusÃ£o em andamento",
         `Estamos gerando o backup e removendo os dados da empresa ${selectedCompany.name}.`,
       );
 
@@ -359,16 +364,16 @@ export function CompaniesSection({
 
       showToast(
         "success",
-        "Empresa excluída",
+        "Empresa excluÃ­da",
         refetchSucceeded
-          ? "A exclusão definitiva foi concluída com sucesso e a listagem já foi atualizada."
-          : "A exclusão definitiva foi concluída com sucesso.",
+          ? "A exclusÃ£o definitiva foi concluÃ­da com sucesso e a listagem jÃ¡ foi atualizada."
+          : "A exclusÃ£o definitiva foi concluÃ­da com sucesso.",
         { autoHideMs: 4000 },
       );
     } catch (error: any) {
       const message = getDeleteErrorMessage(error);
       setDeleteErrorMessage(message);
-      showToast("error", "Falha na exclusão", message, { autoHideMs: 5000 });
+      showToast("error", "Falha na exclusÃ£o", message, { autoHideMs: 5000 });
     } finally {
       setDeleting(false);
       setDeletingCompanyId(null);
@@ -385,8 +390,8 @@ export function CompaniesSection({
   }
 
   function getSortArrow(column: CompanySortBy) {
-    if (sortBy !== column) return "↕";
-    return sortDirection === "asc" ? "↑" : "↓";
+    if (sortBy !== column) return "â†•";
+    return sortDirection === "asc" ? "â†‘" : "â†“";
   }
 
   const filteredCompanies = useMemo(() => {
@@ -487,9 +492,9 @@ export function CompaniesSection({
           <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 shadow-sm">
             <span className="mt-0.5 inline-block h-4 w-4 animate-spin rounded-full border-2 border-amber-300 border-t-amber-700" />
             <div>
-              <p className="font-semibold">Exclusão definitiva em andamento</p>
+              <p className="font-semibold">ExclusÃ£o definitiva em andamento</p>
               <p className="mt-1">
-                A operação está em processamento. A listagem será sincronizada automaticamente ao final.
+                A operaÃ§Ã£o estÃ¡ em processamento. A listagem serÃ¡ sincronizada automaticamente ao final.
               </p>
             </div>
           </div>
@@ -582,7 +587,7 @@ export function CompaniesSection({
                       Criada em {getSortArrow("createdAt")}
                     </button>
                   </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ações</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">AÃ§Ãµes</th>
                 </tr>
               </thead>
               <tbody>
@@ -632,7 +637,7 @@ export function CompaniesSection({
                               className="btn-ui btn-ui-danger disabled:cursor-not-allowed disabled:opacity-50"
                               disabled={deleting}
                             >
-                              {rowDeleting ? "Exclusão em andamento..." : "Excluir"}
+                              {rowDeleting ? "ExclusÃ£o em andamento..." : "Excluir"}
                             </button>
                           </div>
                         </td>
@@ -664,7 +669,7 @@ export function CompaniesSection({
                   <h2 className="text-xl font-bold text-slate-900">
                     {editingCompany ? "Editar empresa" : "Cadastrar empresa"}
                   </h2>
-                  <p className="text-sm text-slate-500">Preencha as informações da empresa.</p>
+                  <p className="text-sm text-slate-500">Preencha as informaÃ§Ãµes da empresa.</p>
                 </div>
                 <button
                   onClick={closeModal}
@@ -749,7 +754,7 @@ export function CompaniesSection({
                     {saving
                       ? "Salvando..."
                       : editingCompany
-                        ? "Salvar alterações"
+                        ? "Salvar alteraÃ§Ãµes"
                         : "Cadastrar empresa"}
                   </button>
                 </div>
@@ -778,7 +783,7 @@ export function CompaniesSection({
             showToast(
               "loading",
               "Em breve",
-              "O download de metadados do backup será disponibilizado em uma próxima etapa.",
+              "O download de metadados do backup serÃ¡ disponibilizado em uma prÃ³xima etapa.",
               { autoHideMs: 3500 },
             );
           }}
@@ -787,3 +792,4 @@ export function CompaniesSection({
     </>
   );
 }
+

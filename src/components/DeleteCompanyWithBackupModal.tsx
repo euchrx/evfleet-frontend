@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import type { Company } from "../types/company";
 
 type DeleteCompanyWithBackupModalProps = {
@@ -53,8 +53,8 @@ export function DeleteCompanyWithBackupModal({
             <div className="space-y-1">
               <h2 className="text-xl font-bold text-slate-900">Excluir empresa em definitivo</h2>
               <p className="text-sm text-slate-600">
-                Esta ação é irreversível. O sistema vai gerar um backup lógico e, na sequência,
-                remover os dados vinculados à empresa.
+                Esta aÃ§Ã£o Ã© irreversÃ­vel. O sistema vai gerar um backup lÃ³gico e, na sequÃªncia,
+                remover os dados vinculados Ã  empresa.
               </p>
             </div>
           </div>
@@ -63,11 +63,11 @@ export function DeleteCompanyWithBackupModal({
         <div className="space-y-5 px-6 py-6">
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4">
             <p className="text-sm font-semibold text-red-700">
-              Você está prestes a excluir permanentemente{" "}
+              VocÃª estÃ¡ prestes a excluir permanentemente{" "}
               <span className="text-red-800">{company.name}</span>.
             </p>
             <p className="mt-1 text-sm text-red-700">
-              Depois da confirmação, a exclusão definitiva será iniciada e não poderá ser desfeita.
+              Depois da confirmaÃ§Ã£o, a exclusÃ£o definitiva serÃ¡ iniciada e nÃ£o poderÃ¡ ser desfeita.
             </p>
           </div>
 
@@ -75,16 +75,20 @@ export function DeleteCompanyWithBackupModal({
             <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
               <span className="mt-0.5 inline-block h-4 w-4 animate-spin rounded-full border-2 border-amber-300 border-t-amber-700" />
               <div>
-                <p className="font-semibold">Exclusão em andamento</p>
+                <p className="font-semibold">ExclusÃ£o em andamento</p>
                 <p className="mt-1">
-                  Estamos gerando o backup e finalizando a remoção dos dados da empresa. Não feche
-                  esta janela até a conclusão.
+                  Estamos gerando o backup e finalizando a remoÃ§Ã£o dos dados da empresa. NÃ£o feche
+                  esta janela atÃ© a conclusÃ£o.
                 </p>
               </div>
             </div>
           ) : null}
 
-          <div className="grid gap-4">
+          <form
+            className="grid gap-4"
+            autoComplete="off"
+            onSubmit={(event) => event.preventDefault()}
+          >
             <div>
               <label className="block text-sm font-medium text-slate-700">Senha atual do ADMIN</label>
               <input
@@ -92,6 +96,10 @@ export function DeleteCompanyWithBackupModal({
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Digite sua senha atual"
+                name="company-delete-password"
+                autoComplete="new-password"
+                data-lpignore="true"
+                data-form-type="other"
                 className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200"
                 disabled={loading}
               />
@@ -106,6 +114,8 @@ export function DeleteCompanyWithBackupModal({
                 value={confirmationText}
                 onChange={(event) => setConfirmationText(event.target.value)}
                 placeholder={REQUIRED_CONFIRMATION_TEXT}
+                name="company-delete-confirmation"
+                autoComplete="off"
                 className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 uppercase outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200"
                 disabled={loading}
               />
@@ -119,9 +129,9 @@ export function DeleteCompanyWithBackupModal({
                 className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
                 disabled={loading}
               />
-              <span>Entendo que esta ação é permanente e remove definitivamente os dados da empresa.</span>
+              <span>Entendo que esta aÃ§Ã£o Ã© permanente e remove definitivamente os dados da empresa.</span>
             </label>
-          </div>
+          </form>
 
           {errorMessage ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -164,3 +174,4 @@ export function DeleteCompanyWithBackupModal({
     </div>
   );
 }
+
