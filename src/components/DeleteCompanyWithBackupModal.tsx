@@ -53,7 +53,8 @@ export function DeleteCompanyWithBackupModal({
             <div className="space-y-1">
               <h2 className="text-xl font-bold text-slate-900">Excluir empresa em definitivo</h2>
               <p className="text-sm text-slate-600">
-                Esta ação é irreversível, remove os dados da empresa e gera um backup antes da exclusão.
+                Esta ação é irreversível. O sistema vai gerar um backup lógico e, na sequência,
+                remover os dados vinculados à empresa.
               </p>
             </div>
           </div>
@@ -66,9 +67,22 @@ export function DeleteCompanyWithBackupModal({
               <span className="text-red-800">{company.name}</span>.
             </p>
             <p className="mt-1 text-sm text-red-700">
-              O sistema vai gerar um backup e, em seguida, remover os dados vinculados a esta empresa.
+              Depois da confirmação, a exclusão definitiva será iniciada e não poderá ser desfeita.
             </p>
           </div>
+
+          {loading ? (
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+              <span className="mt-0.5 inline-block h-4 w-4 animate-spin rounded-full border-2 border-amber-300 border-t-amber-700" />
+              <div>
+                <p className="font-semibold">Exclusão em andamento</p>
+                <p className="mt-1">
+                  Estamos gerando o backup e finalizando a remoção dos dados da empresa. Não feche
+                  esta janela até a conclusão.
+                </p>
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid gap-4">
             <div>
@@ -105,7 +119,7 @@ export function DeleteCompanyWithBackupModal({
                 className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
                 disabled={loading}
               />
-              <span>Entendo que essa ação é permanente.</span>
+              <span>Entendo que esta ação é permanente e remove definitivamente os dados da empresa.</span>
             </label>
           </div>
 
@@ -120,7 +134,7 @@ export function DeleteCompanyWithBackupModal({
           <button
             type="button"
             onClick={onCancel}
-            className="btn-ui btn-ui-neutral"
+            className="btn-ui btn-ui-neutral disabled:cursor-not-allowed disabled:opacity-60"
             disabled={loading}
           >
             Cancelar
@@ -133,10 +147,17 @@ export function DeleteCompanyWithBackupModal({
                 confirmationText: confirmationText.trim(),
               })
             }
-            className="inline-flex items-center justify-center rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!isReadyToConfirm || loading}
           >
-            {loading ? "Gerando backup e excluindo..." : "Gerar backup e excluir"}
+            {loading ? (
+              <>
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-red-200 border-t-white" />
+                Excluindo empresa...
+              </>
+            ) : (
+              "Gerar backup e excluir"
+            )}
           </button>
         </div>
       </div>

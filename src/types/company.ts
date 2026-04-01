@@ -44,9 +44,11 @@ export type CompanyDeleteWithBackupResult = {
     name: string;
   };
   backup: {
+    identifier: string;
     fileName: string;
     filePath: string;
     generatedAt: string;
+    metadataDownloadAvailable: boolean;
   };
   deleted: CompanyDeletionSummary;
 };
