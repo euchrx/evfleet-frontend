@@ -176,13 +176,13 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
-      name: "RelatÃ³rios",
+      name: "Relatórios",
       path: "/reports",
       icon: BarChart3,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
-      name: "VeÃ­culos",
+      name: "Veículos",
       path: "/vehicles",
       icon: Truck,
       roles: ["ADMIN", "FLEET_MANAGER"],
@@ -200,7 +200,7 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
-      name: "ManutenÃ§Ãµes",
+      name: "Manutenções",
       path: "/maintenance-records",
       icon: Wrench,
       roles: ["ADMIN", "FLEET_MANAGER"],
@@ -212,19 +212,19 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
-      name: "DÃ©bitos e Multas",
+      name: "Débitos e Multas",
       path: "/debts",
       icon: BadgeAlert,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
-      name: "GestÃ£o de Viagens",
+      name: "Gestão de Viagens",
       path: "/trips",
       icon: Route,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
-      name: "GestÃ£o de Documentos",
+      name: "Gestão de Documentos",
       path: "/vehicle-documents",
       icon: FileText,
       roles: ["ADMIN", "FLEET_MANAGER"],
@@ -236,9 +236,9 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     { name: "Empresas", path: "/companies", icon: Building2, roles: ["ADMIN"] },
-    { name: "UsuÃ¡rios", path: "/users", icon: Users, roles: ["ADMIN"] },
+    { name: "Usuários", path: "/users", icon: Users, roles: ["ADMIN"] },
     {
-      name: "AdministraÃ§Ã£o",
+      name: "Administração",
       path: "/administration",
       icon: ShieldCheck,
       roles: ["ADMIN"],
@@ -408,15 +408,15 @@ export function AppLayout() {
         const daysUntil = getDaysUntil(record.maintenanceDate);
         const vehicleLabel = record.vehicle
           ? `${record.vehicle.brand} ${record.vehicle.model}`
-          : "VeÃ­culo";
+          : "Veículo";
 
         return {
           id: `maintenance-schedule-${record.id}`,
-          title: `ManutenÃ§Ã£o programada - ${vehicleLabel}`,
+          title: `Manutenção programada - ${vehicleLabel}`,
           description:
             daysUntil === 0
-              ? "A manutenÃ§Ã£o estÃ¡ programada para hoje."
-              : `Faltam ${daysUntil} dia(s) para a manutenÃ§Ã£o programada.`,
+              ? "A manutenção está programada para hoje."
+              : `Faltam ${daysUntil} dia(s) para a manutenção programada.`,
           date: record.maintenanceDate,
           link: `/maintenance-records?tab=records&highlight=${record.id}`,
         };
@@ -432,11 +432,11 @@ export function AppLayout() {
         const daysUntil = getDaysUntil(debt.dueDate || debt.debtDate);
         const vehicleLabel = debt.vehicle
           ? `${debt.vehicle.brand} ${debt.vehicle.model}`
-          : "VeÃ­culo";
+          : "Veículo";
 
         return {
           id: `debt-due-${debt.id}`,
-          title: `DÃ©bito vencendo - ${vehicleLabel}`,
+          title: `Débito vencendo - ${vehicleLabel}`,
           description:
             daysUntil === 0
               ? "O dÃ©bito vence hoje."
@@ -455,15 +455,15 @@ export function AppLayout() {
       .map((debt) => {
         const vehicleLabel = debt.vehicle
           ? `${debt.vehicle.brand} ${debt.vehicle.model}`
-          : "VeÃ­culo";
+          : "Veículo";
         const overdueDays = Math.abs(
           getDaysUntil(debt.dueDate || debt.debtDate),
         );
 
         return {
           id: `debt-overdue-${debt.id}`,
-          title: `DÃ©bito vencido - ${vehicleLabel}`,
-          description: `DÃ©bito vencido hÃ¡ ${overdueDays} dia(s).`,
+          title: `Débito vencido - ${vehicleLabel}`,
+          description: `Débito vencido há ${overdueDays} dia(s).`,
           date: debt.dueDate || debt.debtDate,
           link: `/debts?highlight=${debt.id}`,
         };
@@ -481,7 +481,7 @@ export function AppLayout() {
         );
         const vehicleLabel = document.vehicle
           ? `${document.vehicle.brand} ${document.vehicle.model}`
-          : "VeÃ­culo";
+          : "Veículo";
 
         return {
           id: `document-expiring-${document.id}`,
@@ -508,7 +508,7 @@ export function AppLayout() {
       .map((document) => {
         const vehicleLabel = document.vehicle
           ? `${document.vehicle.brand} ${document.vehicle.model}`
-          : "VeÃ­culo";
+          : "Veículo";
         const overdueDays = document.expiryDate
           ? Math.abs(getDaysUntil(document.expiryDate))
           : 0;
@@ -517,8 +517,8 @@ export function AppLayout() {
           id: `document-expired-${document.id}`,
           title: `Documento vencido - ${vehicleLabel}`,
           description: document.expiryDate
-            ? `${document.name} estÃ¡ vencido hÃ¡ ${overdueDays} dia(s).`
-            : `${document.name} estÃ¡ marcado como vencido.`,
+            ? `${document.name} está vencido há ${overdueDays} dia(s).`
+            : `${document.name} está marcado como vencido.`,
           date: document.expiryDate || document.updatedAt || document.createdAt,
           link: `/vehicle-documents?highlight=${document.id}`,
         };
@@ -816,11 +816,11 @@ export function AppLayout() {
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    NotificaÃ§Ãµes
+                    Notificações
                   </p>
                   <p className="mt-1 text-sm font-medium text-slate-700">
                     {notifications.length > 0
-                      ? `${notifications.length} notificaÃ§Ã£o(Ãµes) pendente(s)`
+                      ? `${notifications.length} notificação(ões) pendente(s)`
                       : "Sem eventos no momento"}
                   </p>
                 </div>
@@ -922,7 +922,7 @@ export function AppLayout() {
                 <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-orange-200 bg-white text-slate-900 shadow-2xl lg:max-w-[340px]">
                   <div className="border-b border-orange-200 px-4 py-3">
                     <p className="truncate text-lg font-semibold">
-                      {user?.name || "UsuÃ¡rio"}
+                      {user?.name || "Usuário"}
                     </p>
                     <p className="text-sm text-slate-600">
                       {selectedCompanyOption?.name || "Empresa selecionada"}
@@ -932,7 +932,7 @@ export function AppLayout() {
                     </span>
                     {subscriptionStatus === "TRIALING" ? (
                       <span className="mt-2 ml-2 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-                        PerÃ­odo de teste
+                        Período de teste
                       </span>
                     ) : null}
                   </div>
@@ -998,19 +998,19 @@ export function AppLayout() {
                 <p className="text-sm text-slate-600">
                   Nome do sistema: {companyName}
                 </p>
-                <p className="text-sm text-slate-600">VersÃ£o atual: {effectiveSystemVersion}</p>
+                <p className="text-sm text-slate-600">Versão atual: {effectiveSystemVersion}</p>
               </div>
               <ClipboardList size={22} className="text-orange-600" />
             </div>
 
             <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                TÃ³picos com as atualizaÃ§Ãµes
+                Tópicos com as atualizações
               </p>
               <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
                 {latestTopics.length === 0 ? (
                   <p className="text-sm text-slate-500">
-                    Nenhuma atualizaÃ§Ã£o registrada atÃ© o momento.
+                    Nenhuma atualização registrada até o momento.
                   </p>
                 ) : (
                   latestTopics.map((log) => (
@@ -1083,7 +1083,7 @@ export function AppLayout() {
         <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
           <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-lg font-semibold text-slate-900">Editar atualizaÃ§Ã£o</h3>
+              <h3 className="text-lg font-semibold text-slate-900">Editar atualização</h3>
               <button
                 type="button"
                 onClick={() => setEditingLog(null)}
@@ -1095,7 +1095,7 @@ export function AppLayout() {
 
             <div className="mt-4 grid gap-3">
               <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">TÃ­tulo</span>
+                <span className="text-sm font-medium text-slate-700">Título</span>
                 <input
                   value={editingLogAction}
                   onChange={(e) => setEditingLogAction(e.target.value)}
@@ -1111,7 +1111,7 @@ export function AppLayout() {
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">VersÃ£o</span>
+                <span className="text-sm font-medium text-slate-700">Versão</span>
                 <input
                   value={editingLogVersion}
                   onChange={(e) => setEditingLogVersion(e.target.value)}
@@ -1152,9 +1152,9 @@ export function AppLayout() {
       {logToDelete ? (
         <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-slate-900">Excluir atualizaÃ§Ã£o</h3>
+            <h3 className="text-lg font-semibold text-slate-900">Excluir atualização</h3>
             <p className="mt-2 text-sm text-slate-600">
-              Deseja excluir esta atualizaÃ§Ã£o do system logs?
+              Deseja excluir esta atualização do system logs?
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -1182,7 +1182,7 @@ export function AppLayout() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  NotificaÃ§Ãµes
+                  Notificações
                 </p>
                 <p className="mt-1 text-sm text-slate-700">
                   {notifications.length} item(ns) pendente(s)
@@ -1238,4 +1238,5 @@ export function AppLayout() {
     </div>
   );
 }
+
 
