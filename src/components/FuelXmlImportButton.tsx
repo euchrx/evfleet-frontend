@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import {
   confirmFuelXmlImports,
   previewFuelXml,
+  type FuelXmlConfirmInvoice,
   type FuelXmlPreviewInvoice,
 } from "../services/fuelRecords";
 import { FuelXmlImportModal } from "./FuelXmlImportModal";
@@ -20,10 +21,6 @@ const initialToastState: ToastState = {
   title: "",
   message: "",
 };
-
-function getItemKey(invoiceKey: string, lineIndex: number) {
-  return `${invoiceKey}:${lineIndex}`;
-}
 
 function getPreviewErrorMessage(error: any) {
   const message =
@@ -85,9 +82,9 @@ export function FuelXmlImportButton({
     const next = new Set<string>();
 
     invoices.forEach((invoice) => {
-      invoice.items.forEach((item) => {
-        if (item.importable && !item.duplicate) {
-          next.add(getItemKey(invoice.invoiceKey, item.lineIndex));
+      invoice.consolidated.forEach((group) => {
+        if (group.importable && !group.duplicate) {
+          next.add(group.groupKey);
         }
       });
     });
@@ -104,7 +101,7 @@ export function FuelXmlImportButton({
       showToast(
         "loading",
         "Lendo XMLs",
-        "Estamos analisando as NF-es e montando o preview dos itens detectados.",
+        "Estamos analisando as NF-es e consolidando os abastecimentos detectados.",
       );
 
       const preview = await previewFuelXml(nextFiles);
@@ -122,23 +119,21 @@ export function FuelXmlImportButton({
     }
   }
 
-  function toggleItem(invoiceKey: string, lineIndex: number) {
-    const key = getItemKey(invoiceKey, lineIndex);
+  function toggleGroup(groupKey: string) {
     setSelectedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
       } else {
-        next.add(key);
+        next.add(groupKey);
       }
       return next;
     });
   }
 
-  async function handleConfirmImport() {
-    if (selectedCount === 0) return;
-
-    const payloadInvoices = previewInvoices.map((invoice) => ({
+  function buildConfirmPayload(): FuelXmlConfirmInvoice[] {
+    return previewInvoices.map((invoice) => ({
+      fileName: invoice.fileName,
       invoiceKey: invoice.invoiceKey,
       invoiceNumber: invoice.invoiceNumber,
       issuedAt: invoice.issuedAt,
@@ -146,41 +141,33 @@ export function FuelXmlImportButton({
       supplierDocument: invoice.supplierDocument,
       plate: invoice.plate,
       odometer: invoice.odometer,
-      items: invoice.items.map((item) => ({
-        selected: selectedKeys.has(getItemKey(invoice.invoiceKey, item.lineIndex)),
-        lineIndex: item.lineIndex,
-        productCode: item.productCode,
-        productName: item.productName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-        detectedType: item.detectedType,
-        importable: item.importable,
-        duplicate: item.duplicate,
-        duplicateReason: item.duplicateReason,
-        detectedFuelType: item.detectedFuelType,
-        fuelDateTime: item.fuelDateTime,
-        nozzleNumber: item.nozzleNumber,
-        pumpNumber: item.pumpNumber,
+      items: invoice.items,
+      consolidated: invoice.consolidated.map((group) => ({
+        ...group,
+        selected: selectedKeys.has(group.groupKey),
       })),
     }));
+  }
+
+  async function handleConfirmImport() {
+    if (selectedCount === 0) return;
 
     try {
       setConfirmLoading(true);
       showToast(
         "loading",
         "Importando abastecimentos",
-        "Os itens selecionados estão sendo gravados em lote.",
+        "Os grupos selecionados estão sendo gravados em lote.",
       );
 
-      const result = await confirmFuelXmlImports(payloadInvoices);
+      const result = await confirmFuelXmlImports(buildConfirmPayload());
       await onImported();
 
       resetPreviewState();
       showToast(
         "success",
         "Importação concluída",
-        `${result.totalImported} item(ns) importado(s), ${result.totalDuplicated} duplicado(s) e ${result.totalIgnored} ignorado(s).`,
+        `${result.totalImported} abastecimento(s) importado(s), ${result.totalDuplicated} grupo(s) duplicado(s) e ${result.totalIgnored} grupo(s) ignorado(s).`,
         5000,
       );
     } catch (error: any) {
@@ -223,7 +210,7 @@ export function FuelXmlImportButton({
         selectedKeys={selectedKeys}
         loading={confirmLoading}
         onClose={closeModal}
-        onToggleItem={toggleItem}
+        onToggleGroup={toggleGroup}
         onConfirm={handleConfirmImport}
       />
     </>

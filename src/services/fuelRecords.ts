@@ -101,6 +101,17 @@ export type FuelXmlPreviewInvoiceItem = {
   pumpNumber?: string;
 };
 
+export type FuelXmlPreviewConsolidatedGroup = {
+  groupKey: string;
+  detectedType: "FUEL" | "ARLA";
+  fuelType: string;
+  totalQuantity: number;
+  totalPrice: number;
+  itemsCount: number;
+  duplicate: boolean;
+  importable: boolean;
+};
+
 export type FuelXmlPreviewInvoice = {
   fileName: string;
   invoiceKey: string;
@@ -111,13 +122,15 @@ export type FuelXmlPreviewInvoice = {
   plate?: string;
   odometer?: number;
   items: FuelXmlPreviewInvoiceItem[];
+  consolidated: FuelXmlPreviewConsolidatedGroup[];
 };
 
-export type FuelXmlConfirmInvoiceItem = FuelXmlPreviewInvoiceItem & {
+export type FuelXmlConfirmConsolidatedGroup = FuelXmlPreviewConsolidatedGroup & {
   selected: boolean;
 };
 
 export type FuelXmlConfirmInvoice = {
+  fileName?: string;
   invoiceKey: string;
   invoiceNumber?: string;
   issuedAt?: string;
@@ -125,7 +138,8 @@ export type FuelXmlConfirmInvoice = {
   supplierDocument?: string;
   plate?: string;
   odometer?: number;
-  items: FuelXmlConfirmInvoiceItem[];
+  items: FuelXmlPreviewInvoiceItem[];
+  consolidated: FuelXmlConfirmConsolidatedGroup[];
 };
 
 export type FuelXmlPreviewResponse = {
@@ -142,6 +156,7 @@ export type FuelXmlPreviewResponse = {
 export type FuelXmlConfirmResponse = {
   totalInvoicesRead: number;
   totalItemsDetected: number;
+  totalGroups: number;
   totalImported: number;
   totalIgnored: number;
   totalDuplicated: number;
