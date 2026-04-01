@@ -114,6 +114,8 @@ export function VehicleDocumentsPage() {
   const [editingDocument, setEditingDocument] = useState<VehicleDocument | null>(null);
   const [documentToDelete, setDocumentToDelete] = useState<VehicleDocument | null>(null);
   const [deletingDocument, setDeletingDocument] = useState(false);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [highlightedDocumentId, setHighlightedDocumentId] = useState<string | null>(null);
   const [form, setForm] = useState<DocumentFormData>(initialForm);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -222,6 +224,10 @@ export function VehicleDocumentsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [search, sortBy, sortDirection, selectedBranchId]);
+
+  useEffect(() => {
+    setSelectedDocumentIds([]);
+  }, [search, sortBy, sortDirection, selectedBranchId, currentPage]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -385,6 +391,54 @@ export function VehicleDocumentsPage() {
     }
   }
 
+  function handleToggleDocument(id: string) {
+    setSelectedDocumentIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  function handleToggleAllDocuments() {
+    const pageIds = paginatedDocuments.map((item) => item.id);
+    const allSelected =
+      pageIds.length > 0 && pageIds.every((id) => selectedDocumentIds.includes(id));
+    setSelectedDocumentIds((prev) =>
+      allSelected ? prev.filter((id) => !pageIds.includes(id)) : [...new Set([...prev, ...pageIds])],
+    );
+  }
+
+  async function confirmBulkDeleteDocuments() {
+    if (selectedDocumentIds.length === 0) return;
+    try {
+      setDeletingDocument(true);
+      const results = await Promise.allSettled(
+        selectedDocumentIds.map((id) => deleteVehicleDocument(id)),
+      );
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+      if (failedCount > 0) {
+        setPageErrorMessage(
+          failedCount === selectedDocumentIds.length
+            ? "Não foi possível excluir os documentos selecionados."
+            : `${failedCount} documento(s) não puderam ser excluídos.`,
+        );
+      } else {
+        setPageErrorMessage("");
+      }
+      setBulkDeleteOpen(false);
+      setSelectedDocumentIds([]);
+      await loadData();
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+    } catch (error) {
+      console.error("Erro ao excluir documentos em lote:", error);
+      setPageErrorMessage("Não foi possível concluir a exclusão em lote dos documentos.");
+    } finally {
+      setDeletingDocument(false);
+    }
+  }
+
+  const allDocumentsOnPageSelected =
+    paginatedDocuments.length > 0 &&
+    paginatedDocuments.every((item) => selectedDocumentIds.includes(item.id));
+
   return (
     <div className="min-w-0 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -414,10 +468,34 @@ export function VehicleDocumentsPage() {
       {pageErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{pageErrorMessage}</div> : null}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm">
+          <span className="text-slate-500">
+            {selectedDocumentIds.length > 0
+              ? `${selectedDocumentIds.length} documento(s) selecionado(s)`
+              : "Selecione registros para excluir em lote"}
+          </span>
+          <button
+            type="button"
+            onClick={() => setBulkDeleteOpen(true)}
+            disabled={selectedDocumentIds.length === 0}
+            className="btn-ui btn-ui-danger disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Excluir selecionados
+          </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={allDocumentsOnPageSelected}
+                    onChange={handleToggleAllDocuments}
+                    aria-label="Selecionar documentos da página"
+                    className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("type")} className="cursor-pointer">Tipo {getSortArrow("type")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("name")} className="cursor-pointer">Documento {getSortArrow("name")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("vehicle")} className="cursor-pointer">Veículo {getSortArrow("vehicle")}</button></th>
@@ -427,11 +505,20 @@ export function VehicleDocumentsPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Carregando documentos...</td></tr> : filteredDocuments.length === 0 ? <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum documento encontrado.</td></tr> : paginatedDocuments.map((item) => {
+              {loading ? <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Carregando documentos...</td></tr> : filteredDocuments.length === 0 ? <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum documento encontrado.</td></tr> : paginatedDocuments.map((item) => {
                 const effectiveStatus = getEffectiveStatus(item);
                 const isHighlighted = highlightedDocumentId === item.id;
                 return (
                   <tr id={`vehicle-document-row-${item.id}`} key={item.id} className={`border-t border-slate-200 ${isHighlighted ? "notification-highlight" : ""}`}>
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={selectedDocumentIds.includes(item.id)}
+                        onChange={() => handleToggleDocument(item.id)}
+                        aria-label={`Selecionar documento ${item.name}`}
+                        className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                      />
+                    </td>
                     <td className="px-6 py-4 text-sm text-slate-700">{documentTypeLabel(item.type)}</td>
                     <td className="px-6 py-4 text-sm text-slate-700"><p className="font-medium text-slate-900">{item.name}</p><p className="text-xs text-slate-500">{item.number || "Sem número"}</p>{item.fileUrl ? <a href={resolveFileUrl(item.fileUrl)} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-blue-700 hover:underline">Ver anexo</a> : null}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{item.vehicle ? formatVehicleLabel(item.vehicle) : item.vehicleId}</td>
@@ -544,6 +631,14 @@ export function VehicleDocumentsPage() {
         loading={deletingDocument}
         onCancel={() => setDocumentToDelete(null)}
         onConfirm={confirmDeleteDocument}
+      />
+      <ConfirmDeleteModal
+        isOpen={bulkDeleteOpen}
+        title="Excluir documentos selecionados"
+        description={`Deseja excluir ${selectedDocumentIds.length} documento(s) selecionado(s)?`}
+        loading={deletingDocument}
+        onCancel={() => setBulkDeleteOpen(false)}
+        onConfirm={confirmBulkDeleteDocuments}
       />
     </div>
   );

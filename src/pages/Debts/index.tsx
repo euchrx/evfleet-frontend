@@ -151,6 +151,8 @@ export function DebtsPage() {
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
   const [debtToDelete, setDebtToDelete] = useState<Debt | null>(null);
   const [deletingDebt, setDeletingDebt] = useState(false);
+  const [selectedDebtIds, setSelectedDebtIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [form, setForm] = useState<DebtFormData>(initialForm);
   const [highlightedDebtId, setHighlightedDebtId] = useState<string | null>(
     null,
@@ -318,6 +320,10 @@ export function DebtsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [search, statusFilter, categoryFilter, sortBy, sortDirection, selectedBranchId]);
+
+  useEffect(() => {
+    setSelectedDebtIds([]);
+  }, [search, statusFilter, categoryFilter, sortBy, sortDirection, selectedBranchId, currentPage]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -489,6 +495,52 @@ export function DebtsPage() {
     }
   }
 
+  function handleToggleDebt(id: string) {
+    setSelectedDebtIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  function handleToggleAllDebts() {
+    const pageIds = paginatedDebts.map((item) => item.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedDebtIds.includes(id));
+    setSelectedDebtIds((prev) =>
+      allSelected ? prev.filter((id) => !pageIds.includes(id)) : [...new Set([...prev, ...pageIds])],
+    );
+  }
+
+  async function confirmBulkDeleteDebts() {
+    if (selectedDebtIds.length === 0) return;
+    try {
+      setDeletingDebt(true);
+      const results = await Promise.allSettled(selectedDebtIds.map((id) => deleteDebt(id)));
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+      if (failedCount > 0) {
+        setPageErrorMessage(
+          failedCount === selectedDebtIds.length
+            ? "Não foi possível excluir os débitos selecionados."
+            : `${failedCount} débito(s) não puderam ser excluídos.`,
+        );
+      } else {
+        setPageErrorMessage("");
+      }
+      setBulkDeleteOpen(false);
+      setSelectedDebtIds([]);
+      notifyHeaderNotifications();
+      const [debtsData, vehiclesData] = await Promise.all([getDebts(), getVehicles()]);
+      setDebts(Array.isArray(debtsData) ? debtsData : []);
+      setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
+    } catch (error) {
+      console.error("Erro ao excluir débitos em lote:", error);
+      setPageErrorMessage("Não foi possível concluir a exclusão em lote dos débitos.");
+    } finally {
+      setDeletingDebt(false);
+    }
+  }
+
+  const allDebtsOnPageSelected =
+    paginatedDebts.length > 0 && paginatedDebts.every((item) => selectedDebtIds.includes(item.id));
+
   return (
     <div className="min-w-0 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -606,10 +658,34 @@ export function DebtsPage() {
       ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm">
+          <span className="text-slate-500">
+            {selectedDebtIds.length > 0
+              ? `${selectedDebtIds.length} débito(s) selecionado(s)`
+              : "Selecione registros para excluir em lote"}
+          </span>
+          <button
+            type="button"
+            onClick={() => setBulkDeleteOpen(true)}
+            disabled={selectedDebtIds.length === 0}
+            className="btn-ui btn-ui-danger disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Excluir selecionados
+          </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={allDebtsOnPageSelected}
+                    onChange={handleToggleAllDebts}
+                    aria-label="Selecionar débitos da página"
+                    className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   <button
                     type="button"
@@ -682,7 +758,7 @@ export function DebtsPage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
                     Carregando débitos...
@@ -691,7 +767,7 @@ export function DebtsPage() {
               ) : filteredDebts.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="px-6 py-8 text-center text-sm text-slate-500"
                   >
                     Nenhum débito encontrado.
@@ -706,6 +782,15 @@ export function DebtsPage() {
                       key={debt.id}
                       className={`border-t border-slate-200 transition-colors ${highlightedDebtId === debt.id ? "notification-highlight" : ""}`}
                     >
+                      <td className="px-6 py-4 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={selectedDebtIds.includes(debt.id)}
+                          onChange={() => handleToggleDebt(debt.id)}
+                          aria-label={`Selecionar débito ${debt.description}`}
+                          className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                        />
+                      </td>
                       <td className="px-6 py-4 text-sm text-slate-700">
                         {categoryLabel(debt.category)}
                       </td>
@@ -975,6 +1060,14 @@ export function DebtsPage() {
         loading={deletingDebt}
         onCancel={() => setDebtToDelete(null)}
         onConfirm={confirmDeleteDebt}
+      />
+      <ConfirmDeleteModal
+        isOpen={bulkDeleteOpen}
+        title="Excluir débitos selecionados"
+        description={`Deseja excluir ${selectedDebtIds.length} débito(s) selecionado(s)?`}
+        loading={deletingDebt}
+        onCancel={() => setBulkDeleteOpen(false)}
+        onConfirm={confirmBulkDeleteDebts}
       />
     </div>
   );

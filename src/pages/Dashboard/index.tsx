@@ -602,7 +602,10 @@ export function DashboardPage() {
       }>
     ) =>
       entries
-        .filter((entry) => entry.samples > 0)
+        .filter(
+          (entry) =>
+            entry.samples > 0 && (kmsDrivenByDriver.get(entry.driverId) ?? 0) > 0
+        )
         .map((entry) => ({
           driver: entry.label,
           averageKmPerLiter: entry.totalEfficiency / entry.samples,

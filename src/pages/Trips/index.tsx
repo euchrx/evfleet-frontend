@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { createTrip, deleteTrip, getTrips, updateTrip } from "../../services/trips";
 import { getVehicles } from "../../services/vehicles";
 import { getDrivers } from "../../services/drivers";
@@ -68,7 +68,7 @@ function toDateText(value?: string | null) {
 
 function statusLabel(status: TripStatus) {
   if (status === "OPEN") return "Aberta";
-  if (status === "COMPLETED") return "Concluída";
+  if (status === "COMPLETED") return "ConcluÃ­da";
   return "Cancelada";
 }
 
@@ -95,6 +95,8 @@ export function TripsPage() {
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
   const [deletingTrip, setDeletingTrip] = useState(false);
+  const [selectedTripIds, setSelectedTripIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [form, setForm] = useState<TripFormData>(initialForm);
 
   async function loadData() {
@@ -111,7 +113,7 @@ export function TripsPage() {
       setDrivers(Array.isArray(driversData) ? driversData : []);
     } catch (error) {
       console.error("Erro ao carregar viagens:", error);
-      setPageErrorMessage("Não foi possível carregar as viagens.");
+      setPageErrorMessage("NÃ£o foi possÃ­vel carregar as viagens.");
     } finally {
       setLoading(false);
     }
@@ -213,6 +215,10 @@ export function TripsPage() {
   }, [search, sortBy, sortDirection, selectedBranchId]);
 
   useEffect(() => {
+    setSelectedTripIds([]);
+  }, [search, sortBy, sortDirection, selectedBranchId, currentPage]);
+
+  useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
@@ -229,8 +235,8 @@ export function TripsPage() {
   }, [trips, selectedBranchId]);
 
   function getSortArrow(column: TripSortBy) {
-    if (sortBy !== column) return "↕";
-    return sortDirection === "asc" ? "↑" : "↓";
+    if (sortBy !== column) return "â†•";
+    return sortDirection === "asc" ? "â†‘" : "â†“";
   }
 
   function handleSort(column: TripSortBy) {
@@ -327,20 +333,20 @@ export function TripsPage() {
       };
 
       const nextErrors: TripFieldErrors = {};
-      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione o veículo.";
+      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione o veÃ­culo.";
       if (!payload.origin) nextErrors.origin = "Informe a origem.";
       if (!payload.destination) nextErrors.destination = "Informe o destino.";
-      if (!payload.departureAt) nextErrors.departureAt = "Informe a data de saída.";
+      if (!payload.departureAt) nextErrors.departureAt = "Informe a data de saÃ­da.";
       if (Object.keys(nextErrors).length > 0) {
         setFieldErrors(nextErrors);
         return;
       }
       if (Number.isNaN(payload.departureKm) || payload.departureKm < 0) {
-        setFieldErrors((prev) => ({ ...prev, departureKm: "KM de saída inválido." }));
+        setFieldErrors((prev) => ({ ...prev, departureKm: "KM de saÃ­da invÃ¡lido." }));
         return;
       }
       if (payload.returnKm !== undefined && (Number.isNaN(payload.returnKm) || payload.returnKm < payload.departureKm)) {
-        setFieldErrors((prev) => ({ ...prev, returnKm: "KM de retorno deve ser maior ou igual ao KM de saída." }));
+        setFieldErrors((prev) => ({ ...prev, returnKm: "KM de retorno deve ser maior ou igual ao KM de saÃ­da." }));
         return;
       }
 
@@ -351,7 +357,7 @@ export function TripsPage() {
       await loadData();
     } catch (error: any) {
       const apiMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "";
-      const apiText = Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage || "Não foi possível salvar a viagem.");
+      const apiText = Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage || "NÃ£o foi possÃ­vel salvar a viagem.");
       setFieldErrors((prev) => ({ ...prev, origin: apiText }));
     } finally {
       setSaving(false);
@@ -371,18 +377,61 @@ export function TripsPage() {
       await loadData();
     } catch (error) {
       console.error("Erro ao excluir viagem:", error);
-      setPageErrorMessage("Não foi possível excluir a viagem.");
+      setPageErrorMessage("NÃ£o foi possÃ­vel excluir a viagem.");
     } finally {
       setDeletingTrip(false);
     }
   }
 
+  function handleToggleTrip(id: string) {
+    setSelectedTripIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  function handleToggleAllTrips() {
+    const pageIds = paginatedTrips.map((item) => item.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedTripIds.includes(id));
+    setSelectedTripIds((prev) =>
+      allSelected ? prev.filter((id) => !pageIds.includes(id)) : [...new Set([...prev, ...pageIds])],
+    );
+  }
+
+  async function confirmBulkDeleteTrips() {
+    if (selectedTripIds.length === 0) return;
+    try {
+      setDeletingTrip(true);
+      const results = await Promise.allSettled(selectedTripIds.map((id) => deleteTrip(id)));
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+      if (failedCount > 0) {
+        setPageErrorMessage(
+          failedCount === selectedTripIds.length
+            ? "NÃ£o foi possÃ­vel excluir as viagens selecionadas."
+            : `${failedCount} viagem(ns) nÃ£o puderam ser excluÃ­das.`,
+        );
+      } else {
+        setPageErrorMessage("");
+      }
+      setBulkDeleteOpen(false);
+      setSelectedTripIds([]);
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao excluir viagens em lote:", error);
+      setPageErrorMessage("NÃ£o foi possÃ­vel concluir a exclusÃ£o em lote das viagens.");
+    } finally {
+      setDeletingTrip(false);
+    }
+  }
+
+  const allTripsOnPageSelected =
+    paginatedTrips.length > 0 && paginatedTrips.every((item) => selectedTripIds.includes(item.id));
+
   return (
     <div className="min-w-0 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Gestão de Viagens</h1>
-          <p className="text-sm text-slate-500">Controle completo de uso da frota por veículo e motorista.</p>
+          <h1 className="text-3xl font-bold text-slate-900">GestÃ£o de Viagens</h1>
+          <p className="text-sm text-slate-500">Controle completo de uso da frota por veÃ­culo e motorista.</p>
         </div>
         <button
           onClick={openCreateModal}
@@ -401,32 +450,49 @@ export function TripsPage() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por veículo, motorista, origem, destino ou status" className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por veÃ­culo, motorista, origem, destino ou status" className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
       </div>
 
       {pageErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{pageErrorMessage}</div> : null}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm">
+          <span className="text-slate-500">
+            {selectedTripIds.length > 0
+              ? `${selectedTripIds.length} viagem(ns) selecionada(s)`
+              : "Selecione registros para excluir em lote"}
+          </span>
+          <button
+            type="button"
+            onClick={() => setBulkDeleteOpen(true)}
+            disabled={selectedTripIds.length === 0}
+            className="btn-ui btn-ui-danger disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Excluir selecionados
+          </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("vehicle")} className="cursor-pointer">Veículo {getSortArrow("vehicle")}</button></th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><input type="checkbox" checked={allTripsOnPageSelected} onChange={handleToggleAllTrips} aria-label="Selecionar viagens da p?gina" className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500" /></th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("vehicle")} className="cursor-pointer">VeÃ­culo {getSortArrow("vehicle")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("driver")} className="cursor-pointer">Motorista {getSortArrow("driver")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("origin")} className="cursor-pointer">Rota {getSortArrow("origin")}</button></th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("departureAt")} className="cursor-pointer">Data de saída {getSortArrow("departureAt")}</button></th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("departureAt")} className="cursor-pointer">Data de saÃ­da {getSortArrow("departureAt")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("returnAt")} className="cursor-pointer">Data de retorno {getSortArrow("returnAt")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("kmDriven")} className="cursor-pointer">KM rodados {getSortArrow("kmDriven")}</button></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("status")} className="cursor-pointer">Status {getSortArrow("status")}</button></th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ações</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">AÃ§Ãµes</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Carregando viagens...</td></tr> : filteredTrips.length === 0 ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma viagem encontrada.</td></tr> : paginatedTrips.map((trip) => (
+              {loading ? <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">Carregando viagens...</td></tr> : filteredTrips.length === 0 ? <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma viagem encontrada.</td></tr> : paginatedTrips.map((trip) => (
                 <tr key={trip.id} className="border-t border-slate-200">
+                  <td className="px-6 py-4 text-sm text-slate-700"><input type="checkbox" checked={selectedTripIds.includes(trip.id)} onChange={() => handleToggleTrip(trip.id)} aria-label={`Selecionar viagem ${trip.origin} para ${trip.destination}`} className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500" /></td>
                   <td className="px-6 py-4 text-sm text-slate-700">{trip.vehicle ? formatVehicleLabel(trip.vehicle) : trip.vehicleId}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{trip.driver?.name || "Sem motorista"}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700"><span className="font-medium">{trip.origin}</span><span className="mx-2 text-slate-400">→</span>{trip.destination}</td>
+                  <td className="px-6 py-4 text-sm text-slate-700"><span className="font-medium">{trip.origin}</span><span className="mx-2 text-slate-400">â†’</span>{trip.destination}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{toDateText(trip.departureAt)}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{toDateText(trip.returnAt)}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{trip.returnKm ? Math.max(trip.returnKm - trip.departureKm, 0).toLocaleString("pt-BR") : "-"} km</td>
@@ -464,9 +530,9 @@ export function TripsPage() {
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Planejamento</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleVehicleChange(e.target.value)} className={inputClass("vehicleId")}><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">VeÃ­culo</label><select value={form.vehicleId} onChange={(e) => handleVehicleChange(e.target.value)} className={inputClass("vehicleId")}><option value="">Selecione um veÃ­culo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Motorista</label><select value={form.driverId} onChange={(e) => handleChange("driverId", e.target.value)} className={inputClass("driverId")}><option value="">Selecione um motorista</option>{availableDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select>{fieldErrors.driverId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.driverId}</p> : null}</div>
-                  <div><label className="block text-sm font-medium text-slate-700">Origem</label><input value={form.origin} onChange={(e) => handleChange("origin", e.target.value)} className={inputClass("origin")} placeholder="Cidade/filial de saída" />{fieldErrors.origin ? <p className="mt-1 text-xs text-red-600">{fieldErrors.origin}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Origem</label><input value={form.origin} onChange={(e) => handleChange("origin", e.target.value)} className={inputClass("origin")} placeholder="Cidade/filial de saÃ­da" />{fieldErrors.origin ? <p className="mt-1 text-xs text-red-600">{fieldErrors.origin}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Destino</label><input value={form.destination} onChange={(e) => handleChange("destination", e.target.value)} className={inputClass("destination")} placeholder="Cidade/filial de destino" />{fieldErrors.destination ? <p className="mt-1 text-xs text-red-600">{fieldErrors.destination}</p> : null}</div>
                   <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Motivo da viagem</label><input value={form.reason} onChange={(e) => handleChange("reason", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Entrega regional" /></div>
                 </div>
@@ -475,17 +541,17 @@ export function TripsPage() {
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Execucao</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="block text-sm font-medium text-slate-700">Data de saída</label><input type="date" value={form.departureAt} onChange={(e) => handleChange("departureAt", e.target.value)} className={inputClass("departureAt")} />{fieldErrors.departureAt ? <p className="mt-1 text-xs text-red-600">{fieldErrors.departureAt}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">Data de saÃ­da</label><input type="date" value={form.departureAt} onChange={(e) => handleChange("departureAt", e.target.value)} className={inputClass("departureAt")} />{fieldErrors.departureAt ? <p className="mt-1 text-xs text-red-600">{fieldErrors.departureAt}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">Data de retorno</label><input type="date" value={form.returnAt} onChange={(e) => handleChange("returnAt", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">KM saída</label><input type="number" min="0" value={form.departureKm} onChange={(e) => handleChange("departureKm", e.target.value)} className={inputClass("departureKm")} />{fieldErrors.departureKm ? <p className="mt-1 text-xs text-red-600">{fieldErrors.departureKm}</p> : null}</div>
+                  <div><label className="block text-sm font-medium text-slate-700">KM saÃ­da</label><input type="number" min="0" value={form.departureKm} onChange={(e) => handleChange("departureKm", e.target.value)} className={inputClass("departureKm")} />{fieldErrors.departureKm ? <p className="mt-1 text-xs text-red-600">{fieldErrors.departureKm}</p> : null}</div>
                   <div><label className="block text-sm font-medium text-slate-700">KM retorno</label><input type="number" min="0" value={form.returnKm} onChange={(e) => handleChange("returnKm", e.target.value)} className={inputClass("returnKm")} />{fieldErrors.returnKm ? <p className="mt-1 text-xs text-red-600">{fieldErrors.returnKm}</p> : null}</div>
-                  <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={form.status} onChange={(e) => handleChange("status", e.target.value as TripStatus)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="OPEN">Aberta</option><option value="COMPLETED">Concluída</option><option value="CANCELLED">Cancelada</option></select></div>
+                  <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={form.status} onChange={(e) => handleChange("status", e.target.value as TripStatus)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="OPEN">Aberta</option><option value="COMPLETED">ConcluÃ­da</option><option value="CANCELLED">Cancelada</option></select></div>
                   <div><label className="block text-sm font-medium text-slate-700">Observacoes</label><input value={form.notes} onChange={(e) => handleChange("notes", e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Opcional" /></div>
                 </div>
               </div>
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button type="button" onClick={closeModal} className="btn-ui btn-ui-neutral">Cancelar</button>
-                <button type="submit" disabled={saving} className="btn-ui btn-ui-primary disabled:cursor-not-allowed disabled:opacity-70">{saving ? "Salvando..." : editingTrip ? "Salvar alterações" : "Registrar viagem"}</button>
+                <button type="submit" disabled={saving} className="btn-ui btn-ui-primary disabled:cursor-not-allowed disabled:opacity-70">{saving ? "Salvando..." : editingTrip ? "Salvar alteraÃ§Ãµes" : "Registrar viagem"}</button>
               </div>
             </form>
           </div>
@@ -502,6 +568,14 @@ export function TripsPage() {
         loading={deletingTrip}
         onCancel={() => setTripToDelete(null)}
         onConfirm={confirmDeleteTrip}
+      />
+      <ConfirmDeleteModal
+        isOpen={bulkDeleteOpen}
+        title="Excluir viagens selecionadas"
+        description={`Deseja excluir ${selectedTripIds.length} viagem(ns) selecionada(s)?`}
+        loading={deletingTrip}
+        onCancel={() => setBulkDeleteOpen(false)}
+        onConfirm={confirmBulkDeleteTrips}
       />
     </div>
   );

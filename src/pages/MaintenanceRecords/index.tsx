@@ -435,6 +435,8 @@ export function MaintenanceRecordsPage() {
   const [readingForm, setReadingForm] = useState<TireReadingFormState>(initialReadingForm);
   const [tireReadings, setTireReadings] = useState<TireReading[]>([]);
   const [recordToDelete, setRecordToDelete] = useState<MaintenanceRecord | null>(null);
+  const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
+  const [bulkDeleteRecordsOpen, setBulkDeleteRecordsOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<MaintenancePlan | null>(null);
   const [tireToDelete, setTireToDelete] = useState<Tire | null>(null);
   const [deleteAllTiresConfirmOpen, setDeleteAllTiresConfirmOpen] = useState(false);
@@ -839,6 +841,9 @@ export function MaintenanceRecordsPage() {
   useEffect(() => {
     setRecordPage(1);
   }, [search, selectedBranchId, recordTypeFilter, recordStatusFilter, recordSortBy, recordSortDirection]);
+  useEffect(() => {
+    setSelectedRecordIds([]);
+  }, [search, selectedBranchId, recordTypeFilter, recordStatusFilter, recordSortBy, recordSortDirection, recordPage, tab]);
   useEffect(() => {
     setPlanPage(1);
   }, [search, selectedBranchId, planSortBy, planSortDirection]);
@@ -1433,6 +1438,52 @@ export function MaintenanceRecordsPage() {
       window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
   }
 
+  function handleToggleRecord(id: string) {
+    setSelectedRecordIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  function handleToggleAllRecords() {
+    const pageIds = paginatedRecords.map((item) => item.id);
+    const allSelected =
+      pageIds.length > 0 && pageIds.every((id) => selectedRecordIds.includes(id));
+    setSelectedRecordIds((prev) =>
+      allSelected ? prev.filter((id) => !pageIds.includes(id)) : [...new Set([...prev, ...pageIds])],
+    );
+  }
+
+  async function confirmBulkDeleteRecords() {
+    if (selectedRecordIds.length === 0) return;
+    try {
+      const results = await Promise.allSettled(
+        selectedRecordIds.map((id) => deleteMaintenanceRecord(id)),
+      );
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+      if (failedCount > 0) {
+        setErrorMessage(
+          failedCount === selectedRecordIds.length
+            ? "Não foi possível excluir as manutenções selecionadas."
+            : `${failedCount} manutenção(ões) não puderam ser excluídas.`,
+        );
+      } else {
+        setErrorMessage("");
+      }
+      setBulkDeleteRecordsOpen(false);
+      setSelectedRecordIds([]);
+      await loadData();
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
+    } catch (error) {
+      console.error("Erro ao excluir manutenções em lote:", error);
+      setErrorMessage("Não foi possível concluir a exclusão em lote das manutenções.");
+    }
+  }
+
+  const allRecordsOnPageSelected =
+    paginatedRecords.length > 0 &&
+    paginatedRecords.every((item) => selectedRecordIds.includes(item.id));
+
   async function confirmRemovePlan() {
     if (!planToDelete) return;
     await deleteMaintenancePlan(planToDelete.id);
@@ -1661,10 +1712,26 @@ export function MaintenanceRecordsPage() {
 
       {!loading && tab === "records" ? (
         <section className="-mt-6 overflow-hidden rounded-b-2xl rounded-t-none border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm">
+            <span className="text-slate-500">
+              {selectedRecordIds.length > 0
+                ? `${selectedRecordIds.length} manutenção(ões) selecionada(s)`
+                : "Selecione registros para excluir em lote"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setBulkDeleteRecordsOpen(true)}
+              disabled={selectedRecordIds.length === 0}
+              className="btn-ui btn-ui-danger disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Excluir selecionados
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-slate-50">
                 <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><input type="checkbox" checked={allRecordsOnPageSelected} onChange={handleToggleAllRecords} aria-label="Selecionar manutenções da página" className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500" /></th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleRecordSort("date")} className="cursor-pointer">Data {sortArrow("date", recordSortBy, recordSortDirection)}</button></th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleRecordSort("vehicle")} className="cursor-pointer">Veículo {sortArrow("vehicle", recordSortBy, recordSortDirection)}</button></th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleRecordSort("type")} className="cursor-pointer">Tipo {sortArrow("type", recordSortBy, recordSortDirection)}</button></th>
@@ -1676,11 +1743,12 @@ export function MaintenanceRecordsPage() {
                 </tr>
               </thead>
               <tbody>
-                {scopedRecords.length === 0 ? <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma manutenção encontrada.</td></tr> : paginatedRecords.map((record) => {
+                {scopedRecords.length === 0 ? <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma manutenção encontrada.</td></tr> : paginatedRecords.map((record) => {
                   const vehicle = record.vehicle || vehicleMap.get(record.vehicleId);
                   const isHighlighted = highlightId === record.id;
                   return (
                     <tr id={`maintenance-row-${record.id}`} key={record.id} className={`border-t border-slate-200 ${isHighlighted ? "notification-highlight" : ""}`}>
+                      <td className="px-6 py-4 text-sm text-slate-700"><input type="checkbox" checked={selectedRecordIds.includes(record.id)} onChange={() => handleToggleRecord(record.id)} aria-label={`Selecionar manutenção ${record.description}`} className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500" /></td>
                       <td className="px-6 py-4 text-sm text-slate-700">{toDateBR(record.maintenanceDate)}</td>
                       <td className="px-6 py-4 text-sm text-slate-900"><p className="font-medium">{vehicle ? formatVehicleLabel(vehicle) : "-"}</p></td>
                       <td className="px-6 py-4 text-sm text-slate-700">{maintenanceTypeLabel(record.type)}</td>
@@ -2545,6 +2613,13 @@ export function MaintenanceRecordsPage() {
         description="Deseja excluir esta manutenção?"
         onCancel={() => setRecordToDelete(null)}
         onConfirm={confirmRemoveRecord}
+      />
+      <ConfirmDeleteModal
+        isOpen={bulkDeleteRecordsOpen}
+        title="Excluir manutenções selecionadas"
+        description={`Deseja excluir ${selectedRecordIds.length} manutenção(ões) selecionada(s)?`}
+        onCancel={() => setBulkDeleteRecordsOpen(false)}
+        onConfirm={confirmBulkDeleteRecords}
       />
 
       <ConfirmDeleteModal
