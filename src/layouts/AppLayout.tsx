@@ -932,10 +932,10 @@ export function AppLayout() {
             <button
               type="button"
               onClick={() => setIsNotificationsModalOpen(true)}
-              className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3 text-left shadow-sm transition hover:border-orange-200 lg:col-start-1 lg:max-w-[320px] lg:justify-self-start"
+              className="w-full min-w-0 cursor-pointer rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3 text-left shadow-sm transition hover:border-orange-200 lg:col-start-1 lg:max-w-[320px] lg:justify-self-start"
             >
-              <div className="flex items-center gap-3">
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
                   <Bell size={18} />
                   {notifications.length > 0 ? (
                     <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
@@ -943,11 +943,11 @@ export function AppLayout() {
                     </span>
                   ) : null}
                 </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Notificações
                   </p>
-                  <p className="mt-1 text-sm font-medium text-slate-700">
+                  <p className="mt-1 truncate text-sm font-medium text-slate-700">
                     {notifications.length > 0
                       ? `${notifications.length} notificação(ões) pendente(s)`
                       : "Sem eventos no momento"}
@@ -959,7 +959,7 @@ export function AppLayout() {
             {canSelectCompanyScope ? (
               <div
                 ref={companyScopeRef}
-                className="relative w-full lg:col-start-2 lg:w-[320px] lg:justify-self-center"
+                className="relative w-full min-w-0 lg:col-start-2 lg:w-[320px] lg:justify-self-center"
               >
                 <button
                   type="button"
@@ -967,16 +967,16 @@ export function AppLayout() {
                     !isLoadingScopeOptions &&
                     setIsCompanyScopeOpen((prev) => !prev)
                   }
-                  className="inline-flex w-full items-center gap-3 rounded-2xl border border-orange-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-orange-300 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex w-full min-w-0 items-center gap-3 rounded-2xl border border-orange-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-orange-300 disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isLoadingScopeOptions}
                 >
-                  <BriefcaseBusiness size={14} className="text-orange-600" />
-                  <Crown size={12} className="text-orange-500" />
+                  <BriefcaseBusiness size={14} className="shrink-0 text-orange-600" />
+                  <Crown size={12} className="shrink-0 text-orange-500" />
                   <span className="min-w-0 leading-tight">
                     <strong className="block truncate text-sm font-semibold text-slate-900">
                       {companyScopeTitle}
                     </strong>
-                    <small className="block text-[13px] text-slate-600">
+                    <small className="block truncate text-[13px] text-slate-600">
                       {companyScopeSubtitle}
                     </small>
                   </span>

@@ -15,6 +15,9 @@ export const MENU_VISIBILITY_ITEMS: MenuVisibilityItem[] = [
   { label: "Abastecimentos", path: "/fuel-records" },
   { label: "Produtos", path: "/products" },
   { label: "Manutenções", path: "/maintenance-records" },
+  { label: "Manutenções - Registros", path: "/maintenance-records::records" },
+  { label: "Manutenções - Planos", path: "/maintenance-records::plans" },
+  { label: "Manutenções - Pneus", path: "/maintenance-records::tires" },
   { label: "Débitos e Multas", path: "/debts" },
   { label: "Gestão de Viagens", path: "/trips" },
   { label: "Gestão de Documentos", path: "/vehicle-documents" },
@@ -28,10 +31,13 @@ export const MENU_VISIBILITY_ITEMS: MenuVisibilityItem[] = [
 const CACHE_KEY = "evfleet_menu_visibility_cache_v2";
 
 export function getDefaultMenuVisibilityMap() {
-  return MENU_VISIBILITY_ITEMS.reduce<MenuVisibilityMap>((acc, item) => {
+  const defaults = MENU_VISIBILITY_ITEMS.reduce<MenuVisibilityMap>((acc, item) => {
     acc[item.path] = true;
     return acc;
   }, {});
+
+  defaults["/maintenance-records::plans"] = false;
+  return defaults;
 }
 
 function normalizeMenuVisibilityMap(raw: unknown): MenuVisibilityMap {

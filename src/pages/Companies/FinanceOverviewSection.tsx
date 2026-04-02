@@ -1,16 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { BanknoteArrowDown, Building2, RefreshCw } from "lucide-react";
 import { TablePagination } from "../../components/TablePagination";
 import { getFinanceOverview, type FinanceCompanyItem } from "../../services/finance";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 
 type SubscriptionStatusFilter = "ALL" | "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "NONE";
+type FinanceSortBy =
+  | "companyName"
+  | "subscriptionStatus"
+  | "planName"
+  | "amountCents"
+  | "currentPeriodStart"
+  | "currentPeriodEnd"
+  | "nextBillingAt"
+  | "paymentsCount"
+  | "lastPaymentDate";
 
 const PAGE_SIZE = 10;
 
 function subscriptionStatusLabel(status?: string) {
   if (status === "ACTIVE") return "Ativa";
-  if (status === "TRIALING") return "Período de teste";
+  if (status === "TRIALING") return "PerÃ­odo de teste";
   if (status === "PAST_DUE") return "Inadimplente";
   if (status === "CANCELED") return "Cancelada";
   return "Sem assinatura";
@@ -40,6 +50,12 @@ function cycleLabel(cycle?: string) {
   return "-";
 }
 
+function toSortableTime(value?: string | null) {
+  if (!value) return 0;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
 export function FinanceOverviewSection() {
   const [items, setItems] = useState<FinanceCompanyItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +63,8 @@ export function FinanceOverviewSection() {
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<SubscriptionStatusFilter>("ALL");
+  const [sortBy, setSortBy] = useState<FinanceSortBy>("companyName");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
 
   async function loadFinanceOverview(isManualRefresh = false) {
@@ -58,8 +76,8 @@ export function FinanceOverviewSection() {
       const data = await getFinanceOverview();
       setItems(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Erro ao carregar finanças:", error);
-      setErrorMessage("Não foi possível carregar as informações financeiras das empresas.");
+      console.error("Erro ao carregar finanÃ§as:", error);
+      setErrorMessage("NÃ£o foi possÃ­vel carregar as informaÃ§Ãµes financeiras das empresas.");
       setItems([]);
     } finally {
       if (isManualRefresh) setRefreshing(false);
@@ -97,8 +115,57 @@ export function FinanceOverviewSection() {
       );
     }
 
-    return base.sort((a, b) => a.companyName.localeCompare(b.companyName, "pt-BR"));
-  }, [items, search, statusFilter]);
+    const direction = sortDirection === "asc" ? 1 : -1;
+
+    return base.sort((a, b) => {
+      if (sortBy === "subscriptionStatus") {
+        return (
+          subscriptionStatusLabel(a.subscriptionStatus).localeCompare(
+            subscriptionStatusLabel(b.subscriptionStatus),
+            "pt-BR",
+          ) * direction
+        );
+      }
+
+      if (sortBy === "planName") {
+        return (
+          String(a.planName || "").localeCompare(String(b.planName || ""), "pt-BR", {
+            sensitivity: "base",
+          }) * direction
+        );
+      }
+
+      if (sortBy === "amountCents") {
+        return (Number(a.amountCents || 0) - Number(b.amountCents || 0)) * direction;
+      }
+
+      if (sortBy === "currentPeriodStart") {
+        return (toSortableTime(a.currentPeriodStart) - toSortableTime(b.currentPeriodStart)) * direction;
+      }
+
+      if (sortBy === "currentPeriodEnd") {
+        return (toSortableTime(a.currentPeriodEnd) - toSortableTime(b.currentPeriodEnd)) * direction;
+      }
+
+      if (sortBy === "nextBillingAt") {
+        return (toSortableTime(a.nextBillingAt) - toSortableTime(b.nextBillingAt)) * direction;
+      }
+
+      if (sortBy === "paymentsCount") {
+        return (Number(a.paymentsCount || 0) - Number(b.paymentsCount || 0)) * direction;
+      }
+
+      if (sortBy === "lastPaymentDate") {
+        return (toSortableTime(a.lastPaymentDate) - toSortableTime(b.lastPaymentDate)) * direction;
+      }
+
+      return (
+        a.companyName.localeCompare(b.companyName, "pt-BR", {
+          sensitivity: "base",
+        }) * direction
+      );
+    });
+  }, [items, search, sortBy, sortDirection, statusFilter]);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE)),
@@ -112,7 +179,22 @@ export function FinanceOverviewSection() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter]);
+  }, [search, sortBy, sortDirection, statusFilter]);
+
+  function handleSort(column: FinanceSortBy) {
+    if (sortBy === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortBy(column);
+    setSortDirection("asc");
+  }
+
+  function getSortArrow(column: FinanceSortBy) {
+    if (sortBy !== column) return "â†•";
+    return sortDirection === "asc" ? "â†‘" : "â†“";
+  }
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -138,7 +220,7 @@ export function FinanceOverviewSection() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Empresas</h1>
           <p className="text-sm text-slate-500">
-            Visão administrativa das empresas, assinaturas, status de cobrança e datas.
+            VisÃ£o administrativa das empresas, assinaturas, status de cobranÃ§a e datas.
           </p>
         </div>
         <button
@@ -196,7 +278,7 @@ export function FinanceOverviewSection() {
           >
             <option value="ALL">Todos os status</option>
             <option value="ACTIVE">Ativa</option>
-            <option value="TRIALING">Período de teste</option>
+            <option value="TRIALING">PerÃ­odo de teste</option>
             <option value="PAST_DUE">Inadimplente</option>
             <option value="CANCELED">Cancelada</option>
             <option value="NONE">Sem assinatura</option>
@@ -209,15 +291,51 @@ export function FinanceOverviewSection() {
           <table className="min-w-[1200px] w-full text-sm">
             <thead className="bg-slate-50 text-slate-700">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold">Empresa</th>
-                <th className="px-4 py-3 text-left font-semibold">Assinatura</th>
-                <th className="px-4 py-3 text-left font-semibold">Plano</th>
-                <th className="px-4 py-3 text-left font-semibold">Valor</th>
-                <th className="px-4 py-3 text-left font-semibold">Início</th>
-                <th className="px-4 py-3 text-left font-semibold">Fim do período</th>
-                <th className="px-4 py-3 text-left font-semibold">Próxima cobrança</th>
-                <th className="px-4 py-3 text-left font-semibold">Pagamentos</th>
-                <th className="px-4 py-3 text-left font-semibold">Último pagamento</th>
+                <th className="px-4 py-3 text-left font-semibold">
+                  <button type="button" onClick={() => handleSort("companyName")} className="cursor-pointer">
+                    Empresa {getSortArrow("companyName")}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold">
+                  <button type="button" onClick={() => handleSort("subscriptionStatus")} className="cursor-pointer">
+                    Assinatura {getSortArrow("subscriptionStatus")}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold">
+                  <button type="button" onClick={() => handleSort("planName")} className="cursor-pointer">
+                    Plano {getSortArrow("planName")}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold">
+                  <button type="button" onClick={() => handleSort("amountCents")} className="cursor-pointer">
+                    Valor {getSortArrow("amountCents")}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold">
+                  <button type="button" onClick={() => handleSort("currentPeriodStart")} className="cursor-pointer">
+                    Início {getSortArrow("currentPeriodStart")}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold">
+                  <button type="button" onClick={() => handleSort("currentPeriodEnd")} className="cursor-pointer">
+                    Fim do período {getSortArrow("currentPeriodEnd")}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold">
+                  <button type="button" onClick={() => handleSort("nextBillingAt")} className="cursor-pointer">
+                    Próxima cobrança {getSortArrow("nextBillingAt")}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold">
+                  <button type="button" onClick={() => handleSort("paymentsCount")} className="cursor-pointer">
+                    Pagamentos {getSortArrow("paymentsCount")}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold">
+                  <button type="button" onClick={() => handleSort("lastPaymentDate")} className="cursor-pointer">
+                    Último pagamento {getSortArrow("lastPaymentDate")}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -242,7 +360,7 @@ export function FinanceOverviewSection() {
                         <div>
                           <p className="font-semibold text-slate-900">{item.companyName}</p>
                           <p className="text-xs text-slate-500">
-                            {item.companyDocument || "Documento não informado"}
+                            {item.companyDocument || "Documento nÃ£o informado"}
                           </p>
                         </div>
                       </div>
@@ -268,7 +386,7 @@ export function FinanceOverviewSection() {
                     <td className="px-4 py-3">
                       <p className="font-semibold text-slate-900">{item.paymentsCount}</p>
                       <p className="text-xs text-slate-500">
-                        Pagos: {item.paidPaymentsCount} • Pendentes: {item.pendingPaymentsCount} • Expirados:{" "}
+                        Pagos: {item.paidPaymentsCount} â€¢ Pendentes: {item.pendingPaymentsCount} â€¢ Expirados:{" "}
                         {item.expiredPaymentsCount}
                       </p>
                     </td>
@@ -282,7 +400,7 @@ export function FinanceOverviewSection() {
                               : "-"}
                           </p>
                           <p className="text-xs text-slate-500">
-                            {paymentStatusLabel(item.lastPaymentStatus)} • {formatDate(item.lastPaymentDate)}
+                            {paymentStatusLabel(item.lastPaymentStatus)} â€¢ {formatDate(item.lastPaymentDate)}
                           </p>
                         </div>
                       </div>
@@ -306,3 +424,4 @@ export function FinanceOverviewSection() {
     </section>
   );
 }
+

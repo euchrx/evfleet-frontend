@@ -3,6 +3,11 @@ import { useLocation } from "react-router-dom";
 import { LayoutGrid, Table2 } from "lucide-react";
 import { useBranch } from "../../contexts/BranchContext";
 import { useCompanyScope } from "../../contexts/CompanyScopeContext";
+import {
+  fetchMenuVisibilityMap,
+  getCachedMenuVisibilityMap,
+  type MenuVisibilityMap,
+} from "../../services/menuVisibility";
 import { getVehicles } from "../../services/vehicles";
 import {
   createMaintenanceRecord,
@@ -381,6 +386,9 @@ export function MaintenanceRecordsPage() {
   const { selectedCompanyId } = useCompanyScope();
 
   const [tab, setTab] = useState<Tab>("records");
+  const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(() =>
+    getCachedMenuVisibilityMap(),
+  );
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
@@ -473,11 +481,26 @@ export function MaintenanceRecordsPage() {
   }, [selectedCompanyId]);
 
   useEffect(() => {
+    fetchMenuVisibilityMap().then(setMenuVisibility);
+
+    function handleMenuVisibilityUpdated() {
+      fetchMenuVisibilityMap().then(setMenuVisibility);
+    }
+
+    window.addEventListener("evfleet-menu-visibility-updated", handleMenuVisibilityUpdated);
+    return () => {
+      window.removeEventListener("evfleet-menu-visibility-updated", handleMenuVisibilityUpdated);
+    };
+  }, []);
+
+  useEffect(() => {
     const query = new URLSearchParams(location.search);
     const incomingTab = query.get("tab");
     const incomingHighlight = query.get("highlight");
     if (incomingTab === "records" || incomingTab === "plans" || incomingTab === "tires") {
-      setTab(incomingTab);
+      if (menuVisibility[`/maintenance-records::${incomingTab}`] !== false) {
+        setTab(incomingTab);
+      }
     }
     if (incomingHighlight) {
       setHighlightId(incomingHighlight);
@@ -493,7 +516,7 @@ export function MaintenanceRecordsPage() {
       window.history.replaceState({}, "", nextUrl);
       return () => window.clearTimeout(timer);
     }
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, menuVisibility]);
 
   useEffect(() => {
     if (!highlightId) return;
@@ -514,6 +537,29 @@ export function MaintenanceRecordsPage() {
       document.body.style.overflow = prev;
     };
   }, [recordModalOpen, planModalOpen, tireModalOpen, readingModalOpen]);
+
+  const visibleTabs = useMemo(
+    () => ({
+      records: menuVisibility["/maintenance-records::records"] !== false,
+      plans: menuVisibility["/maintenance-records::plans"] !== false,
+      tires: menuVisibility["/maintenance-records::tires"] !== false,
+    }),
+    [menuVisibility],
+  );
+
+  const availableTabs = useMemo(
+    () =>
+      (["records", "plans", "tires"] as Tab[]).filter(
+        (item) => visibleTabs[item],
+      ),
+    [visibleTabs],
+  );
+
+  useEffect(() => {
+    if (!visibleTabs[tab]) {
+      setTab(availableTabs[0] || "records");
+    }
+  }, [availableTabs, tab, visibleTabs]);
 
   const scopedVehicles = useMemo(
     () => (selectedBranchId ? vehicles.filter((vehicle) => vehicle.branchId === selectedBranchId) : vehicles),
@@ -1633,9 +1679,15 @@ export function MaintenanceRecordsPage() {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1.5">
-          <button type="button" onClick={() => setTab("records")} className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "records" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>Manutenções</button>
-          <button type="button" onClick={() => setTab("plans")} className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "plans" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>Planos de manutenção</button>
-          <button type="button" onClick={() => setTab("tires")} className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "tires" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>Gestão de pneus</button>
+          {visibleTabs.records ? (
+            <button type="button" onClick={() => setTab("records")} className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "records" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>Manutenções</button>
+          ) : null}
+          {visibleTabs.plans ? (
+            <button type="button" onClick={() => setTab("plans")} className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "plans" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>Planos de manutenção</button>
+          ) : null}
+          {visibleTabs.tires ? (
+            <button type="button" onClick={() => setTab("tires")} className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "tires" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>Gestão de pneus</button>
+          ) : null}
         </div>
       </section>
 
