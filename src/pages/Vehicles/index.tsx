@@ -24,7 +24,7 @@ type VehicleFormData = {
   brand: string;
   year: string;
   vehicleType: "LIGHT" | "HEAVY" | "";
-  category: "CAR" | "TRUCK" | "UTILITY" | "";
+  category: "CAR" | "TRUCK" | "UTILITY" | "IMPLEMENT" | "";
   chassis: string;
   renavam: string;
   acquisitionDate: string;
@@ -33,6 +33,7 @@ type VehicleFormData = {
     | "GASOLINE"
     | "ETHANOL"
     | "DIESEL"
+    | "ARLA32"
     | "FLEX"
     | "ELECTRIC"
     | "HYBRID"
@@ -56,6 +57,7 @@ const FUEL_OPTIONS: Array<{ value: FuelType; label: string }> = [
   { value: "GASOLINE", label: "Gasolina" },
   { value: "ETHANOL", label: "Etanol" },
   { value: "DIESEL", label: "Diesel" },
+  { value: "ARLA32", label: "ARLA 32" },
   { value: "FLEX", label: "Flex" },
   { value: "ELECTRIC", label: "Elétrico" },
   { value: "HYBRID", label: "Híbrido" },
@@ -63,8 +65,9 @@ const FUEL_OPTIONS: Array<{ value: FuelType; label: string }> = [
 ];
 const FUEL_BY_CATEGORY: Record<Exclude<VehicleCategory, "">, FuelType[]> = {
   CAR: ["GASOLINE", "ETHANOL", "FLEX", "ELECTRIC", "HYBRID", "CNG"],
-  TRUCK: ["DIESEL", "CNG"],
-  UTILITY: ["GASOLINE", "ETHANOL", "DIESEL", "FLEX", "CNG"],
+  TRUCK: ["DIESEL", "ARLA32", "CNG"],
+  UTILITY: ["GASOLINE", "ETHANOL", "DIESEL", "ARLA32", "FLEX", "CNG"],
+  IMPLEMENT: ["DIESEL", "ARLA32", "CNG"],
 };
 
 function getAllowedFuelByCategory(category: VehicleCategory) {
@@ -148,9 +151,10 @@ function saveConsumptionRules(rules: Record<string, ConsumptionRule>) {
 const normalizePlate = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
 const normalizeRenavam = (v: string) => v.replace(/\D/g, "").slice(0, 11);
 const normalizeChassis = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 30);
-const getCategoryLabel = (value?: "CAR" | "TRUCK" | "UTILITY") => {
+const getCategoryLabel = (value?: "CAR" | "TRUCK" | "UTILITY" | "IMPLEMENT") => {
   if (value === "TRUCK") return "Caminhão";
   if (value === "UTILITY") return "Utilitário";
+  if (value === "IMPLEMENT") return "Implemento";
   return "Carro";
 };
 const getVehicleTypeLabel = (value?: "LIGHT" | "HEAVY") =>
@@ -184,9 +188,11 @@ const translateHistoryText = (value: string) => {
     CAR: "Carro",
     TRUCK: "Caminhão",
     UTILITY: "Utilitário",
+    IMPLEMENT: "Implemento",
     GASOLINE: "Gasolina",
     ETHANOL: "Etanol",
     DIESEL: "Diesel",
+    ARLA32: "ARLA 32",
     FLEX: "Flex",
     ELECTRIC: "Elétrico",
     HYBRID: "Híbrido",
@@ -416,7 +422,7 @@ export function VehiclesPage() {
         brand: form.brand.trim(),
         year: Number(form.year),
         vehicleType: form.vehicleType as "LIGHT" | "HEAVY",
-        category: form.category as "CAR" | "TRUCK" | "UTILITY",
+        category: form.category as "CAR" | "TRUCK" | "UTILITY" | "IMPLEMENT",
         chassis: normalizeChassis(form.chassis),
         renavam: normalizeRenavam(form.renavam),
         acquisitionDate: form.noAcquisitionDate ? undefined : form.acquisitionDate || undefined,
@@ -424,6 +430,7 @@ export function VehiclesPage() {
           | "GASOLINE"
           | "ETHANOL"
           | "DIESEL"
+          | "ARLA32"
           | "FLEX"
           | "ELECTRIC"
           | "HYBRID"
@@ -1119,7 +1126,7 @@ export function VehiclesPage() {
                     <select
                       value={form.category}
                       onChange={(e) => {
-                        const nextCategory = e.target.value as "CAR" | "TRUCK" | "UTILITY" | "";
+                        const nextCategory = e.target.value as "CAR" | "TRUCK" | "UTILITY" | "IMPLEMENT" | "";
                         setForm((prev) => {
                           const allowed = getAllowedFuelByCategory(nextCategory).map((item) => item.value);
                           const nextFuelType =
@@ -1135,6 +1142,7 @@ export function VehiclesPage() {
                       <option value="CAR">Carro</option>
                       <option value="TRUCK">Caminhão</option>
                       <option value="UTILITY">Utilitário</option>
+                      <option value="IMPLEMENT">Implemento</option>
                     </select>
                     {fieldErrors.category ? <p className="text-xs text-red-600">{fieldErrors.category}</p> : null}
                   </label>

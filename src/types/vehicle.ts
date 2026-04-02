@@ -1,9 +1,10 @@
 export type VehicleType = "LIGHT" | "HEAVY";
-export type VehicleCategory = "CAR" | "TRUCK" | "UTILITY";
+export type VehicleCategory = "CAR" | "TRUCK" | "UTILITY" | "IMPLEMENT";
 export type FuelType =
   | "GASOLINE"
   | "ETHANOL"
   | "DIESEL"
+  | "ARLA32"
   | "FLEX"
   | "ELECTRIC"
   | "HYBRID"

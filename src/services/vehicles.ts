@@ -7,11 +7,19 @@ export type CreateVehicleInput = {
   brand: string;
   year: number;
   vehicleType: "LIGHT" | "HEAVY";
-  category: "CAR" | "TRUCK" | "UTILITY";
+  category: "CAR" | "TRUCK" | "UTILITY" | "IMPLEMENT";
   chassis: string;
   renavam: string;
   acquisitionDate?: string;
-  fuelType: "GASOLINE" | "ETHANOL" | "DIESEL" | "FLEX" | "ELECTRIC" | "HYBRID" | "CNG";
+  fuelType:
+    | "GASOLINE"
+    | "ETHANOL"
+    | "DIESEL"
+    | "ARLA32"
+    | "FLEX"
+    | "ELECTRIC"
+    | "HYBRID"
+    | "CNG";
   tankCapacity: number;
   status: "ACTIVE" | "MAINTENANCE" | "SOLD";
   photoUrls?: string[];

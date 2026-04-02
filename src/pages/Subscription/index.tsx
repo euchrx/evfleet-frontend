@@ -607,7 +607,6 @@ export function SubscriptionPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <h3 className="text-base font-bold text-slate-900">{plan.name}</h3>
-                    <p className="text-sm text-slate-500">{plan.description}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {plan.isCurrent ? <span className="status-pill status-pending">Plano atual</span> : null}

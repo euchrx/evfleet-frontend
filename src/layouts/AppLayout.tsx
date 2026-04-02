@@ -128,6 +128,52 @@ function getDaysUntil(dateValue: string) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
+function isPendingMaintenanceStatus(value?: string | null) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (!normalized) return true;
+  return normalized !== "DONE" && normalized !== "CONCLUIDA" && normalized !== "CONCLUÍDA";
+}
+
+function getSubscriptionStatusMeta(status: SubscriptionStatus | null) {
+  if (status === "ACTIVE") {
+    return {
+      label: "Assinatura ativa",
+      tone: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      dot: "bg-emerald-500",
+    };
+  }
+
+  if (status === "TRIALING") {
+    return {
+      label: "Período de teste",
+      tone: "border-amber-200 bg-amber-50 text-amber-700",
+      dot: "bg-amber-500",
+    };
+  }
+
+  if (status === "PAST_DUE") {
+    return {
+      label: "Pagamento pendente",
+      tone: "border-red-200 bg-red-50 text-red-700",
+      dot: "bg-red-500",
+    };
+  }
+
+  if (status === "CANCELED") {
+    return {
+      label: "Assinatura cancelada",
+      tone: "border-slate-200 bg-slate-100 text-slate-700",
+      dot: "bg-slate-500",
+    };
+  }
+
+  return {
+    label: "Sem assinatura",
+    tone: "border-slate-200 bg-slate-100 text-slate-600",
+    dot: "bg-slate-400",
+  };
+}
+
 export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -315,6 +361,10 @@ export function AppLayout() {
     () => getLatestVersionFromLogs(systemLogs) || normalizeVersionLabel(systemVersion) || "v1.0",
     [systemLogs, systemVersion],
   );
+  const subscriptionMeta = useMemo(
+    () => getSubscriptionStatusMeta(subscriptionStatus),
+    [subscriptionStatus],
+  );
   const initial = user?.name?.charAt(0).toUpperCase() || "U";
 
   function handleCompanyScopeChange(nextCompanyId: string) {
@@ -412,7 +462,7 @@ export function AppLayout() {
 
     const maintenanceNotifications: AppNotification[] = maintenanceRecords
       .filter((record) => {
-        if (String(record.status || "").toUpperCase() !== "OPEN") return false;
+        if (!isPendingMaintenanceStatus(record.status)) return false;
         const daysUntil = getDaysUntil(record.maintenanceDate);
         return daysUntil >= 0 && daysUntil <= 5;
       })
@@ -425,8 +475,29 @@ export function AppLayout() {
           title: `Manutenção programada - ${vehicleLabel}`,
           description:
             daysUntil === 0
-              ? "A manutenção está programada para hoje."
-              : `Faltam ${daysUntil} dia(s) para a manutenção programada.`,
+              ? "Há uma manutenção programada não realizada para hoje."
+              : `Há uma manutenção programada não realizada. Faltam ${daysUntil} dia(s).`,
+          date: record.maintenanceDate,
+          link: `/maintenance-records?tab=records&highlight=${record.id}`,
+        };
+      });
+
+    const overdueMaintenanceNotifications: AppNotification[] = maintenanceRecords
+      .filter((record) => {
+        if (!isPendingMaintenanceStatus(record.status)) return false;
+        return getDaysUntil(record.maintenanceDate) < 0;
+      })
+      .map((record) => {
+        const overdueDays = Math.abs(getDaysUntil(record.maintenanceDate));
+        const vehicleLabel = formatVehicleLabel(record.vehicle);
+
+        return {
+          id: `maintenance-overdue-${record.id}`,
+          title: `Manutenção programada não realizada - ${vehicleLabel}`,
+          description:
+            overdueDays === 1
+              ? "Há uma manutenção programada não realizada há 1 dia."
+              : `Há uma manutenção programada não realizada há ${overdueDays} dia(s).`,
           date: record.maintenanceDate,
           link: `/maintenance-records?tab=records&highlight=${record.id}`,
         };
@@ -582,6 +653,7 @@ export function AppLayout() {
     setNotifications(
       [
         ...expiredCnhNotifications,
+        ...overdueMaintenanceNotifications,
         ...overdueDebtNotifications,
         ...expiredDocumentNotifications,
         ...maintenanceNotifications,
@@ -965,8 +1037,21 @@ export function AppLayout() {
 
             <div
               ref={profileMenuRef}
-              className="relative flex w-full justify-end lg:col-start-3 lg:justify-self-end"
+              className="relative flex w-full items-center justify-end gap-3 lg:col-start-3 lg:justify-self-end"
             >
+              {subscriptionStatus ? (
+                <button
+                  type="button"
+                  onClick={() => navigate("/subscription")}
+                  className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-left shadow-sm transition hover:brightness-95 ${subscriptionMeta.tone}`}
+                >
+                  <span className={`h-2.5 w-2.5 rounded-full ${subscriptionMeta.dot}`} />
+                  <span className="hidden text-xs font-semibold sm:inline">
+                    {subscriptionMeta.label}
+                  </span>
+                  <CreditCard size={14} />
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setIsProfileMenuOpen((prev) => !prev)}

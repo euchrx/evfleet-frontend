@@ -5,6 +5,7 @@ import {
   CircleAlert,
   Fuel,
   Gauge,
+  Package,
   Route,
   Truck,
   Users,
@@ -16,6 +17,8 @@ import type { Branch } from "../../types/branch";
 import type { Debt } from "../../types/debt";
 import type { Driver } from "../../types/driver";
 import type { MaintenanceRecord } from "../../types/maintenance-record";
+import type { RetailProductItem } from "../../services/retailProducts";
+import type { Tire } from "../../types/tire";
 import type { Trip } from "../../types/trip";
 import type { Vehicle } from "../../types/vehicle";
 import { getBranches } from "../../services/branches";
@@ -23,6 +26,8 @@ import { getDebts } from "../../services/debts";
 import { getDrivers } from "../../services/drivers";
 import { getFuelRecords, type FuelRecord } from "../../services/fuelRecords";
 import { getMaintenanceRecords } from "../../services/maintenanceRecords";
+import { getRetailProducts } from "../../services/retailProducts";
+import { getTires } from "../../services/tires";
 import { getTrips } from "../../services/trips";
 import { getVehicles } from "../../services/vehicles";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
@@ -56,7 +61,7 @@ function maintenanceTypePtBr(value?: string) {
 }
 
 type CostPeriod = "CURRENT_MONTH" | "LAST_30_DAYS" | "CURRENT_YEAR" | "ALL";
-type CostModalType = "FUEL" | "MAINTENANCE" | "DEBTS";
+type CostModalType = "FUEL" | "PRODUCTS" | "TIRES" | "MAINTENANCE" | "DEBTS";
 type DriverCategory = "LIGHT" | "HEAVY";
 type VehicleCategoryFilter = "ALL" | "LIGHT" | "HEAVY";
 const MAX_RANKING_ITEMS = 10;
@@ -131,6 +136,8 @@ export function DashboardPage() {
   );
   const [debts, setDebts] = useState<Debt[]>([]);
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
+  const [retailProducts, setRetailProducts] = useState<RetailProductItem[]>([]);
+  const [tires, setTires] = useState<Tire[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [costPeriod, setCostPeriod] = useState<CostPeriod>("CURRENT_MONTH");
   const [selectedVehicleCategory, setSelectedVehicleCategory] =
@@ -158,7 +165,7 @@ export function DashboardPage() {
       setLoading(true);
       setErrorMessage("");
 
-      const [vehiclesData, driversData, branchesData, maintenanceData, debtsData, fuelData, tripsData] =
+      const [vehiclesData, driversData, branchesData, maintenanceData, debtsData, fuelData, retailProductsData, tiresData, tripsData] =
         await Promise.all([
           getVehicles(),
           getDrivers(),
@@ -166,6 +173,8 @@ export function DashboardPage() {
           getMaintenanceRecords(),
           getDebts(),
           getFuelRecords(),
+          getRetailProducts(),
+          getTires(),
           getTrips(),
         ]);
 
@@ -175,6 +184,8 @@ export function DashboardPage() {
       setMaintenanceRecords(Array.isArray(maintenanceData) ? maintenanceData : []);
       setDebts(Array.isArray(debtsData) ? debtsData : []);
       setFuelRecords(Array.isArray(fuelData) ? fuelData : []);
+      setRetailProducts(Array.isArray(retailProductsData) ? retailProductsData : []);
+      setTires(Array.isArray(tiresData) ? tiresData : []);
       setTrips(Array.isArray(tripsData) ? tripsData : []);
     } catch (error) {
       console.error("Erro ao carregar dashboard:", error);
@@ -246,6 +257,19 @@ export function DashboardPage() {
     const fuelFiltered = fuelRecords.filter((record) =>
       selectedBranchId ? vehicleIds.has(record.vehicleId) : true
     );
+    const productsFiltered = retailProducts.filter((item) =>
+      selectedBranchId
+        ? !item.retailProductImport.branch?.id ||
+          item.retailProductImport.branch.id === selectedBranchId
+        : true
+    );
+    const tiresFiltered = tires.filter((item) =>
+      selectedBranchId
+        ? item.vehicleId
+          ? vehicleIds.has(item.vehicleId)
+          : true
+        : true
+    );
     const tripsFiltered = trips.filter((trip) =>
       selectedBranchId ? vehicleIds.has(trip.vehicleId) : true
     );
@@ -257,6 +281,8 @@ export function DashboardPage() {
       maintenance: maintenanceFiltered,
       debts: debtsFiltered,
       fuel: fuelFiltered,
+      products: productsFiltered,
+      tires: tiresFiltered,
       trips: tripsFiltered,
     };
   }, [
@@ -266,6 +292,8 @@ export function DashboardPage() {
     maintenanceRecords,
     debts,
     fuelRecords,
+    retailProducts,
+    tires,
     trips,
     selectedBranchId,
   ]);
@@ -319,6 +347,15 @@ export function DashboardPage() {
     const debtsInPeriod = filteredData.debts.filter(
       (debt) => isInPeriod(debt.debtDate, costPeriod) && isVehicleMatch(debt.vehicleId)
     );
+    const productsInPeriod = filteredData.products.filter((item) =>
+      isInPeriod(item.retailProductImport.issuedAt || item.createdAt, costPeriod)
+    );
+    const tiresInPeriod = filteredData.tires.filter((item) => {
+      const effectiveDate = item.purchaseDate || item.installedAt || item.createdAt;
+      const vehicleMatches =
+        !item.vehicleId || isVehicleMatch(item.vehicleId);
+      return vehicleMatches && isInPeriod(effectiveDate, costPeriod);
+    });
     const maintenanceInPeriod = filteredData.maintenance.filter(
       (record) =>
         isInPeriod(record.maintenanceDate, costPeriod) &&
@@ -337,7 +374,20 @@ export function DashboardPage() {
       (sum, debt) => sum + toSafeNumber(debt.amount),
       0
     );
-    const totalCostPeriod = fuelCostPeriod + maintenanceCostPeriod + debtsCostPeriod;
+    const productsCostPeriod = productsInPeriod.reduce(
+      (sum, item) => sum + toSafeNumber(item.totalValue),
+      0
+    );
+    const tiresCostPeriod = tiresInPeriod.reduce(
+      (sum, item) => sum + toSafeNumber(item.purchaseCost),
+      0
+    );
+    const totalCostPeriod =
+      fuelCostPeriod +
+      productsCostPeriod +
+      tiresCostPeriod +
+      maintenanceCostPeriod +
+      debtsCostPeriod;
 
     return {
       pendingMaintenance,
@@ -361,6 +411,8 @@ export function DashboardPage() {
         .length,
       fuelOperationsPeriod: fuelInPeriod.length,
       fuelCostPeriod,
+      productsCostPeriod,
+      tiresCostPeriod,
       maintenanceCostPeriod,
       debtsCostPeriod,
       totalCostPeriod,
@@ -652,9 +704,31 @@ export function DashboardPage() {
       )
       .sort((a, b) => parseDateSafe(b.debtDate).getTime() - parseDateSafe(a.debtDate).getTime());
 
-    return { fuel, maintenance, debts };
+    const products = filteredData.products
+      .filter((item) => isInPeriod(item.retailProductImport.issuedAt || item.createdAt, costPeriod))
+      .sort(
+        (a, b) =>
+          parseDateSafe(b.retailProductImport.issuedAt || b.createdAt).getTime() -
+          parseDateSafe(a.retailProductImport.issuedAt || a.createdAt).getTime()
+      );
+    const tires = filteredData.tires
+      .filter((item) => {
+        const effectiveDate = item.purchaseDate || item.installedAt || item.createdAt;
+        const vehicleMatches =
+          !item.vehicleId || isVehicleMatch(item.vehicleId);
+        return vehicleMatches && isInPeriod(effectiveDate, costPeriod);
+      })
+      .sort(
+        (a, b) =>
+          parseDateSafe(b.purchaseDate || b.installedAt || b.createdAt).getTime() -
+          parseDateSafe(a.purchaseDate || a.installedAt || a.createdAt).getTime()
+      );
+
+    return { fuel, products, tires, maintenance, debts };
   }, [
     filteredData.fuel,
+    filteredData.products,
+    filteredData.tires,
     filteredData.maintenance,
     filteredData.debts,
     costPeriod,
@@ -705,6 +779,59 @@ export function DashboardPage() {
       maintenanceByVehicle.set(key, current);
     });
 
+    const productsByCategory = new Map<
+      string,
+      { label: string; totalValue: number; records: number; totalQuantity: number }
+    >();
+    costDetails.products.forEach((item) => {
+      const key = item.category;
+      const label =
+        item.category === "PERFUMARIA"
+          ? "Perfumaria"
+          : item.category === "COSMETICOS"
+            ? "Cosméticos"
+            : item.category === "LUBRIFICANTES"
+              ? "Lubrificantes"
+              : item.category === "CONVENIENCIA"
+                ? "Conveniência"
+                : item.category === "LIMPEZA"
+                  ? "Limpeza"
+                  : "Outros";
+      const current = productsByCategory.get(key) || {
+        label,
+        totalValue: 0,
+        records: 0,
+        totalQuantity: 0,
+      };
+      current.totalValue += toSafeNumber(item.totalValue);
+      current.records += 1;
+      current.totalQuantity += toSafeNumber(item.quantity);
+      productsByCategory.set(key, current);
+    });
+
+    const tiresByVehicle = new Map<
+      string,
+      { label: string; plate: string; totalValue: number; records: number; totalKm: number }
+    >();
+    costDetails.tires.forEach((item) => {
+      const key = item.vehicleId || `tire-${item.id}`;
+      const plate = item.vehicle?.plate || "";
+      const label = item.vehicle
+        ? formatVehicleLabel(item.vehicle)
+        : "Sem veículo vinculado";
+      const current = tiresByVehicle.get(key) || {
+        label,
+        plate,
+        totalValue: 0,
+        records: 0,
+        totalKm: 0,
+      };
+      current.totalValue += toSafeNumber(item.purchaseCost);
+      current.records += 1;
+      current.totalKm += toSafeNumber(item.currentKm);
+      tiresByVehicle.set(key, current);
+    });
+
     const debtsByVehicle = new Map<
       string,
       { label: string; plate: string; totalValue: number; records: number; totalPoints: number }
@@ -728,6 +855,8 @@ export function DashboardPage() {
 
     return {
       fuel: [...fuelByVehicle.values()].sort((a, b) => b.totalValue - a.totalValue),
+      products: [...productsByCategory.values()].sort((a, b) => b.totalValue - a.totalValue),
+      tires: [...tiresByVehicle.values()].sort((a, b) => b.totalValue - a.totalValue),
       maintenance: [...maintenanceByVehicle.values()].sort((a, b) => b.totalValue - a.totalValue),
       debts: [...debtsByVehicle.values()].sort((a, b) => b.totalValue - a.totalValue),
     };
@@ -849,7 +978,7 @@ export function DashboardPage() {
         {periodReferenceLabel}
       </p>
 
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
         <button
           type="button"
           onClick={() => setCostModal("FUEL")}
@@ -875,6 +1004,29 @@ export function DashboardPage() {
 
         <button
           type="button"
+          onClick={() => setCostModal("PRODUCTS")}
+          className="cursor-pointer rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-lg font-semibold text-slate-900">Custo com produtos</p>
+            <div className="rounded-xl bg-violet-100 p-2 text-violet-700">
+              <Package size={16} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-end justify-between">
+            <p className="text-3xl font-bold text-slate-900">
+              {loading ? "..." : toCurrency(metrics.productsCostPeriod)}
+            </p>
+            <span className="text-xs font-semibold text-slate-500">Ver detalhes</span>
+          </div>
+          <div className="mt-4 flex items-center gap-3 text-xs text-slate-500">
+            <span>{periodLabel}</span>
+            <span>Todas as categorias</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setCostModal("MAINTENANCE")}
           className="cursor-pointer rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md"
         >
@@ -887,6 +1039,29 @@ export function DashboardPage() {
           <div className="mt-4 flex items-end justify-between">
             <p className="text-3xl font-bold text-slate-900">
               {loading ? "..." : toCurrency(metrics.maintenanceCostPeriod)}
+            </p>
+            <span className="text-xs font-semibold text-slate-500">Ver detalhes</span>
+          </div>
+          <div className="mt-4 flex items-center gap-3 text-xs text-slate-500">
+            <span>{periodLabel}</span>
+            <span>{selectedVehicleLabel}</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCostModal("TIRES")}
+          className="cursor-pointer rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-lg font-semibold text-slate-900">Custo com pneus</p>
+            <div className="rounded-xl bg-sky-100 p-2 text-sky-700">
+              <Gauge size={16} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-end justify-between">
+            <p className="text-3xl font-bold text-slate-900">
+              {loading ? "..." : toCurrency(metrics.tiresCostPeriod)}
             </p>
             <span className="text-xs font-semibold text-slate-500">Ver detalhes</span>
           </div>
@@ -1410,12 +1585,16 @@ export function DashboardPage() {
                 <h3 className="text-xl font-bold text-slate-900">
                   {costModal === "FUEL"
                     ? "Detalhamento - Custo com combustível"
+                    : costModal === "PRODUCTS"
+                      ? "Detalhamento - Custo com produtos"
+                    : costModal === "TIRES"
+                      ? "Detalhamento - Custo com pneus"
                     : costModal === "MAINTENANCE"
                       ? "Detalhamento - Custo com manutenção"
                       : "Detalhamento - Custo com débitos e multas"}
                 </h3>
                 <p className="text-sm text-slate-500">
-                  {periodLabel} • {selectedVehicleLabel}
+                  {periodLabel} • {costModal === "PRODUCTS" ? "Todas as categorias" : selectedVehicleLabel}
                 </p>
               </div>
               <button
@@ -1468,6 +1647,119 @@ export function DashboardPage() {
                                   if (!item.plate) return;
                                   setCostModal(null);
                                   navigate(`/fuel-records?plate=${encodeURIComponent(item.plate)}`);
+                                }}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-600 transition hover:border-orange-300 hover:text-orange-600"
+                              >
+                                <ArrowUpRight size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+
+            {costModal === "PRODUCTS" ? (
+              <div>
+                <p className="mb-3 text-sm text-slate-700">
+                  Total: <span className="font-semibold">{toCurrency(metrics.productsCostPeriod)}</span> • Registros:{" "}
+                  <span className="font-semibold">{costDetails.products.length}</span>
+                </p>
+                <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                  <table className="min-w-full">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Categoria</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Valor total</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Itens</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Quantidade total</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Ir para módulo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupedCostDetails.products.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">
+                            Nenhum registro encontrado para este filtro.
+                          </td>
+                        </tr>
+                      ) : (
+                        groupedCostDetails.products.map((item) => (
+                          <tr key={item.label} className="border-t border-slate-200">
+                            <td className="px-4 py-3 text-sm text-slate-600">{item.label}</td>
+                            <td className="px-4 py-3 text-sm font-semibold text-slate-900">{toCurrency(item.totalValue)}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{item.records}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">
+                              {item.totalQuantity.toLocaleString("pt-BR", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-slate-600">
+                              <button
+                                type="button"
+                                title="Abrir produtos"
+                                onClick={() => {
+                                  setCostModal(null);
+                                  navigate("/products");
+                                }}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-600 transition hover:border-orange-300 hover:text-orange-600"
+                              >
+                                <ArrowUpRight size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+
+            {costModal === "TIRES" ? (
+              <div>
+                <p className="mb-3 text-sm text-slate-700">
+                  Total: <span className="font-semibold">{toCurrency(metrics.tiresCostPeriod)}</span> • Registros:{" "}
+                  <span className="font-semibold">{costDetails.tires.length}</span>
+                </p>
+                <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                  <table className="min-w-full">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Veículo</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Custo total</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Pneus</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">KM acumulado</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Ir para módulo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupedCostDetails.tires.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">
+                            Nenhum registro encontrado para este filtro.
+                          </td>
+                        </tr>
+                      ) : (
+                        groupedCostDetails.tires.map((item) => (
+                          <tr key={item.label} className="border-t border-slate-200">
+                            <td className="px-4 py-3 text-sm text-slate-600">{item.label}</td>
+                            <td className="px-4 py-3 text-sm font-semibold text-slate-900">{toCurrency(item.totalValue)}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{item.records}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">
+                              {item.totalKm.toLocaleString("pt-BR")}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-slate-600">
+                              <button
+                                type="button"
+                                title="Abrir gestão de pneus"
+                                onClick={() => {
+                                  setCostModal(null);
+                                  navigate(`/maintenance-records?tab=tires${item.plate ? `&plate=${encodeURIComponent(item.plate)}` : ""}`);
                                 }}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-600 transition hover:border-orange-300 hover:text-orange-600"
                               >

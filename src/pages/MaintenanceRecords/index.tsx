@@ -197,6 +197,9 @@ function normalizeWheelToMasculine(value: string) {
 }
 
 function formatPositionLabel(axle: string, wheel: string) {
+  if (String(wheel || "").trim().toLowerCase() === "estepe") {
+    return "Estepe";
+  }
   return `${formatAxleLabel(axle)} | Lado ${normalizeWheelToMasculine(wheel)}`;
 }
 
@@ -718,7 +721,10 @@ export function MaintenanceRecordsPage() {
     const heavy: typeof tireCardsByVehicle = [];
 
     for (const item of tireCardsByVehicle) {
-      const isHeavy = item.vehicle.vehicleType === "HEAVY" || item.vehicle.category === "TRUCK";
+      const isHeavy =
+        item.vehicle.vehicleType === "HEAVY" ||
+        item.vehicle.category === "TRUCK" ||
+        item.vehicle.category === "IMPLEMENT";
       if (isHeavy) {
         heavy.push(item);
       } else {
@@ -737,7 +743,11 @@ export function MaintenanceRecordsPage() {
   const selectedTireVehicleSlots = useMemo(() => {
     if (!selectedTireVehicle) return createHeavyTireSlots(9);
     if (selectedTireVehicle.category === "CAR") return TIRE_VISUAL_SLOTS_CAR;
-    if (selectedTireVehicle.vehicleType === "HEAVY" || selectedTireVehicle.category === "TRUCK") {
+    if (
+      selectedTireVehicle.vehicleType === "HEAVY" ||
+      selectedTireVehicle.category === "TRUCK" ||
+      selectedTireVehicle.category === "IMPLEMENT"
+    ) {
       return createHeavyTireSlots(9);
     }
     return TIRE_VISUAL_SLOTS_CAR;
@@ -767,7 +777,11 @@ export function MaintenanceRecordsPage() {
   const tireFormVehicleSlots = useMemo(() => {
     if (!tireFormVehicle) return [];
     if (tireFormVehicle.category === "CAR") return TIRE_VISUAL_SLOTS_CAR;
-    if (tireFormVehicle.vehicleType === "HEAVY" || tireFormVehicle.category === "TRUCK") {
+    if (
+      tireFormVehicle.vehicleType === "HEAVY" ||
+      tireFormVehicle.category === "TRUCK" ||
+      tireFormVehicle.category === "IMPLEMENT"
+    ) {
       return createHeavyTireSlots(9);
     }
     return TIRE_VISUAL_SLOTS_CAR;

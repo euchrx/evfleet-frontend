@@ -1037,6 +1037,7 @@ export function FuelRecordsPage() {
                   >
                     <option value="">Selecione um combustível</option>
                     <option value="DIESEL">Diesel</option>
+                    <option value="ARLA32">ARLA 32</option>
                     <option value="GASOLINE">Gasolina</option>
                     <option value="ETHANOL">Etanol</option>
                     <option value="FLEX">Flex</option>
