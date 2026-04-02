@@ -244,7 +244,9 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
       }
     : null;
 
-  const invoices = paymentsData.map((payment) => toInvoiceView(payment, subscription?.plan?.name || "Plano"));
+  const invoices = paymentsData
+    .filter((payment) => payment.status === "PAID")
+    .map((payment) => toInvoiceView(payment, subscription?.plan?.name || "Plano"));
 
   const hasPendingPayment = paymentsData.some((payment) => payment.status === "PENDING");
   const pendingPayment = paymentsData.find((payment) => payment.status === "PENDING");
@@ -285,11 +287,15 @@ export async function selectCompanyPlan(
   });
 }
 
-export async function generateSubscriptionPayment(subscriptionId: string) {
+export async function generateSubscriptionPayment(subscriptionId: string, planId?: string) {
   const context = getUserContext();
   const { data } = context.isAdmin
-    ? await api.post<{ checkoutUrl?: string }>(`/billing/subscriptions/${subscriptionId}/pay`)
-    : await api.post<{ checkoutUrl?: string }>("/billing/me/pay");
+    ? await api.post<{ checkoutUrl?: string }>(`/billing/subscriptions/${subscriptionId}/pay`, {
+        ...(planId ? { planId } : {}),
+      })
+    : await api.post<{ checkoutUrl?: string }>("/billing/me/pay", {
+        ...(planId ? { planId } : {}),
+      });
 
   if (!data?.checkoutUrl) {
     throw new Error("Não foi possível obter a URL de checkout do pagamento.");

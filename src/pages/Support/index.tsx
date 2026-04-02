@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Headset, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { StatusToast } from "../../components/StatusToast";
 import { TablePagination } from "../../components/TablePagination";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   completeSupportRequest,
   createSupportRequest,
+  deleteSupportRequest,
   getSupportRequests,
   respondSupportRequest,
   type CreateSupportRequestInput,
@@ -38,11 +39,65 @@ function statusClass(status: SupportRequestStatus) {
   return "border-emerald-200 bg-emerald-50 text-emerald-700";
 }
 
+function parseLocalDateTime(value?: string | null) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  const normalized = raw.replace(" ", "T");
+  const match = normalized.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/,
+  );
+
+  if (match) {
+    return new Date(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+      Number(match[4]),
+      Number(match[5]),
+      Number(match[6] || 0),
+      0,
+    );
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function toIsoFromDateTimeLocal(value?: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return undefined;
+
+  const match = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/,
+  );
+  if (!match) return raw;
+
+  const localDate = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5]),
+    Number(match[6] || 0),
+    0,
+  );
+
+  return localDate.toISOString();
+}
+
 function formatDateTime(value?: string | null) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("pt-BR");
+  const date = parseLocalDateTime(value);
+  if (!date) return "-";
+
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 function getApiErrorMessage(error: any, fallback: string) {
@@ -53,6 +108,148 @@ function getApiErrorMessage(error: any, fallback: string) {
     fallback;
 
   return Array.isArray(message) ? message.join(", ") : String(message);
+}
+
+function SupportDetailsModal({
+  request,
+  onClose,
+}: {
+  request: SupportRequest | null;
+  onClose: () => void;
+}) {
+  if (!request) return null;
+
+  return (
+    <div className="fixed inset-0 z-[105] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-6 py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">{request.title}</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Pedido completo com histórico do atendimento.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
+              <span className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(request.status)}`}>
+                {statusLabel(request.status)}
+              </span>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Categoria</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">
+                {categoryLabel(request.category)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Prazo</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">
+                {formatDateTime(request.estimatedCompletionAt)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Empresa</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">{request.company.name}</p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Solicitação</p>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+              {request.description}
+            </p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Solicitante
+                </p>
+                <p className="mt-1 text-sm text-slate-700">
+                  {request.createdByUser?.name || "Não identificado"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Criado em
+                </p>
+                <p className="mt-1 text-sm text-slate-700">{formatDateTime(request.createdAt)}</p>
+              </div>
+            </div>
+          </div>
+
+          {request.responseMessage ? (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-5 py-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                Resposta
+              </p>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                {request.responseMessage}
+              </p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Responsável pela resposta
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {request.respondedByUser?.name || "Não informado"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Respondido em
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {formatDateTime(request.respondedAt)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {request.completionMessage ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                Conclusão
+              </p>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                {request.completionMessage}
+              </p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Responsável pela conclusão
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {request.completedByUser?.name || "Não informado"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Concluído em
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {formatDateTime(request.completedAt)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function SupportPage() {
@@ -68,8 +265,10 @@ export function SupportPage() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | SupportRequestStatus>("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [requestDetails, setRequestDetails] = useState<SupportRequest | null>(null);
   const [requestToRespond, setRequestToRespond] = useState<SupportRequest | null>(null);
   const [requestToComplete, setRequestToComplete] = useState<SupportRequest | null>(null);
+  const [requestToDelete, setRequestToDelete] = useState<SupportRequest | null>(null);
   const [toast, setToast] = useState({
     visible: false,
     tone: "success" as "loading" | "success" | "error",
@@ -100,9 +299,7 @@ export function SupportPage() {
       if (!isAdmin && status === 403) {
         setSupportLocked(true);
         setRequests([]);
-        setErrorMessage(
-          "O suporte direto pelo sistema está disponível apenas para empresas no plano Starter.",
-        );
+        setErrorMessage("");
       } else {
         setErrorMessage(
           getApiErrorMessage(error, "Não foi possível carregar os pedidos de suporte."),
@@ -131,6 +328,7 @@ export function SupportPage() {
         item.company.name,
         item.createdByUser?.name || "",
         item.responseMessage || "",
+        item.completionMessage || "",
       ]
         .join(" ")
         .toLowerCase();
@@ -178,6 +376,10 @@ export function SupportPage() {
     }
   }
 
+  function canDeleteRequest(item: SupportRequest) {
+    return Boolean(isAdmin || item.createdByUser?.id === user?.id);
+  }
+
   async function handleCreateRequest() {
     try {
       setSaving(true);
@@ -206,7 +408,10 @@ export function SupportPage() {
     try {
       setSaving(true);
       showToast("loading", "Respondendo pedido", "A resposta está sendo registrada.");
-      await respondSupportRequest(requestToRespond.id, responseForm);
+      await respondSupportRequest(requestToRespond.id, {
+        responseMessage: responseForm.responseMessage,
+        estimatedCompletionAt: toIsoFromDateTimeLocal(responseForm.estimatedCompletionAt),
+      });
       setRequestToRespond(null);
       setResponseForm({ responseMessage: "", estimatedCompletionAt: "" });
       await loadRequests(true);
@@ -241,6 +446,32 @@ export function SupportPage() {
         "error",
         "Falha ao concluir",
         getApiErrorMessage(error, "Não foi possível concluir o pedido."),
+        5000,
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteRequest() {
+    if (!requestToDelete) return;
+
+    try {
+      setSaving(true);
+      showToast("loading", "Excluindo pedido", "O pedido de suporte está sendo removido.");
+      await deleteSupportRequest(requestToDelete.id);
+      if (requestDetails?.id === requestToDelete.id) {
+        setRequestDetails(null);
+      }
+      setRequestToDelete(null);
+      await loadRequests(true);
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      showToast("success", "Pedido excluído", "O pedido de suporte foi excluído com sucesso.", 4000);
+    } catch (error: any) {
+      showToast(
+        "error",
+        "Falha ao excluir",
+        getApiErrorMessage(error, "Não foi possível excluir o pedido."),
         5000,
       );
     } finally {
@@ -316,7 +547,7 @@ export function SupportPage() {
 
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2">
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -335,12 +566,6 @@ export function SupportPage() {
               <option value="IN_PROGRESS">Em atendimento</option>
               <option value="COMPLETED">Concluídos</option>
             </select>
-            <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-              <Headset size={16} className="mr-2 text-orange-500" />
-              {isAdmin
-                ? "Visão administrativa de todos os pedidos."
-                : "Disponível apenas para clientes no plano Starter."}
-            </div>
           </div>
         </div>
 
@@ -374,17 +599,27 @@ export function SupportPage() {
                 paginatedRequests.map((item) => (
                   <tr key={item.id} className="border-t border-slate-200">
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      <p className="font-semibold text-slate-900">{item.title}</p>
-                      <p className="mt-1 line-clamp-2 text-slate-500">{item.description}</p>
-                      {item.createdByUser ? (
-                        <p className="mt-2 text-xs text-slate-400">
-                          Solicitante: {item.createdByUser.name}
+                      <button
+                        type="button"
+                        onClick={() => setRequestDetails(item)}
+                        className="w-full text-left"
+                      >
+                        <p className="font-semibold text-slate-900 transition hover:text-orange-600">
+                          {item.title}
                         </p>
-                      ) : null}
+                        <p className="mt-1 line-clamp-2 text-slate-500">{item.description}</p>
+                        {item.createdByUser ? (
+                          <p className="mt-2 text-xs text-slate-400">
+                            Solicitante: {item.createdByUser.name}
+                          </p>
+                        ) : null}
+                      </button>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">{categoryLabel(item.category)}</td>
                     <td className="px-6 py-4 text-sm">
-                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}>
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}
+                      >
                         {statusLabel(item.status)}
                       </span>
                     </td>
@@ -399,12 +634,22 @@ export function SupportPage() {
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRequestDetails(item)}
+                          className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          Ver detalhes
+                        </button>
                         {isAdmin && item.status === "OPEN" ? (
                           <button
                             type="button"
                             onClick={() => {
                               setRequestToRespond(item);
-                              setResponseForm({ responseMessage: item.responseMessage || "", estimatedCompletionAt: "" });
+                              setResponseForm({
+                                responseMessage: item.responseMessage || "",
+                                estimatedCompletionAt: "",
+                              });
                             }}
                             className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                           >
@@ -421,6 +666,15 @@ export function SupportPage() {
                             className="rounded-xl border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
                           >
                             Concluir
+                          </button>
+                        ) : null}
+                        {canDeleteRequest(item) ? (
+                          <button
+                            type="button"
+                            onClick={() => setRequestToDelete(item)}
+                            className="rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                          >
+                            Excluir
                           </button>
                         ) : null}
                       </div>
@@ -626,6 +880,47 @@ export function SupportPage() {
           </div>
         </div>
       ) : null}
+
+      {requestToDelete ? (
+        <div className="fixed inset-0 z-[105] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl">
+            <div className="border-b border-slate-200 px-6 py-5">
+              <h2 className="text-xl font-bold text-slate-900">Excluir pedido</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Esta ação remove o pedido de suporte selecionado.
+              </p>
+            </div>
+            <div className="px-6 py-6">
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-800">
+                <p className="font-semibold">{requestToDelete.title}</p>
+                <p className="mt-1">
+                  Deseja excluir este pedido de suporte? Esta ação não poderá ser desfeita.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 px-6 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setRequestToDelete(null)}
+                disabled={saving}
+                className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteRequest}
+                disabled={saving}
+                className="rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Excluir pedido
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <SupportDetailsModal request={requestDetails} onClose={() => setRequestDetails(null)} />
     </div>
   );
 }

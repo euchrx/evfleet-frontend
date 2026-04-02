@@ -30,6 +30,11 @@ export type SupportRequest = {
     name: string;
     email: string;
   } | null;
+  completedByUser?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
 };
 
 export type CreateSupportRequestInput = {
@@ -70,5 +75,10 @@ export async function completeSupportRequest(
   input: CompleteSupportRequestInput,
 ) {
   const response = await api.patch(`/support/requests/${requestId}/complete`, input);
+  return response.data;
+}
+
+export async function deleteSupportRequest(requestId: string) {
+  const response = await api.delete(`/support/requests/${requestId}`);
   return response.data;
 }

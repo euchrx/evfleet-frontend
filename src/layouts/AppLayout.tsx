@@ -275,13 +275,6 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
-      name: "Suporte",
-      path: "/support",
-      icon: BriefcaseBusiness,
-      roles: ["ADMIN", "FLEET_MANAGER"],
-      requiresStarterPlan: true,
-    },
-    {
       name: "Manutenções",
       path: "/maintenance-records",
       icon: Wrench,
@@ -316,6 +309,13 @@ export function AppLayout() {
       path: "/how-to-use",
       icon: BookOpenCheck,
       roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Suporte",
+      path: "/support",
+      icon: BriefcaseBusiness,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+      requiresStarterPlan: true,
     },
     { name: "Empresas", path: "/companies", icon: Building2, roles: ["ADMIN"] },
     { name: "Usuários", path: "/users", icon: Users, roles: ["ADMIN"] },

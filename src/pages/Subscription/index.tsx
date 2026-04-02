@@ -292,20 +292,15 @@ export function SubscriptionPage() {
     try {
       setRedirectingToCheckout(true);
       setErrorMessage("");
-      await selectCompanyPlan(
-        data.companyId,
-        selectedPlanForCheckout.id,
-        selectedPlanActivationStatus || getSuggestedActivationStatus(selectedPlanForCheckout),
-      );
-      const refreshed = await getSubscriptionPageData();
-      setData(refreshed);
-
-      const subscriptionId = refreshed.overview?.subscriptionId;
+      const subscriptionId = data.overview?.subscriptionId;
       if (!subscriptionId) {
         throw new Error("Assinatura não encontrada para gerar o checkout.");
       }
 
-      const checkoutUrl = await generateSubscriptionPayment(subscriptionId);
+      const checkoutUrl = await generateSubscriptionPayment(
+        subscriptionId,
+        selectedPlanForCheckout.id,
+      );
       redirectToCheckout(checkoutUrl);
     } catch (error) {
       setErrorMessage(
