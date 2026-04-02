@@ -898,12 +898,17 @@ export function AppLayout() {
       const isAllowedPath =
         location.pathname === "/companies" ||
         location.pathname === "/branches" ||
+        location.pathname === "/support" ||
         location.pathname === "/users" ||
         location.pathname === "/administration";
       if (!isAllowedPath) {
         navigate("/administration", { replace: true });
         return;
       }
+    }
+
+    if (user.role === "ADMIN" && location.pathname === "/support") {
+      return;
     }
 
     if (isMenuPathVisible(location.pathname, menuVisibility)) return;
