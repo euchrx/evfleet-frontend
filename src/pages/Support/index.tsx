@@ -43,6 +43,11 @@ function parseLocalDateTime(value?: string | null) {
   const raw = String(value || "").trim();
   if (!raw) return null;
 
+  if (/z$/i.test(raw) || /[+-]\d{2}:\d{2}$/.test(raw)) {
+    const parsedWithTimezone = new Date(raw);
+    return Number.isNaN(parsedWithTimezone.getTime()) ? null : parsedWithTimezone;
+  }
+
   const normalized = raw.replace(" ", "T");
   const match = normalized.match(
     /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/,
@@ -377,7 +382,8 @@ export function SupportPage() {
   }
 
   function canDeleteRequest(item: SupportRequest) {
-    return Boolean(isAdmin || item.createdByUser?.id === user?.id);
+    void item;
+    return Boolean(isAdmin);
   }
 
   async function handleCreateRequest() {
@@ -607,7 +613,6 @@ export function SupportPage() {
                         <p className="font-semibold text-slate-900 transition hover:text-orange-600">
                           {item.title}
                         </p>
-                        <p className="mt-1 line-clamp-2 text-slate-500">{item.description}</p>
                         {item.createdByUser ? (
                           <p className="mt-2 text-xs text-slate-400">
                             Solicitante: {item.createdByUser.name}

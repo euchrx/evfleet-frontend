@@ -371,6 +371,9 @@ export function AppLayout() {
   const filteredMenu = menu.filter((item) => {
     const hasRole = user ? item.roles.includes(user.role) : false;
     if (!hasRole) return false;
+    if (item.path === "/support" && user?.role === "ADMIN") {
+      return true;
+    }
     if (!isMenuPathVisible(item.path, menuVisibility)) return false;
     if (item.requiresStarterPlan && !canAccessSupport) return false;
 
@@ -452,6 +455,28 @@ export function AppLayout() {
   }
 
   async function loadNotifications() {
+    if (user?.role === "ADMIN") {
+      const supportRequestsResult = await Promise.allSettled([getSupportRequests()]);
+      const supportRequests =
+        supportRequestsResult[0].status === "fulfilled"
+          ? supportRequestsResult[0].value
+          : [];
+
+      const supportNotifications: AppNotification[] = supportRequests
+        .filter((request) => request.status === "OPEN")
+        .map((request) => ({
+          id: `support-open-${request.id}`,
+          title: `Novo pedido de suporte - ${request.company.name}`,
+          description: `${request.title} • ${formatSupportCategory(request.category)}`,
+          date: request.createdAt,
+          link: "/support",
+        }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      setNotifications(supportNotifications);
+      return;
+    }
+
     const [
       driversResult,
       fuelRecordsResult,
@@ -688,17 +713,7 @@ export function AppLayout() {
         };
       });
 
-    const supportNotifications: AppNotification[] = user?.role === "ADMIN"
-      ? supportRequests
-          .filter((request) => request.status === "OPEN")
-          .map((request) => ({
-            id: `support-open-${request.id}`,
-            title: `Novo pedido de suporte - ${request.company.name}`,
-            description: `${request.title} • ${formatSupportCategory(request.category)}`,
-            date: request.createdAt,
-            link: "/support",
-          }))
-      : supportRequests.flatMap((request) => {
+    const supportNotifications: AppNotification[] = supportRequests.flatMap((request) => {
           if (request.status === "COMPLETED" && request.completedAt) {
             return [
               {
