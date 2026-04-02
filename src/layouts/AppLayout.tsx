@@ -53,6 +53,7 @@ import {
   readSoftwareSettings,
 } from "../services/adminSettings";
 import { api } from "../services/api";
+import { getSupportRequests } from "../services/support";
 import type { SubscriptionStatus } from "../services/subscription";
 import { formatVehicleLabel } from "../utils/vehicleLabel";
 
@@ -62,6 +63,12 @@ type AppNotification = {
   description: string;
   date: string;
   link?: string;
+};
+
+type HeaderSubscriptionInfo = {
+  status: SubscriptionStatus | null;
+  planCode?: string | null;
+  planName?: string | null;
 };
 
 function formatRole(role?: string) {
@@ -134,6 +141,13 @@ function isPendingMaintenanceStatus(value?: string | null) {
   return normalized !== "DONE" && normalized !== "CONCLUIDA" && normalized !== "CONCLUÍDA";
 }
 
+function formatSupportCategory(value?: string | null) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (normalized === "BUG") return "Bug";
+  if (normalized === "IMPROVEMENT") return "Melhoria";
+  return "Pedido";
+}
+
 function getSubscriptionStatusMeta(status: SubscriptionStatus | null) {
   if (status === "ACTIVE") {
     return {
@@ -174,6 +188,12 @@ function getSubscriptionStatusMeta(status: SubscriptionStatus | null) {
   };
 }
 
+function isStarterSupportPlan(subscription: HeaderSubscriptionInfo | null) {
+  const code = String(subscription?.planCode || "").trim().toUpperCase();
+  const name = String(subscription?.planName || "").trim().toUpperCase();
+  return code === "STA" || code === "STARTER" || name.includes("STARTER");
+}
+
 export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -212,8 +232,8 @@ export function AppLayout() {
     const saved = readSoftwareSettings().systemVersion?.trim();
     return saved || defaultSoftwareSettings.systemVersion;
   });
-  const [subscriptionStatus, setSubscriptionStatus] =
-    useState<SubscriptionStatus | null>(null);
+  const [subscriptionInfo, setSubscriptionInfo] =
+    useState<HeaderSubscriptionInfo | null>(null);
   const companyScopeRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -253,6 +273,13 @@ export function AppLayout() {
       path: "/products",
       icon: Sparkles,
       roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Suporte",
+      path: "/support",
+      icon: BriefcaseBusiness,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+      requiresStarterPlan: true,
     },
     {
       name: "Manutenções",
@@ -304,6 +331,7 @@ export function AppLayout() {
     "/companies",
     "/users",
     "/administration",
+    "/support",
   ]);
   const isAdminWithoutCompanyScope =
     user?.role === "ADMIN" && !selectedCompanyId;
@@ -335,10 +363,16 @@ export function AppLayout() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const canAccessSupport = useMemo(
+    () => Boolean(user?.role === "ADMIN" || isStarterSupportPlan(subscriptionInfo)),
+    [subscriptionInfo, user?.role],
+  );
+
   const filteredMenu = menu.filter((item) => {
     const hasRole = user ? item.roles.includes(user.role) : false;
     if (!hasRole) return false;
     if (!isMenuPathVisible(item.path, menuVisibility)) return false;
+    if (item.requiresStarterPlan && !canAccessSupport) return false;
 
     if (isAdminWithoutCompanyScope) {
       return administrativePaths.has(item.path);
@@ -362,8 +396,8 @@ export function AppLayout() {
     [systemLogs, systemVersion],
   );
   const subscriptionMeta = useMemo(
-    () => getSubscriptionStatusMeta(subscriptionStatus),
-    [subscriptionStatus],
+    () => getSubscriptionStatusMeta(subscriptionInfo?.status || null),
+    [subscriptionInfo?.status],
   );
   const initial = user?.name?.charAt(0).toUpperCase() || "U";
 
@@ -425,6 +459,7 @@ export function AppLayout() {
       maintenanceRecordsResult,
       debtsResult,
       vehicleDocumentsResult,
+      supportRequestsResult,
     ] = await Promise.allSettled([
       getDrivers(),
       getFuelRecords(),
@@ -432,6 +467,7 @@ export function AppLayout() {
       getMaintenanceRecords(),
       getDebts(),
       getVehicleDocuments(),
+      getSupportRequests(),
     ]);
 
     const drivers = driversResult.status === "fulfilled" ? driversResult.value : [];
@@ -448,6 +484,8 @@ export function AppLayout() {
       vehicleDocumentsResult.status === "fulfilled"
         ? vehicleDocumentsResult.value
         : [];
+    const supportRequests =
+      supportRequestsResult.status === "fulfilled" ? supportRequestsResult.value : [];
 
     const anomalyNotifications: AppNotification[] =
       fuelRecords.length > 0 && vehicles.length > 0
@@ -650,6 +688,50 @@ export function AppLayout() {
         };
       });
 
+    const supportNotifications: AppNotification[] = user?.role === "ADMIN"
+      ? supportRequests
+          .filter((request) => request.status === "OPEN")
+          .map((request) => ({
+            id: `support-open-${request.id}`,
+            title: `Novo pedido de suporte - ${request.company.name}`,
+            description: `${request.title} • ${formatSupportCategory(request.category)}`,
+            date: request.createdAt,
+            link: "/support",
+          }))
+      : supportRequests.flatMap((request) => {
+          if (request.status === "COMPLETED" && request.completedAt) {
+            return [
+              {
+                id: `support-completed-${request.id}`,
+                title: `Suporte concluído - ${request.title}`,
+                description:
+                  request.completionMessage ||
+                  "O pedido foi marcado como concluído pela equipe.",
+                date: request.completedAt,
+                link: "/support",
+              },
+            ];
+          }
+
+          if (request.status === "IN_PROGRESS" && request.respondedAt) {
+            const etaText = request.estimatedCompletionAt
+              ? ` Prazo estimado: ${formatDateOnly(request.estimatedCompletionAt)}.`
+              : "";
+
+            return [
+              {
+                id: `support-responded-${request.id}`,
+                title: `Suporte respondeu - ${request.title}`,
+                description: `${request.responseMessage || "Seu pedido já está em atendimento."}${etaText}`,
+                date: request.respondedAt,
+                link: "/support",
+              },
+            ];
+          }
+
+          return [];
+        });
+
     setNotifications(
       [
         ...expiredCnhNotifications,
@@ -661,6 +743,7 @@ export function AppLayout() {
         ...debtNotifications,
         ...expiringDocumentNotifications,
         ...anomalyNotifications,
+        ...supportNotifications,
       ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
     );
   }
@@ -698,13 +781,13 @@ export function AppLayout() {
     async function loadSubscriptionStatus() {
       try {
         if (!user) {
-          if (active) setSubscriptionStatus(null);
+          if (active) setSubscriptionInfo(null);
           return;
         }
 
         const isAdmin = user.role === "ADMIN";
         if (isAdmin && !selectedCompanyId) {
-          if (active) setSubscriptionStatus(null);
+          if (active) setSubscriptionInfo(null);
           return;
         }
 
@@ -713,14 +796,21 @@ export function AppLayout() {
             ? `/billing/companies/${selectedCompanyId}/subscription`
             : "/billing/me/subscription";
 
-        const { data } = await api.get<{ status?: SubscriptionStatus } | null>(
+        const { data } = await api.get<{
+          status?: SubscriptionStatus;
+          plan?: { code?: string | null; name?: string | null } | null;
+        } | null>(
           endpoint,
         );
         if (!active) return;
-        setSubscriptionStatus(data?.status || null);
+        setSubscriptionInfo({
+          status: data?.status || null,
+          planCode: data?.plan?.code || null,
+          planName: data?.plan?.name || null,
+        });
       } catch {
         if (!active) return;
-        setSubscriptionStatus(null);
+        setSubscriptionInfo(null);
       }
     }
 
@@ -1039,7 +1129,7 @@ export function AppLayout() {
               ref={profileMenuRef}
               className="relative flex w-full items-center justify-end gap-3 lg:col-start-3 lg:justify-self-end"
             >
-              {subscriptionStatus ? (
+              {subscriptionInfo?.status ? (
                 <button
                   type="button"
                   onClick={() => navigate("/subscription")}
@@ -1074,7 +1164,7 @@ export function AppLayout() {
                     <span className="mt-2 inline-flex rounded-full border border-orange-300 bg-white px-2.5 py-0.5 text-xs font-semibold text-orange-700">
                       {String(formatRole(user?.role)).toUpperCase()}
                     </span>
-                    {subscriptionStatus === "TRIALING" ? (
+                    {subscriptionInfo?.status === "TRIALING" ? (
                       <span className="mt-2 ml-2 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
                         Período de teste
                       </span>

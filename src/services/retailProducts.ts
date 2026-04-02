@@ -19,12 +19,19 @@ export type RetailProductItem = {
   category: RetailProductCategory;
   retailProductImport: {
     id: string;
+    sourcePlate?: string | null;
     supplierName?: string | null;
     supplierDocument?: string | null;
     invoiceNumber?: string | null;
     invoiceSeries?: string | null;
     issuedAt?: string | null;
     totalAmount?: string | number | null;
+    vehicle?: {
+      id: string;
+      plate: string;
+      brand: string;
+      model: string;
+    } | null;
     branch?: {
       id: string;
       name: string;
@@ -67,6 +74,7 @@ export type ProductXmlPreviewInvoice = {
   issuedAt?: string;
   supplierName?: string;
   supplierDocument?: string;
+  plate?: string;
   items: ProductXmlPreviewItem[];
 };
 
@@ -141,6 +149,17 @@ export async function confirmProductXmlImports(
   const response = await api.post<ProductXmlConfirmResponse>(
     "/products/xml/confirm",
     { invoices },
+  );
+
+  return response.data;
+}
+
+export async function deleteRetailProducts(itemIds: string[]) {
+  const response = await api.delete<{ deletedItems: number; deletedImports: number }>(
+    "/products",
+    {
+      data: { itemIds },
+    },
   );
 
   return response.data;

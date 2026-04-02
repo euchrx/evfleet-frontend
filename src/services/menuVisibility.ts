@@ -14,6 +14,7 @@ export const MENU_VISIBILITY_ITEMS: MenuVisibilityItem[] = [
   { label: "Motoristas", path: "/drivers" },
   { label: "Abastecimentos", path: "/fuel-records" },
   { label: "Produtos", path: "/products" },
+  { label: "Suporte", path: "/support" },
   { label: "Manutenções", path: "/maintenance-records" },
   { label: "Manutenções - Registros", path: "/maintenance-records::records" },
   { label: "Manutenções - Planos", path: "/maintenance-records::plans" },

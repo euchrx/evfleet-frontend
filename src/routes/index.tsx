@@ -14,6 +14,7 @@ import { DebtsPage } from "../pages/Debts";
 import { ReportsPage } from "../pages/Reports";
 import { FuelRecordsPage } from "../pages/FuelRecords";
 import { RetailProductsPage } from "../pages/RetailProducts";
+import { SupportPage } from "../pages/Support";
 import { AdministrationPage } from "../pages/Administration";
 import { TripsPage } from "../pages/Trips";
 import { VehicleDocumentsPage } from "../pages/VehicleDocuments";
@@ -40,6 +41,7 @@ export function AppRoutes() {
             <Route path="/maintenance-records/register" element={<MaintenanceRegisterPage />} />
             <Route path="/fuel-records" element={<FuelRecordsPage />} />
             <Route path="/products" element={<RetailProductsPage />} />
+            <Route path="/support" element={<SupportPage />} />
             <Route path="/retail-products" element={<Navigate to="/products" replace />} />
             <Route path="/trips" element={<TripsPage />} />
             <Route path="/vehicle-documents" element={<VehicleDocumentsPage />} />

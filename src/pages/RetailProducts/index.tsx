@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { ProductXmlImportButton } from "../../components/ProductXmlImportButton";
 import { TablePagination } from "../../components/TablePagination";
+import { formatVehicleLabel } from "../../utils/vehicleLabel";
 import {
+  deleteRetailProducts,
   getRetailProducts,
   type RetailProductCategory,
   type RetailProductFilters,
@@ -14,9 +17,9 @@ const PAGE_SIZE = 10;
 
 const categoryOptions: Array<{ value: RetailProductCategory; label: string }> = [
   { value: "PERFUMARIA", label: "Perfumaria" },
-  { value: "COSMETICOS", label: "Cosméticos" },
+  { value: "COSMETICOS", label: "CosmÃ©ticos" },
   { value: "LUBRIFICANTES", label: "Lubrificantes" },
-  { value: "CONVENIENCIA", label: "Conveniência" },
+  { value: "CONVENIENCIA", label: "ConveniÃªncia" },
   { value: "LIMPEZA", label: "Limpeza" },
   { value: "OUTROS", label: "Outros" },
 ];
@@ -64,17 +67,17 @@ export function RetailProductsPage() {
   const [lastSuccessfulItems, setLastSuccessfulItems] = useState<RetailProductItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [filters, setFilters] = useState<RetailProductFilters>({
     dateFrom: "",
     dateTo: "",
-    supplier: "",
-    invoiceNumber: "",
-    itemDescription: "",
     category: "",
   });
+  const [search, setSearch] = useState("");
 
   async function loadData(nextFilters = filters, manualRefresh = false) {
     try {
@@ -86,7 +89,7 @@ export function RetailProductsPage() {
       setLastSuccessfulItems(data);
     } catch (error) {
       console.error("Erro ao carregar produtos:", error);
-      setErrorMessage("Não foi possível carregar os produtos importados.");
+      setErrorMessage("NÃ£o foi possÃ­vel carregar os produtos importados.");
       setItems(lastSuccessfulItems);
     } finally {
       if (manualRefresh) setRefreshing(false);
@@ -115,12 +118,10 @@ export function RetailProductsPage() {
     const emptyFilters: RetailProductFilters = {
       dateFrom: "",
       dateTo: "",
-      supplier: "",
-      invoiceNumber: "",
-      itemDescription: "",
       category: "",
     };
     setFilters(emptyFilters);
+    setSearch("");
     setCurrentPage(1);
     await loadData(emptyFilters, true);
   }
@@ -136,15 +137,33 @@ export function RetailProductsPage() {
     };
   }, [items]);
 
+  const filteredItems = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return items;
+
+    return items.filter((item) => {
+      const haystack = [
+        item.description,
+        item.productCode || "",
+        item.retailProductImport.supplierName || "",
+        item.retailProductImport.invoiceNumber || "",
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(term);
+    });
+  }, [items, search]);
+
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(items.length / PAGE_SIZE)),
-    [items.length],
+    () => Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE)),
+    [filteredItems.length],
   );
 
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
-    return items.slice(start, start + PAGE_SIZE);
-  }, [currentPage, items]);
+    return filteredItems.slice(start, start + PAGE_SIZE);
+  }, [currentPage, filteredItems]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -153,7 +172,7 @@ export function RetailProductsPage() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedItemIds([]);
-  }, [selectedCompanyId, filters.dateFrom, filters.dateTo, filters.supplier, filters.invoiceNumber, filters.itemDescription, filters.category]);
+  }, [selectedCompanyId, filters.dateFrom, filters.dateTo, filters.category, search]);
 
   function toggleItemSelection(itemId: string) {
     setSelectedItemIds((prev) =>
@@ -176,13 +195,34 @@ export function RetailProductsPage() {
     paginatedItems.length > 0 &&
     paginatedItems.every((item) => selectedItemIds.includes(item.id));
 
+  async function confirmBulkDelete() {
+    if (selectedItemIds.length === 0) {
+      setBulkDeleteOpen(false);
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setErrorMessage("");
+      await deleteRetailProducts(selectedItemIds);
+      setSelectedItemIds([]);
+      setBulkDeleteOpen(false);
+      await loadData(filters, true);
+    } catch (error) {
+      console.error("Erro ao excluir produtos em lote:", error);
+      setErrorMessage("NÃ£o foi possÃ­vel excluir os produtos selecionados.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Produtos</h1>
           <p className="text-sm text-slate-500">
-            Controle de itens comprados para o veículo, organizados por categoria e nota fiscal.
+            Controle de itens comprados para o veÃ­culo, organizados por categoria e nota fiscal.
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -226,7 +266,7 @@ export function RetailProductsPage() {
 
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <input
               type="date"
               value={filters.dateFrom || ""}
@@ -240,21 +280,9 @@ export function RetailProductsPage() {
               className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
             <input
-              value={filters.supplier || ""}
-              onChange={(event) => handleFilterChange("supplier", event.target.value)}
-              placeholder="Fornecedor"
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            />
-            <input
-              value={filters.invoiceNumber || ""}
-              onChange={(event) => handleFilterChange("invoiceNumber", event.target.value)}
-              placeholder="Número da nota"
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            />
-            <input
-              value={filters.itemDescription || ""}
-              onChange={(event) => handleFilterChange("itemDescription", event.target.value)}
-              placeholder="Buscar item"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar por produto, fornecedor ou NF-e"
               className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
             <select
@@ -302,9 +330,9 @@ export function RetailProductsPage() {
             </p>
             <button
               type="button"
-              disabled
+              onClick={() => setBulkDeleteOpen(true)}
+              disabled={selectedItemIds.length === 0}
               className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition disabled:cursor-not-allowed disabled:opacity-50"
-              title="A exclusão em lote de produtos ainda não está disponível."
             >
               Excluir selecionados
             </button>
@@ -321,32 +349,29 @@ export function RetailProductsPage() {
                     checked={allItemsOnPageSelected}
                     onChange={toggleSelectAllPage}
                     className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
-                    aria-label="Selecionar itens da página"
+                    aria-label="Selecionar itens da pÃ¡gina"
                   />
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   Produto
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  Veículo
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   Categoria
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Quantidade
+                  Qtd
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Valor unitário
+                  Valor
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   Valor total
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Fornecedor
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   NF-e
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Filial
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   Data
@@ -356,13 +381,13 @@ export function RetailProductsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">
                     Carregando produtos...
                   </td>
                 </tr>
               ) : paginatedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">
                     Nenhum produto encontrado.
                   </td>
                 </tr>
@@ -381,8 +406,17 @@ export function RetailProductsPage() {
                     <td className="px-6 py-4 text-sm text-slate-700">
                       <p className="font-medium text-slate-900">{item.description}</p>
                       <p className="mt-1 text-xs text-slate-500">
-                        Código: {item.productCode || "-"}
+                        CÃ³digo: {item.productCode || "-"}
                       </p>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      {item.retailProductImport.vehicle ? (
+                        <span>{formatVehicleLabel(item.retailProductImport.vehicle)}</span>
+                      ) : item.retailProductImport.sourcePlate ? (
+                        <span>{item.retailProductImport.sourcePlate}</span>
+                      ) : (
+                        <span className="text-slate-500">Sem veículo detectado</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -399,13 +433,7 @@ export function RetailProductsPage() {
                       {formatMoney(item.totalValue)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      {item.retailProductImport.supplierName || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
                       {item.retailProductImport.invoiceNumber || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      {item.retailProductImport.branch?.name || "Empresa"}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {formatDate(item.retailProductImport.issuedAt)}
@@ -421,7 +449,7 @@ export function RetailProductsPage() {
           <TablePagination
             currentPage={currentPage}
             totalPages={totalPages}
-            totalItems={items.length}
+            totalItems={filteredItems.length}
             pageSize={PAGE_SIZE}
             itemLabel="produtos"
             onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
@@ -429,6 +457,17 @@ export function RetailProductsPage() {
           />
         ) : null}
       </div>
+
+      <ConfirmDeleteModal
+        isOpen={bulkDeleteOpen}
+        title="Excluir produtos selecionados"
+        description={`Deseja excluir ${selectedItemIds.length} produto(s) selecionado(s)?`}
+        loading={deleting}
+        onCancel={() => {
+          if (!deleting) setBulkDeleteOpen(false);
+        }}
+        onConfirm={confirmBulkDelete}
+      />
     </div>
   );
 }

@@ -139,6 +139,7 @@ export function ProductXmlImportButton({
       issuedAt: invoice.issuedAt,
       supplierName: invoice.supplierName,
       supplierDocument: invoice.supplierDocument,
+      plate: invoice.plate,
       items: invoice.items.map((item) => ({
         ...item,
         selected: selectedKeys.has(getItemKey(invoice.invoiceKey, item.lineIndex)),
