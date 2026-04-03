@@ -1,14 +1,7 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import FeedbackKiosk from './pages/Feedback';
+import { AppRoutes } from "./routes";
 
 function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/feedback" element={<FeedbackKiosk />} />
-      </Routes>
-    </BrowserRouter>
-  );
+  return <AppRoutes />;
 }
 
 export default App;
