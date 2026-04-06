@@ -250,7 +250,12 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
 
   const hasPendingPayment = paymentsData.some((payment) => payment.status === "PENDING");
   const pendingPayment = paymentsData.find((payment) => payment.status === "PENDING");
-  const canPayNow = Boolean(subscription && (subscription.status === "PAST_DUE" || !hasPendingPayment));
+  const canPayNow = Boolean(
+    subscription &&
+      (subscription.status === "PAST_DUE" ||
+        subscription.status === "CANCELED" ||
+        !hasPendingPayment),
+  );
 
   return {
     overview,

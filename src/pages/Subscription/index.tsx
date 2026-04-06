@@ -191,7 +191,10 @@ export function SubscriptionPage() {
   }
 
   function requiresCheckoutOnSelection(plan?: SubscriptionPlan | null) {
-    if (!plan || plan.isCurrent) return false;
+    if (!plan) return false;
+    if (plan.isCurrent) {
+      return overview?.status === "CANCELED";
+    }
     return getSuggestedActivationStatus(plan) === "ACTIVE";
   }
 
@@ -315,6 +318,7 @@ export function SubscriptionPage() {
 
   function getPlanActionLabel(plan: SubscriptionPlan) {
     if (canManagePlans && !hasCompanyScope) return "Selecione empresa";
+    if (plan.isCurrent && overview?.status === "CANCELED") return "Reativar e pagar";
     if (plan.isCurrent && overview) return "Ver assinatura";
     return requiresCheckoutOnSelection(plan) ? "Selecionar e pagar" : "Selecionar plano";
   }
@@ -327,6 +331,9 @@ export function SubscriptionPage() {
   const selectedPlanRequiresCheckout = requiresCheckoutOnSelection(
     selectedPlanForCheckout,
   );
+  const selectedPlanIsStarter = isStarterPlan(selectedPlanForCheckout);
+  const selectedPlanIsCanceledCurrent =
+    Boolean(selectedPlanForCheckout?.isCurrent) && overview?.status === "CANCELED";
 
   async function handlePayNow() {
     if (!overview?.subscriptionId) return;
@@ -764,9 +771,11 @@ export function SubscriptionPage() {
 
               {!selectedPlanAllowsTrial ? (
                 <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-                  {trialEnded
-                    ? "O período de teste já foi encerrado. Para continuar com este plano, o checkout será iniciado na próxima etapa."
-                    : "O período de teste é permitido apenas para o plano Starter. Este plano seguirá diretamente para pagamento."}
+                  {selectedPlanIsStarter
+                    ? trialEnded || selectedPlanIsCanceledCurrent
+                      ? "O periodo de teste deste plano ja foi encerrado. Para continuar, o checkout sera iniciado na proxima etapa."
+                      : "Este plano seguira diretamente para pagamento."
+                    : "O periodo de teste esta disponivel apenas para o plano Starter. Este plano seguira diretamente para pagamento."}
                 </div>
               ) : null}
 
@@ -832,7 +841,13 @@ export function SubscriptionPage() {
                   disabled={payingNow || !data?.canPayNow || paymentWindowBlocked}
                   className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {payingNow ? "Redirecionando..." : paymentWindowBlocked ? "Pago no ciclo atual" : "Pagar agora"}
+                  {payingNow
+                    ? "Redirecionando..."
+                    : paymentWindowBlocked
+                      ? "Pago no ciclo atual"
+                      : overview?.status === "CANCELED"
+                        ? "Reativar e pagar"
+                        : "Pagar agora"}
                 </button>
               ) : (
                 <button
