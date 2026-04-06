@@ -1063,6 +1063,15 @@ export function MaintenanceRecordsPage() {
     addTireAxles([value]);
   }
 
+  function toggleAllTireAxles() {
+    if (tireAxleBatch.length === tireFormAllowedAxles.length) {
+      setTireAxleBatch([]);
+      setTireWheelBatch([]);
+      return;
+    }
+    setTireAxleBatch([...tireFormAllowedAxles]);
+  }
+
   function addTireWheels(values: string[]) {
     const normalized = values.map(normalizeTirePositionLabel).filter(Boolean);
     if (!normalized.length) return;
@@ -1095,6 +1104,14 @@ export function MaintenanceRecordsPage() {
       return;
     }
     addTireWheels([value]);
+  }
+
+  function toggleAllTireWheels() {
+    if (tireWheelBatch.length === tireFormAllowedPositionLabels.length) {
+      setTireWheelBatch([]);
+      return;
+    }
+    setTireWheelBatch([...tireFormAllowedPositionLabels]);
   }
 
   function addSuggestedSlot(slot: TireVisualSlot) {
@@ -2508,16 +2525,29 @@ export function MaintenanceRecordsPage() {
                 <div><label className="block text-sm font-medium text-slate-700">Modelo</label><input value={tireForm.model} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, model: undefined })); setTireForm((prev) => ({ ...prev, model: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.model))} placeholder="Ex: X Multi D" />{tireFieldErrors.model ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.model}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Medida</label><input value={tireForm.size} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, size: undefined })); setTireForm((prev) => ({ ...prev, size: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.size))} placeholder="Ex: 295/80R22.5" />{tireFieldErrors.size ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.size}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={tireForm.status} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, status: undefined })); setTireForm((prev) => ({ ...prev, status: event.target.value as TireStatus | "" })); }} className={getFieldClass(Boolean(tireFieldErrors.status))}><option value="">Selecione o status</option><option value="IN_STOCK">Estoque</option><option value="INSTALLED">Instalado</option><option value="MAINTENANCE">Manutenção</option><option value="RETREADED">Recapado</option><option value="SCRAPPED">Descartado</option></select>{tireFieldErrors.status ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.status}</p> : null}</div>
-                <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => { const vehicleId = event.target.value; setTireAxleBatch([]); setTireWheelBatch([]); setTireForm((prev) => { if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; }); }} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select></div>
+                <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => { const vehicleId = event.target.value; setTireAxleBatch([]); setTireWheelBatch([]); setTireForm((prev) => { if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; }); }} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select></div>
                 <div className="relative">
-                  <label className="block text-sm font-medium text-slate-700">Posição do eixo</label>
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="block text-sm font-medium text-slate-700">Posição do eixo</label>
+                    {tireForm.vehicleId ? (
+                      <button
+                        type="button"
+                        onClick={toggleAllTireAxles}
+                        className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+                      >
+                        {tireAxleBatch.length === tireFormAllowedAxles.length
+                          ? "Limpar seleção"
+                          : "Selecionar todos"}
+                      </button>
+                    ) : null}
+                  </div>
                   <div className="mt-1 rounded-xl border border-slate-300 px-4 py-4">
                     {!tireForm.vehicleId ? (
                       <p className="text-sm text-slate-500">
                         Selecione um veículo para liberar os eixos disponíveis.
                       </p>
                     ) : (
-                      <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
                         {tireFormAllowedAxles.map((axle) => {
                           const checked = tireAxleBatch.some(
                             (item) =>
@@ -2550,8 +2580,26 @@ export function MaintenanceRecordsPage() {
                     Marque rapidamente os eixos que receberão pneus neste cadastro.
                   </p>
                 </div>
-                <div className="relative">
-                  <label className="block text-sm font-medium text-slate-700">Posição da roda (eixo + lado)</label>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">KM atual</label>
+                  <input type="number" min={0} value={tireForm.currentKm} onChange={(event) => setTireForm((prev) => ({ ...prev, currentKm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 128500" />
+                </div>
+                <div className="relative md:col-span-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="block text-sm font-medium text-slate-700">Posição da roda (eixo + lado)</label>
+                    {tireForm.vehicleId && tireAxleBatch.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={toggleAllTireWheels}
+                        className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+                      >
+                        {tireWheelBatch.length === tireFormAllowedPositionLabels.length &&
+                        tireFormAllowedPositionLabels.length > 0
+                          ? "Limpar seleção"
+                          : "Selecionar todos"}
+                      </button>
+                    ) : null}
+                  </div>
                   <div className="mt-1 rounded-xl border border-slate-300 px-4 py-4">
                     {!tireForm.vehicleId ? (
                       <p className="text-sm text-slate-500">
@@ -2620,7 +2668,6 @@ export function MaintenanceRecordsPage() {
                     )}
                   </div>
                 ) : null}
-                <div><label className="block text-sm font-medium text-slate-700">KM atual</label><input type="number" min={0} value={tireForm.currentKm} onChange={(event) => setTireForm((prev) => ({ ...prev, currentKm: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 128500" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Pressão recomendada (PSI)</label><input value={tireForm.targetPressurePsi} onChange={(event) => setTireForm((prev) => ({ ...prev, targetPressurePsi: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 100" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Data de compra</label><input type="date" value={tireForm.purchaseDate} onChange={(event) => setTireForm((prev) => ({ ...prev, purchaseDate: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" /></div>
                 <div><label className="block text-sm font-medium text-slate-700">Custo unitário (R$)</label><input value={tireForm.purchaseCost} onChange={(event) => setTireForm((prev) => ({ ...prev, purchaseCost: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: 1850,00 por pneu" /></div>
