@@ -45,11 +45,6 @@ export function LoginPage() {
   async function handleLogin(event: FormEvent) {
     event.preventDefault();
 
-    if (!acceptedTerms) {
-      setErrorMessage("Você precisa aceitar os termos de uso e a política de privacidade para continuar.");
-      return;
-    }
-
     setLoading(true);
     setErrorMessage("");
 
@@ -57,6 +52,7 @@ export function LoginPage() {
       const response = await api.post("/auth/login", {
         email,
         password,
+        acceptedLegalTerms: acceptedTerms,
       });
 
       const token =
@@ -123,7 +119,7 @@ export function LoginPage() {
               className="mt-1 h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
             />
             <span>
-              Li e aceito os{" "}
+              Como responsável pelo uso da plataforma pela empresa, li e aceito os{" "}
               <Link
                 to="/terms"
                 target="_blank"
@@ -142,6 +138,9 @@ export function LoginPage() {
                 política de privacidade
               </Link>
               .
+              <span className="mt-1 block text-xs text-slate-500">
+                O aceite é registrado para a empresa e permanece válido até que uma nova versão seja publicada.
+              </span>
             </span>
           </label>
 
