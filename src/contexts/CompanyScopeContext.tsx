@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { getCompanies, getCompanyById, getMyCompany } from "../services/companies";
 import type { Company } from "../types/company";
 import { useAuth } from "./AuthContext";
@@ -23,6 +30,14 @@ type CompanyScopeContextType = {
 
 const CompanyScopeContext = createContext<CompanyScopeContextType | undefined>(undefined);
 
+function normalizeCompanyErrorMessage(error: any) {
+  return (
+    error?.response?.data?.message ||
+    error?.message ||
+    "Não foi possível carregar o contexto da empresa."
+  );
+}
+
 export function CompanyScopeProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
   const [selectedCompanyId, setSelectedCompanyIdState] = useState("");
@@ -44,10 +59,8 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    async function bootstrapCompanyScope() {
-      if (isLoadingAuth) {
-        return;
-      }
+    async function bootstrapAdminScope() {
+      if (isLoadingAuth) return;
 
       if (!isAuthenticated || !user) {
         setOptions([]);
@@ -56,41 +69,107 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (user.role !== "ADMIN") return;
+
       setCompanyErrorMessage("");
+      setIsLoadingScopeOptions(true);
 
       try {
-        setIsLoadingScopeOptions(true);
-        setIsLoadingCurrentCompany(true);
+        const companies = await getCompanies();
+        const normalizedOptions = companies.map((company: Company) => ({
+          id: company.id,
+          name: company.name,
+        }));
 
-        if (user.role === "ADMIN") {
-          const companies = await getCompanies();
-          setOptions(
-            companies.map((company: Company) => ({
-              id: company.id,
-              name: company.name,
-            })),
-          );
+        setOptions(normalizedOptions);
 
-          const scopedCompanyId = String(selectedCompanyId || "").trim();
-          if (!scopedCompanyId) {
-            setCurrentCompany(null);
-            return;
-          }
-
-          const companyExistsInScopeList = companies.some(
-            (company: Company) => String(company.id) === scopedCompanyId,
-          );
-          if (!companyExistsInScopeList) {
-            clearSelectedCompanyScope();
-            setCurrentCompany(null);
-            return;
-          }
-
-          const scopedCompany = await getCompanyById(scopedCompanyId);
-          setCurrentCompany(scopedCompany || null);
+        const scopedCompanyId = String(selectedCompanyId || "").trim();
+        if (!scopedCompanyId) {
+          setCurrentCompany(null);
           return;
         }
 
+        const companyExistsInScopeList = companies.some(
+          (company: Company) => String(company.id) === scopedCompanyId,
+        );
+
+        if (!companyExistsInScopeList) {
+          clearSelectedCompanyScope();
+          setCurrentCompany(null);
+        }
+      } catch (error: any) {
+        if (error?.response?.status === 404) {
+          clearSelectedCompanyScope();
+          setCurrentCompany(null);
+          setOptions([]);
+          setCompanyErrorMessage("");
+          return;
+        }
+
+        setCurrentCompany(null);
+        setOptions([]);
+        setCompanyErrorMessage(normalizeCompanyErrorMessage(error));
+      } finally {
+        setIsLoadingScopeOptions(false);
+      }
+    }
+
+    bootstrapAdminScope();
+  }, [isAuthenticated, isLoadingAuth, selectedCompanyId, user]);
+
+  useEffect(() => {
+    async function loadAdminCurrentCompany() {
+      if (isLoadingAuth || !isAuthenticated || !user || user.role !== "ADMIN") return;
+
+      const scopedCompanyId = String(selectedCompanyId || "").trim();
+      if (!scopedCompanyId) {
+        setCurrentCompany(null);
+        setCompanyErrorMessage("");
+        return;
+      }
+
+      setCompanyErrorMessage("");
+      setIsLoadingCurrentCompany(true);
+
+      try {
+        const scopedCompany = await getCompanyById(scopedCompanyId);
+        setCurrentCompany(scopedCompany || null);
+      } catch (error: any) {
+        if (error?.response?.status === 404) {
+          clearSelectedCompanyScope();
+          setCurrentCompany(null);
+          setCompanyErrorMessage("");
+          return;
+        }
+
+        setCurrentCompany(null);
+        setCompanyErrorMessage(normalizeCompanyErrorMessage(error));
+      } finally {
+        setIsLoadingCurrentCompany(false);
+      }
+    }
+
+    loadAdminCurrentCompany();
+  }, [isAuthenticated, isLoadingAuth, selectedCompanyId, user]);
+
+  useEffect(() => {
+    async function bootstrapUserCompany() {
+      if (isLoadingAuth) return;
+
+      if (!isAuthenticated || !user) {
+        setOptions([]);
+        setCurrentCompany(null);
+        setCompanyErrorMessage("");
+        return;
+      }
+
+      if (user.role === "ADMIN") return;
+
+      setCompanyErrorMessage("");
+      setIsLoadingScopeOptions(true);
+      setIsLoadingCurrentCompany(true);
+
+      try {
         let myCompany: Company | null = null;
         let myCompanyError: any = null;
 
@@ -141,29 +220,24 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
           window.dispatchEvent(new Event("evfleet-company-scope-updated"));
         }
       } catch (error: any) {
-        if (user.role === "ADMIN" && error?.response?.status === 404) {
-          clearSelectedCompanyScope();
-          setCurrentCompany(null);
-          setOptions([]);
-          setCompanyErrorMessage("");
-          return;
-        }
-
         setCurrentCompany(null);
         setOptions([]);
-        setCompanyErrorMessage(
-          error?.response?.data?.message ||
-            error?.message ||
-            "Não foi possível carregar o contexto da empresa.",
-        );
+        setCompanyErrorMessage(normalizeCompanyErrorMessage(error));
       } finally {
         setIsLoadingScopeOptions(false);
         setIsLoadingCurrentCompany(false);
       }
     }
 
-    bootstrapCompanyScope();
-  }, [isAuthenticated, isLoadingAuth, selectedCompanyId, user]);
+    bootstrapUserCompany();
+  }, [
+    isAuthenticated,
+    isLoadingAuth,
+    user?.companyId,
+    user?.companyName,
+    user?.id,
+    user?.role,
+  ]);
 
   function setSelectedCompanyId(companyId: string) {
     const normalized = String(companyId || "").trim();
