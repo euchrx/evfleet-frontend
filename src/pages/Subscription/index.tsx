@@ -363,7 +363,9 @@ export function SubscriptionPage() {
       const payload = {
         code: newPlan.code,
         name: newPlan.name,
-        description: newPlan.description,
+        ...(newPlan.description.trim()
+          ? { description: newPlan.description.trim() }
+          : {}),
         priceCents: Number(newPlan.priceCents),
         vehicleLimit: newPlan.vehicleLimit ? Number(newPlan.vehicleLimit) : undefined,
         interval: newPlan.interval,
@@ -397,6 +399,13 @@ export function SubscriptionPage() {
     } finally {
       setSavingPlan(false);
     }
+  }
+
+  async function handleAdminSetPlanStatus(
+    planId: string,
+    status: Extract<SubscriptionStatus, "ACTIVE" | "TRIALING">,
+  ) {
+    await handleSelectPlan(planId, status);
   }
 
   async function handleDeletePlan() {
@@ -664,6 +673,27 @@ export function SubscriptionPage() {
                 >
                   {isSubmitting || redirectingToCheckout ? "Carregando..." : getPlanActionLabel(plan)}
                 </button>
+
+                {canManagePlans && hasCompanyScope ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAdminSetPlanStatus(plan.id, "TRIALING")}
+                      disabled={isSubmitting || redirectingToCheckout || !isStarterPlan(plan)}
+                      className="cursor-pointer rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Setar teste
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAdminSetPlanStatus(plan.id, "ACTIVE")}
+                      disabled={isSubmitting || redirectingToCheckout}
+                      className="cursor-pointer rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Setar pago
+                    </button>
+                  </div>
+                ) : null}
               </article>
             );
           })}
@@ -773,7 +803,7 @@ export function SubscriptionPage() {
                 <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
                   {selectedPlanIsStarter
                     ? trialEnded || selectedPlanIsCanceledCurrent
-                      ? "O periodo de teste deste plano ja foi encerrado. Para continuar, o checkout sera iniciado na proxima etapa."
+                      ? "O periodo de teste do plano Starter ja foi encerrado. Para continuar, o checkout sera iniciado na proxima etapa."
                       : "Este plano seguira diretamente para pagamento."
                     : "O periodo de teste esta disponivel apenas para o plano Starter. Este plano seguira diretamente para pagamento."}
                 </div>
