@@ -139,11 +139,6 @@ export function LoginPage() {
     }
   }
 
-  const showInvalidCredentialsHint =
-    isValidEmail(email) &&
-    !resolvingProfile &&
-    resolvedProfile?.userExists === false;
-
   const showAcceptanceField =
     resolvedProfile?.userExists === true &&
     resolvedProfile?.isAdmin !== true &&
@@ -182,10 +177,6 @@ export function LoginPage() {
                 <span className="font-semibold text-slate-700">
                   {resolvedProfile.role === "ADMIN" ? "Administrador" : "Gestor"}
                 </span>
-              </p>
-            ) : showInvalidCredentialsHint ? (
-              <p className="mt-2 text-xs font-medium text-red-600">
-                Credenciais inválidas.
               </p>
             ) : null}
           </div>
