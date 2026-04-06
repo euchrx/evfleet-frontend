@@ -30,6 +30,7 @@ type CompaniesSectionProps = {
   title?: string;
   description?: string;
   showHeader?: boolean;
+  onQuickViewFinance?: (company: Company) => void;
 };
 
 type ToastState = {
@@ -119,6 +120,7 @@ export function CompaniesSection({
   title = "Empresas",
   description = "Cadastre, visualize, edite e remova empresas do sistema multiempresa.",
   showHeader = true,
+  onQuickViewFinance,
 }: CompaniesSectionProps) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -622,6 +624,13 @@ export function CompaniesSection({
                         <td className="px-6 py-4 text-sm text-slate-600">{formatDate(company.createdAt)}</td>
                         <td className="px-6 py-4 text-sm">
                           <div className="flex gap-2">
+                            <button
+                              onClick={() => onQuickViewFinance?.(company)}
+                              className="btn-ui btn-ui-neutral disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={deleting}
+                            >
+                              Ver finanças
+                            </button>
                             <button
                               onClick={() => openEditModal(company)}
                               className="btn-ui btn-ui-neutral disabled:cursor-not-allowed disabled:opacity-50"

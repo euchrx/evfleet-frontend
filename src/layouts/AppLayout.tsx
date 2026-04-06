@@ -197,7 +197,7 @@ function isStarterSupportPlan(subscription: HeaderSubscriptionInfo | null) {
 export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
+  const { logout, user, isLoadingAuth } = useAuth();
   const {
     selectedCompanyId,
     setSelectedCompanyId,
@@ -455,6 +455,11 @@ export function AppLayout() {
   }
 
   async function loadNotifications() {
+    if (isLoadingAuth || !user) {
+      setNotifications([]);
+      return;
+    }
+
     if (user?.role === "ADMIN") {
       const supportRequestsResult = await Promise.allSettled([getSupportRequests()]);
       const supportRequests =
@@ -492,7 +497,7 @@ export function AppLayout() {
       getMaintenanceRecords(),
       getDebts(),
       getVehicleDocuments(),
-      getSupportRequests(),
+      canAccessSupport ? getSupportRequests() : Promise.resolve([]),
     ]);
 
     const drivers = driversResult.status === "fulfilled" ? driversResult.value : [];
@@ -792,7 +797,7 @@ export function AppLayout() {
         refreshNotifications,
       );
     };
-  }, [selectedCompanyId]);
+  }, [canAccessSupport, isLoadingAuth, selectedCompanyId, user]);
 
   useEffect(() => {
     let active = true;

@@ -1,10 +1,17 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BanknoteArrowDown, Building2, RefreshCw } from "lucide-react";
 import { TablePagination } from "../../components/TablePagination";
 import { getFinanceOverview, type FinanceCompanyItem } from "../../services/finance";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 
-type SubscriptionStatusFilter = "ALL" | "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "NONE";
+type SubscriptionStatusFilter =
+  | "ALL"
+  | "ACTIVE"
+  | "TRIALING"
+  | "PAST_DUE"
+  | "CANCELED"
+  | "NONE";
+
 type FinanceSortBy =
   | "companyName"
   | "subscriptionStatus"
@@ -16,11 +23,15 @@ type FinanceSortBy =
   | "paymentsCount"
   | "lastPaymentDate";
 
+type FinanceOverviewSectionProps = {
+  focusedCompanyId?: string | null;
+};
+
 const PAGE_SIZE = 10;
 
 function subscriptionStatusLabel(status?: string) {
   if (status === "ACTIVE") return "Ativa";
-  if (status === "TRIALING") return "PerÃ­odo de teste";
+  if (status === "TRIALING") return "Período de teste";
   if (status === "PAST_DUE") return "Inadimplente";
   if (status === "CANCELED") return "Cancelada";
   return "Sem assinatura";
@@ -56,7 +67,9 @@ function toSortableTime(value?: string | null) {
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 }
 
-export function FinanceOverviewSection() {
+export function FinanceOverviewSection({
+  focusedCompanyId = null,
+}: FinanceOverviewSectionProps) {
   const [items, setItems] = useState<FinanceCompanyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -66,6 +79,7 @@ export function FinanceOverviewSection() {
   const [sortBy, setSortBy] = useState<FinanceSortBy>("companyName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
+  const [highlightedCompanyId, setHighlightedCompanyId] = useState<string | null>(null);
 
   async function loadFinanceOverview(isManualRefresh = false) {
     try {
@@ -76,8 +90,8 @@ export function FinanceOverviewSection() {
       const data = await getFinanceOverview();
       setItems(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Erro ao carregar finanÃ§as:", error);
-      setErrorMessage("NÃ£o foi possÃ­vel carregar as informaÃ§Ãµes financeiras das empresas.");
+      console.error("Erro ao carregar finanças:", error);
+      setErrorMessage("Não foi possível carregar as informações financeiras das empresas.");
       setItems([]);
     } finally {
       if (isManualRefresh) setRefreshing(false);
@@ -88,6 +102,26 @@ export function FinanceOverviewSection() {
   useEffect(() => {
     loadFinanceOverview();
   }, []);
+
+  useEffect(() => {
+    if (!focusedCompanyId || items.length === 0) return;
+
+    const target = items.find((item) => item.companyId === focusedCompanyId);
+    if (!target) return;
+
+    setSearch(target.companyName);
+    setStatusFilter("ALL");
+    setCurrentPage(1);
+    setHighlightedCompanyId(target.companyId);
+
+    const timer = window.setTimeout(() => {
+      setHighlightedCompanyId((current) =>
+        current === target.companyId ? null : current,
+      );
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [focusedCompanyId, items]);
 
   const filteredItems = useMemo(() => {
     let base = [...items];
@@ -140,11 +174,15 @@ export function FinanceOverviewSection() {
       }
 
       if (sortBy === "currentPeriodStart") {
-        return (toSortableTime(a.currentPeriodStart) - toSortableTime(b.currentPeriodStart)) * direction;
+        return (
+          toSortableTime(a.currentPeriodStart) - toSortableTime(b.currentPeriodStart)
+        ) * direction;
       }
 
       if (sortBy === "currentPeriodEnd") {
-        return (toSortableTime(a.currentPeriodEnd) - toSortableTime(b.currentPeriodEnd)) * direction;
+        return (
+          toSortableTime(a.currentPeriodEnd) - toSortableTime(b.currentPeriodEnd)
+        ) * direction;
       }
 
       if (sortBy === "nextBillingAt") {
@@ -181,6 +219,10 @@ export function FinanceOverviewSection() {
     setCurrentPage(1);
   }, [search, sortBy, sortDirection, statusFilter]);
 
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   function handleSort(column: FinanceSortBy) {
     if (sortBy === column) {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -192,13 +234,9 @@ export function FinanceOverviewSection() {
   }
 
   function getSortArrow(column: FinanceSortBy) {
-    if (sortBy !== column) return "â†•";
-    return sortDirection === "asc" ? "â†‘" : "â†“";
+    if (sortBy !== column) return "↕";
+    return sortDirection === "asc" ? "↑" : "↓";
   }
-
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [currentPage, totalPages]);
 
   const summary = useMemo(
     () => ({
@@ -207,7 +245,9 @@ export function FinanceOverviewSection() {
       trialing: items.filter((item) => item.subscriptionStatus === "TRIALING").length,
       pastDue: items.filter((item) => item.subscriptionStatus === "PAST_DUE").length,
       monthlyRevenueCents: items.reduce((sum, item) => {
-        if (item.subscriptionStatus !== "ACTIVE" && item.subscriptionStatus !== "TRIALING") return sum;
+        if (item.subscriptionStatus !== "ACTIVE" && item.subscriptionStatus !== "TRIALING") {
+          return sum;
+        }
         return sum + item.amountCents;
       }, 0),
     }),
@@ -220,7 +260,7 @@ export function FinanceOverviewSection() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Empresas</h1>
           <p className="text-sm text-slate-500">
-            VisÃ£o administrativa das empresas, assinaturas, status de cobranÃ§a e datas.
+            Visão administrativa das empresas, assinaturas, status de cobrança e datas.
           </p>
         </div>
         <button
@@ -259,7 +299,9 @@ export function FinanceOverviewSection() {
         </div>
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Receita mensal prevista</p>
-          <p className="mt-1 text-3xl font-bold text-blue-900">{formatCurrency(summary.monthlyRevenueCents)}</p>
+          <p className="mt-1 text-3xl font-bold text-blue-900">
+            {formatCurrency(summary.monthlyRevenueCents)}
+          </p>
         </div>
       </div>
 
@@ -278,7 +320,7 @@ export function FinanceOverviewSection() {
           >
             <option value="ALL">Todos os status</option>
             <option value="ACTIVE">Ativa</option>
-            <option value="TRIALING">PerÃ­odo de teste</option>
+            <option value="TRIALING">Período de teste</option>
             <option value="PAST_DUE">Inadimplente</option>
             <option value="CANCELED">Cancelada</option>
             <option value="NONE">Sem assinatura</option>
@@ -353,14 +395,21 @@ export function FinanceOverviewSection() {
                 </tr>
               ) : (
                 paginatedItems.map((item) => (
-                  <tr key={item.companyId} className="border-t border-slate-100 align-top">
+                  <tr
+                    key={item.companyId}
+                    className={`border-t border-slate-100 align-top transition-colors ${
+                      highlightedCompanyId === item.companyId
+                        ? "bg-amber-50/80 ring-1 ring-inset ring-amber-300"
+                        : ""
+                    }`}
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-start gap-2">
                         <Building2 size={16} className="mt-0.5 text-slate-400" />
                         <div>
                           <p className="font-semibold text-slate-900">{item.companyName}</p>
                           <p className="text-xs text-slate-500">
-                            {item.companyDocument || "Documento nÃ£o informado"}
+                            {item.companyDocument || "Documento não informado"}
                           </p>
                         </div>
                       </div>
@@ -386,7 +435,7 @@ export function FinanceOverviewSection() {
                     <td className="px-4 py-3">
                       <p className="font-semibold text-slate-900">{item.paymentsCount}</p>
                       <p className="text-xs text-slate-500">
-                        Pagos: {item.paidPaymentsCount} â€¢ Pendentes: {item.pendingPaymentsCount} â€¢ Expirados:{" "}
+                        Pagos: {item.paidPaymentsCount} • Pendentes: {item.pendingPaymentsCount} • Expirados:{" "}
                         {item.expiredPaymentsCount}
                       </p>
                     </td>
@@ -400,7 +449,7 @@ export function FinanceOverviewSection() {
                               : "-"}
                           </p>
                           <p className="text-xs text-slate-500">
-                            {paymentStatusLabel(item.lastPaymentStatus)} â€¢ {formatDate(item.lastPaymentDate)}
+                            {paymentStatusLabel(item.lastPaymentStatus)} • {formatDate(item.lastPaymentDate)}
                           </p>
                         </div>
                       </div>
@@ -424,4 +473,3 @@ export function FinanceOverviewSection() {
     </section>
   );
 }
-

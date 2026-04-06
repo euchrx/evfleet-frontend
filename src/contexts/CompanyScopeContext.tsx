@@ -24,7 +24,7 @@ type CompanyScopeContextType = {
 const CompanyScopeContext = createContext<CompanyScopeContextType | undefined>(undefined);
 
 export function CompanyScopeProvider({ children }: { children: ReactNode }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoadingAuth } = useAuth();
   const [selectedCompanyId, setSelectedCompanyIdState] = useState("");
   const [options, setOptions] = useState<ScopeOption[]>([]);
   const [isLoadingScopeOptions, setIsLoadingScopeOptions] = useState(false);
@@ -45,6 +45,10 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function bootstrapCompanyScope() {
+      if (isLoadingAuth) {
+        return;
+      }
+
       if (!isAuthenticated || !user) {
         setOptions([]);
         setCurrentCompany(null);
@@ -57,15 +61,6 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
       try {
         setIsLoadingScopeOptions(true);
         setIsLoadingCurrentCompany(true);
-
-        let myCompany: Company | null = null;
-        let myCompanyError: any = null;
-
-        try {
-          myCompany = await getMyCompany();
-        } catch (error: any) {
-          myCompanyError = error;
-        }
 
         if (user.role === "ADMIN") {
           const companies = await getCompanies();
@@ -94,6 +89,15 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
           const scopedCompany = await getCompanyById(scopedCompanyId);
           setCurrentCompany(scopedCompany || null);
           return;
+        }
+
+        let myCompany: Company | null = null;
+        let myCompanyError: any = null;
+
+        try {
+          myCompany = await getMyCompany();
+        } catch (error: any) {
+          myCompanyError = error;
         }
 
         if (!myCompany?.id) {
@@ -159,7 +163,7 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
     }
 
     bootstrapCompanyScope();
-  }, [isAuthenticated, selectedCompanyId, user]);
+  }, [isAuthenticated, isLoadingAuth, selectedCompanyId, user]);
 
   function setSelectedCompanyId(companyId: string) {
     const normalized = String(companyId || "").trim();

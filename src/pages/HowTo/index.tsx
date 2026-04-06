@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { BookOpenCheck, CirclePlay, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
@@ -19,40 +19,46 @@ type VideoForm = {
 const initialForm: VideoForm = {
   title: "",
   url: "",
-  category: "OperaÃ§Ã£o",
+  category: "Operação",
   description: "",
 };
 
 const manualSteps = [
   {
     title: "1. Cadastre a base da frota",
-    route: "Caminho: VeÃ­culos > + Cadastrar veÃ­culo",
-    steps: "Inclua placa, marca, modelo, ano, tipo, combustÃ­vel, capacidade e status. Depois vincule filial para manter custos e relatÃ³rios corretos.",
+    route: "Caminho: Veículos > + Cadastrar veículo",
+    steps:
+      "Inclua placa, marca, modelo, ano, tipo, combustível, capacidade e status. Depois vincule filial para manter custos e relatórios corretos.",
   },
   {
-    title: "2. Vincule motoristas e veÃ­culos",
+    title: "2. Vincule motoristas e veículos",
     route: "Caminho: Motoristas > + Cadastrar motorista",
-    steps: "Cadastre dados de CNH e status. Mantenha apenas perfis ativos para evitar vÃ­nculos incorretos em abastecimentos, viagens e multas.",
+    steps:
+      "Cadastre dados de CNH e status. Mantenha apenas perfis ativos para evitar vínculos incorretos em abastecimentos, viagens e multas.",
   },
   {
     title: "3. Registre abastecimentos com KM",
     route: "Caminho: Abastecimentos > + Registrar",
-    steps: "Informe veÃ­culo, motorista, filial, litros, valor e odÃ´metro. O sistema calcula consumo mÃ©dio e aponta anomalias automaticamente.",
+    steps:
+      "Informe veículo, motorista, filial, litros, valor e odômetro. O sistema calcula consumo médio e aponta anomalias automaticamente.",
   },
   {
     title: "4. Planeje manutenção preventiva",
     route: "Caminho: Manutenções",
-    steps: "Registre e acompanhe as manutenções programadas e pendentes da frota. Use o módulo de pneus para leituras técnicas e controle de desgaste.",
+    steps:
+      "Registre e acompanhe as manutenções programadas e pendentes da frota. Use o módulo de pneus para leituras técnicas e controle de desgaste.",
   },
   {
-    title: "5. Controle dÃ©bitos e documentos",
-    route: "Caminho: DÃ©bitos e Multas / GestÃ£o de Documentos",
-    steps: "Registre vencimentos, status e responsÃ¡veis. Monitore as notificaÃ§Ãµes para itens a vencer e pendÃªncias vencidas.",
+    title: "5. Controle débitos e documentos",
+    route: "Caminho: Débitos e Multas / Gestão de Documentos",
+    steps:
+      "Registre vencimentos, status e responsáveis. Monitore as notificações para itens a vencer e pendências vencidas.",
   },
   {
     title: "6. Acompanhe indicadores no dashboard",
     route: "Caminho: Dashboard",
-    steps: "Use os cards e rankings para decidir com rapidez: custo total, custos por categoria, motoristas e veÃ­culos com maior impacto financeiro.",
+    steps:
+      "Use os cards e rankings para decidir com rapidez: custo total, custos por categoria, motoristas e veículos com maior impacto financeiro.",
   },
 ];
 
@@ -92,7 +98,7 @@ export function HowToPage() {
     if (!search.trim()) return videos;
     const term = search.toLowerCase();
     return videos.filter((video) =>
-      [video.title, video.category, video.description || "", video.url].join(" ").toLowerCase().includes(term)
+      [video.title, video.category, video.description || "", video.url].join(" ").toLowerCase().includes(term),
     );
   }, [videos, search]);
 
@@ -105,18 +111,18 @@ export function HowToPage() {
     event.preventDefault();
     if (!canManageVideos) return;
     if (!form.title.trim() || !form.url.trim()) {
-      setFormError("Informe tÃ­tulo e URL do vÃ­deo.");
+      setFormError("Informe título e URL do vídeo.");
       return;
     }
 
     try {
       const parsed = new URL(form.url);
       if (!parsed.protocol.startsWith("http")) {
-        setFormError("Informe uma URL vÃ¡lida iniciando com http:// ou https://.");
+        setFormError("Informe uma URL válida iniciando com http:// ou https://.");
         return;
       }
     } catch {
-      setFormError("Informe uma URL vÃ¡lida.");
+      setFormError("Informe uma URL válida.");
       return;
     }
 
@@ -148,14 +154,14 @@ export function HowToPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Como usar</h1>
-          <p className="text-sm text-slate-500">Manual completo no sistema e feed de vÃ­deos explicativos.</p>
+          <p className="text-sm text-slate-500">Manual completo no sistema e feed de vídeos explicativos.</p>
         </div>
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
           <BookOpenCheck size={18} className="text-blue-600" />
-          <h2 className="text-lg font-semibold text-slate-900">Manual rÃ¡pido</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Manual rápido</h2>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {manualSteps.map((item) => (
@@ -172,30 +178,50 @@ export function HowToPage() {
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
             <Plus size={18} className="text-orange-600" />
-            <h2 className="text-lg font-semibold text-slate-900">Incluir vÃ­deo</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Incluir vídeo</h2>
           </div>
           <form onSubmit={handleAddVideo} className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700">TÃ­tulo</label>
-              <input value={form.title} onChange={(event) => handleChange("title", event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Ex: Como registrar abastecimento" />
+              <label className="block text-sm font-medium text-slate-700">Título</label>
+              <input
+                value={form.title}
+                onChange={(event) => handleChange("title", event.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                placeholder="Ex: Como registrar abastecimento"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700">Categoria</label>
-              <select value={form.category} onChange={(event) => handleChange("category", event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200">
-                <option value="OperaÃ§Ã£o">OperaÃ§Ã£o</option>
-                <option value="ManutenÃ§Ã£o">ManutenÃ§Ã£o</option>
+              <select
+                value={form.category}
+                onChange={(event) => handleChange("category", event.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              >
+                <option value="Operação">Operação</option>
+                <option value="Manutenção">Manutenção</option>
                 <option value="Financeiro">Financeiro</option>
-                <option value="AdministraÃ§Ã£o">AdministraÃ§Ã£o</option>
+                <option value="Administração">Administração</option>
                 <option value="Treinamento">Treinamento</option>
               </select>
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700">URL do vÃ­deo</label>
-              <input value={form.url} onChange={(event) => handleChange("url", event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="https://www.youtube.com/watch?v=..." />
+              <label className="block text-sm font-medium text-slate-700">URL do vídeo</label>
+              <input
+                value={form.url}
+                onChange={(event) => handleChange("url", event.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                placeholder="https://www.youtube.com/watch?v=..."
+              />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700">DescriÃ§Ã£o (opcional)</label>
-              <textarea rows={2} value={form.description} onChange={(event) => handleChange("description", event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" placeholder="Resumo do conteÃºdo do vÃ­deo" />
+              <label className="block text-sm font-medium text-slate-700">Descrição (opcional)</label>
+              <textarea
+                rows={2}
+                value={form.description}
+                onChange={(event) => handleChange("description", event.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                placeholder="Resumo do conteúdo do vídeo"
+              />
             </div>
             {formError ? <div className="md:col-span-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div> : null}
             <div className="md:col-span-2 flex justify-end">
@@ -208,7 +234,7 @@ export function HowToPage() {
       ) : (
         <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
           <p className="text-sm text-blue-800">
-            Seu perfil Ã© de visualizaÃ§Ã£o neste mÃ³dulo. Apenas administradores podem incluir ou remover vÃ­deos.
+            Seu perfil é de visualização neste módulo. Apenas administradores podem incluir ou remover vídeos.
           </p>
         </section>
       )}
@@ -217,14 +243,19 @@ export function HowToPage() {
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2">
             <CirclePlay size={18} className="text-red-600" />
-            <h2 className="text-lg font-semibold text-slate-900">VÃ­deos explicativos</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Vídeos explicativos</h2>
           </div>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por tÃ­tulo, categoria ou descriÃ§Ã£o" className="w-full max-w-md rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar por título, categoria ou descrição"
+            className="w-full max-w-md rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+          />
         </div>
 
         {filteredVideos.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
-            Nenhum vÃ­deo encontrado no feed.
+            Nenhum vídeo encontrado no feed.
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -243,7 +274,7 @@ export function HowToPage() {
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center p-4 text-center text-sm text-slate-500">
-                        Preview disponÃ­vel para links do YouTube.
+                        Preview disponível para links do YouTube.
                       </div>
                     )}
                   </div>
@@ -253,10 +284,10 @@ export function HowToPage() {
                       <span className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{video.category}</span>
                     </div>
                     {video.description ? <p className="line-clamp-2 text-sm text-slate-600">{video.description}</p> : null}
-                    <p className="text-xs text-slate-500">IncluÃ­do em {formatDateTime(video.createdAt)}</p>
+                    <p className="text-xs text-slate-500">Incluído em {formatDateTime(video.createdAt)}</p>
                     <div className="flex items-center justify-between pt-1">
                       <a href={video.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-800">
-                        Abrir vÃ­deo <ExternalLink size={14} />
+                        Abrir vídeo <ExternalLink size={14} />
                       </a>
                       {canManageVideos ? (
                         <button type="button" onClick={() => handleDeleteVideo(video)} className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-100">
@@ -271,12 +302,11 @@ export function HowToPage() {
           </div>
         )}
       </section>
+
       <ConfirmDeleteModal
         isOpen={Boolean(videoToDelete)}
-        title="Remover vÃ­deo"
-        description={
-          videoToDelete ? `Deseja remover o vÃ­deo "${videoToDelete.title}"?` : ""
-        }
+        title="Remover vídeo"
+        description={videoToDelete ? `Deseja remover o vídeo "${videoToDelete.title}"?` : ""}
         confirmText="Remover"
         onCancel={() => setVideoToDelete(null)}
         onConfirm={confirmDeleteVideo}

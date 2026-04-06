@@ -17,9 +17,9 @@ const PAGE_SIZE = 10;
 
 const categoryOptions: Array<{ value: RetailProductCategory; label: string }> = [
   { value: "PERFUMARIA", label: "Perfumaria" },
-  { value: "COSMETICOS", label: "CosmÃ©ticos" },
+  { value: "COSMETICOS", label: "Cosméticos" },
   { value: "LUBRIFICANTES", label: "Lubrificantes" },
-  { value: "CONVENIENCIA", label: "ConveniÃªncia" },
+  { value: "CONVENIENCIA", label: "Conveniência" },
   { value: "LIMPEZA", label: "Limpeza" },
   { value: "OUTROS", label: "Outros" },
 ];
@@ -89,7 +89,7 @@ export function RetailProductsPage() {
       setLastSuccessfulItems(data);
     } catch (error) {
       console.error("Erro ao carregar produtos:", error);
-      setErrorMessage("NÃ£o foi possÃ­vel carregar os produtos importados.");
+      setErrorMessage("Não foi possível carregar os produtos importados.");
       setItems(lastSuccessfulItems);
     } finally {
       if (manualRefresh) setRefreshing(false);
@@ -210,7 +210,7 @@ export function RetailProductsPage() {
       await loadData(filters, true);
     } catch (error) {
       console.error("Erro ao excluir produtos em lote:", error);
-      setErrorMessage("NÃ£o foi possÃ­vel excluir os produtos selecionados.");
+      setErrorMessage("Não foi possível excluir os produtos selecionados.");
     } finally {
       setDeleting(false);
     }
@@ -222,7 +222,7 @@ export function RetailProductsPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Produtos</h1>
           <p className="text-sm text-slate-500">
-            Controle de itens comprados para o veÃ­culo, organizados por categoria e nota fiscal.
+            Controle de itens comprados para o veículo, organizados por categoria e nota fiscal.
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -349,7 +349,7 @@ export function RetailProductsPage() {
                     checked={allItemsOnPageSelected}
                     onChange={toggleSelectAllPage}
                     className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
-                    aria-label="Selecionar itens da pÃ¡gina"
+                    aria-label="Selecionar itens da página"
                   />
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
@@ -406,7 +406,7 @@ export function RetailProductsPage() {
                     <td className="px-6 py-4 text-sm text-slate-700">
                       <p className="font-medium text-slate-900">{item.description}</p>
                       <p className="mt-1 text-xs text-slate-500">
-                        CÃ³digo: {item.productCode || "-"}
+                        Código: {item.productCode || "-"}
                       </p>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
