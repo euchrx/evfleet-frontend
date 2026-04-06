@@ -1,10 +1,21 @@
 import axios from "axios";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../services/api";
 import { defaultSoftwareSettings, readSoftwareSettings } from "../../services/adminSettings";
+
+type ResolvedLoginProfile = {
+  email: string;
+  userExists: boolean;
+  role: string | null;
+  isAdmin: boolean;
+};
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -14,6 +25,8 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resolvingProfile, setResolvingProfile] = useState(false);
+  const [resolvedProfile, setResolvedProfile] = useState<ResolvedLoginProfile | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const companyName =
     readSoftwareSettings().companyName?.trim() || defaultSoftwareSettings.companyName;
@@ -41,6 +54,47 @@ export function LoginPage() {
 
     return "Não foi possível fazer login. Verifique a API e tente novamente.";
   }
+
+  useEffect(() => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!isValidEmail(normalizedEmail)) {
+      setResolvedProfile(null);
+      setResolvingProfile(false);
+      return;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        setResolvingProfile(true);
+        const response = await api.post<ResolvedLoginProfile>("/auth/login-profile", {
+          email: normalizedEmail,
+        });
+
+        if (!active) return;
+
+        const profile = response.data;
+        setResolvedProfile(profile);
+
+        if (profile?.isAdmin) {
+          setAcceptedTerms(false);
+        }
+      } catch {
+        if (!active) return;
+        setResolvedProfile(null);
+      } finally {
+        if (active) {
+          setResolvingProfile(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [email]);
 
   async function handleLogin(event: FormEvent) {
     event.preventDefault();
@@ -74,12 +128,13 @@ export function LoginPage() {
     }
   }
 
+  const checkboxDisabled = resolvedProfile?.isAdmin === true;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-6">
       <div className="w-full max-w-md rounded-2xl bg-white p-10 shadow-2xl">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-slate-900">{companyName}</h1>
-
           <p className="mt-2 text-sm text-slate-500">Painel de gestão de frota</p>
         </div>
 
@@ -94,6 +149,19 @@ export function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
+
+            {resolvingProfile ? (
+              <p className="mt-2 text-xs text-slate-500">Identificando perfil...</p>
+            ) : resolvedProfile?.userExists ? (
+              <p className="mt-2 text-xs text-slate-500">
+                Perfil identificado:{" "}
+                <span className="font-semibold text-slate-700">
+                  {resolvedProfile.role === "ADMIN" ? "Administrador" : "Gestor"}
+                </span>
+              </p>
+            ) : isValidEmail(email) ? (
+              <p className="mt-2 text-xs text-slate-500">E-mail válido. O perfil será confirmado no login.</p>
+            ) : null}
           </div>
 
           <div>
@@ -108,15 +176,22 @@ export function LoginPage() {
             />
           </div>
 
-          <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <label
+            className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${
+              checkboxDisabled
+                ? "border-slate-200 bg-slate-100 text-slate-500"
+                : "border-slate-200 bg-slate-50 text-slate-700"
+            }`}
+          >
             <input
               type="checkbox"
               checked={acceptedTerms}
+              disabled={checkboxDisabled}
               onChange={(e) => {
                 setAcceptedTerms(e.target.checked);
                 if (errorMessage) setErrorMessage("");
               }}
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200 disabled:cursor-not-allowed disabled:opacity-60"
             />
             <span>
               Como responsável pelo uso da plataforma pela empresa, li e aceito os{" "}
@@ -139,7 +214,9 @@ export function LoginPage() {
               </Link>
               .
               <span className="mt-1 block text-xs text-slate-500">
-                O aceite é registrado para a empresa e permanece válido até que uma nova versão seja publicada.
+                {checkboxDisabled
+                  ? "Administradores não realizam este aceite pela empresa."
+                  : "O aceite é registrado para a empresa e permanece válido até que uma nova versão seja publicada."}
               </span>
             </span>
           </label>
