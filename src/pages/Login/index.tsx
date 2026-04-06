@@ -4,13 +4,17 @@ import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../services/api";
-import { defaultSoftwareSettings, readSoftwareSettings } from "../../services/adminSettings";
+import {
+  defaultSoftwareSettings,
+  readSoftwareSettings,
+} from "../../services/adminSettings";
 
 type ResolvedLoginProfile = {
   email: string;
   userExists: boolean;
   role: string | null;
   isAdmin: boolean;
+  needsLegalAcceptance: boolean;
 };
 
 function isValidEmail(value: string) {
@@ -26,10 +30,12 @@ export function LoginPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resolvingProfile, setResolvingProfile] = useState(false);
-  const [resolvedProfile, setResolvedProfile] = useState<ResolvedLoginProfile | null>(null);
+  const [resolvedProfile, setResolvedProfile] =
+    useState<ResolvedLoginProfile | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const companyName =
-    readSoftwareSettings().companyName?.trim() || defaultSoftwareSettings.companyName;
+    readSoftwareSettings().companyName?.trim() ||
+    defaultSoftwareSettings.companyName;
 
   function getErrorMessage(error: unknown) {
     if (axios.isAxiosError(error)) {
@@ -44,7 +50,7 @@ export function LoginPage() {
       }
 
       if (error.response?.status === 401) {
-        return "E-mail ou senha inválidos.";
+        return "Credenciais inválidas.";
       }
     }
 
@@ -61,6 +67,7 @@ export function LoginPage() {
     if (!isValidEmail(normalizedEmail)) {
       setResolvedProfile(null);
       setResolvingProfile(false);
+      setAcceptedTerms(false);
       return;
     }
 
@@ -68,21 +75,25 @@ export function LoginPage() {
     const timer = window.setTimeout(async () => {
       try {
         setResolvingProfile(true);
-        const response = await api.post<ResolvedLoginProfile>("/auth/login-profile", {
-          email: normalizedEmail,
-        });
+        const response = await api.post<ResolvedLoginProfile>(
+          "/auth/login-profile",
+          {
+            email: normalizedEmail,
+          },
+        );
 
         if (!active) return;
 
         const profile = response.data;
         setResolvedProfile(profile);
 
-        if (profile?.isAdmin) {
+        if (profile.isAdmin || !profile.needsLegalAcceptance) {
           setAcceptedTerms(false);
         }
       } catch {
         if (!active) return;
         setResolvedProfile(null);
+        setAcceptedTerms(false);
       } finally {
         if (active) {
           setResolvingProfile(false);
@@ -128,7 +139,15 @@ export function LoginPage() {
     }
   }
 
-  const checkboxDisabled = resolvedProfile?.isAdmin === true;
+  const showInvalidCredentialsHint =
+    isValidEmail(email) &&
+    !resolvingProfile &&
+    resolvedProfile?.userExists === false;
+
+  const showAcceptanceField =
+    resolvedProfile?.userExists === true &&
+    resolvedProfile?.isAdmin !== true &&
+    resolvedProfile?.needsLegalAcceptance === true;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-6">
@@ -140,13 +159,18 @@ export function LoginPage() {
 
         <form className="space-y-5" onSubmit={handleLogin}>
           <div>
-            <label className="block text-sm font-medium text-slate-700">E-mail</label>
+            <label className="block text-sm font-medium text-slate-700">
+              E-mail
+            </label>
 
             <input
               type="email"
               placeholder="seuemail@empresa.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errorMessage) setErrorMessage("");
+              }}
               className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
 
@@ -159,13 +183,17 @@ export function LoginPage() {
                   {resolvedProfile.role === "ADMIN" ? "Administrador" : "Gestor"}
                 </span>
               </p>
-            ) : isValidEmail(email) ? (
-              <p className="mt-2 text-xs text-slate-500">E-mail válido. O perfil será confirmado no login.</p>
+            ) : showInvalidCredentialsHint ? (
+              <p className="mt-2 text-xs font-medium text-red-600">
+                Credenciais inválidas.
+              </p>
             ) : null}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">Senha</label>
+            <label className="block text-sm font-medium text-slate-700">
+              Senha
+            </label>
 
             <input
               type="password"
@@ -176,50 +204,44 @@ export function LoginPage() {
             />
           </div>
 
-          <label
-            className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${
-              checkboxDisabled
-                ? "border-slate-200 bg-slate-100 text-slate-500"
-                : "border-slate-200 bg-slate-50 text-slate-700"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={acceptedTerms}
-              disabled={checkboxDisabled}
-              onChange={(e) => {
-                setAcceptedTerms(e.target.checked);
-                if (errorMessage) setErrorMessage("");
-              }}
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200 disabled:cursor-not-allowed disabled:opacity-60"
-            />
-            <span>
-              Como responsável pelo uso da plataforma pela empresa, li e aceito os{" "}
-              <Link
-                to="/terms"
-                target="_blank"
-                rel="noreferrer"
-                className="font-semibold text-orange-600 hover:text-orange-700"
-              >
-                termos de uso
-              </Link>{" "}
-              e a{" "}
-              <Link
-                to="/privacy"
-                target="_blank"
-                rel="noreferrer"
-                className="font-semibold text-orange-600 hover:text-orange-700"
-              >
-                política de privacidade
-              </Link>
-              .
-              <span className="mt-1 block text-xs text-slate-500">
-                {checkboxDisabled
-                  ? "Administradores não realizam este aceite pela empresa."
-                  : "O aceite é registrado para a empresa e permanece válido até que uma nova versão seja publicada."}
+          {showAcceptanceField ? (
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => {
+                  setAcceptedTerms(e.target.checked);
+                  if (errorMessage) setErrorMessage("");
+                }}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+              />
+              <span>
+                Como responsável pelo uso da plataforma pela empresa, li e aceito os{" "}
+                <Link
+                  to="/terms"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold text-orange-600 hover:text-orange-700"
+                >
+                  termos de uso
+                </Link>{" "}
+                e a{" "}
+                <Link
+                  to="/privacy"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold text-orange-600 hover:text-orange-700"
+                >
+                  política de privacidade
+                </Link>
+                .
+                <span className="mt-1 block text-xs text-slate-500">
+                  O aceite é registrado para a empresa e permanece válido até que
+                  uma nova versão seja publicada.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          ) : null}
 
           {errorMessage && (
             <p className="text-sm font-medium text-red-600">{errorMessage}</p>
