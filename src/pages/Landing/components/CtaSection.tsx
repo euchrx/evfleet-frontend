@@ -1,4 +1,4 @@
-import { ArrowRight, MessageCircle, PlayCircle } from "lucide-react";
+import { ArrowRight, MessageCircle } from "lucide-react";
 
 export function CtaSection() {
   return (
@@ -27,15 +27,7 @@ export function CtaSection() {
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <a
-              href="/login"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-6 py-4 text-sm font-bold text-slate-950 transition hover:bg-cyan-300"
-            >
-              <PlayCircle className="h-4 w-4" />
-              Acessar plataforma
-            </a>
-
-            <a
-              href="https://wa.me/"
+              href="https://wa.me/5543998022310"
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
             >
               <MessageCircle className="h-4 w-4" />
