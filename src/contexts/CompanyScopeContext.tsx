@@ -100,7 +100,7 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
           if (user.companyId) {
             const fallbackCompany: Company = {
               id: user.companyId,
-              name: "Empresa vinculada",
+              name: String(user.companyName || "").trim() || "Empresa vinculada",
               document: null,
               slug: null,
               active: true,

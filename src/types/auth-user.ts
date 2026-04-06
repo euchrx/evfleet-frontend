@@ -6,5 +6,6 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   companyId?: string | null;
+  companyName?: string | null;
   branchId?: string | null;
 };

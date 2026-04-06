@@ -82,6 +82,18 @@ function readStoredAuthUser() {
   }
 }
 
+function normalizeAuthUserPayload(payload: any): AuthUser {
+  return {
+    id: String(payload?.id || ""),
+    name: String(payload?.name || "Usuário"),
+    email: String(payload?.email || ""),
+    role: payload?.role,
+    companyId: payload?.companyId ?? null,
+    companyName: payload?.companyName ?? payload?.company?.name ?? null,
+    branchId: payload?.branchId ?? null,
+  };
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -100,8 +112,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         },
       });
 
-      setUser(response.data);
-      saveAuthUser(response.data);
+      const normalizedUser = normalizeAuthUserPayload(response.data);
+      setUser(normalizedUser);
+      saveAuthUser(normalizedUser);
       return true;
     } catch (error: any) {
       const status = error?.response?.status;
@@ -121,6 +134,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             role: payload.role,
             name: payload.name || localStorage.getItem("auth_user_name") || "Usuário",
             companyId: payload.companyId || null,
+            companyName: null,
           };
           setUser(fallbackUser);
           saveAuthUser(fallbackUser);
@@ -170,6 +184,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const normalizedUser: AuthUser = {
         ...userFromLogin,
         companyId: userFromLogin.companyId ?? payload?.companyId ?? null,
+        companyName: userFromLogin.companyName ?? null,
       };
       setUser(normalizedUser);
       saveAuthUser(normalizedUser);
