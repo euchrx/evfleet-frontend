@@ -11,8 +11,22 @@ import { FeaturesSection } from "./components/FeaturesSection";
 import { HeroSection } from "./components/HeroSection";
 import { PreviewSection } from "./components/PreviewSection";
 import { ProblemSolutionSection } from "./components/ProblemSolutionSection";
+import logo from "/src/assets/logo.png";
+
+import { useEffect, useState } from "react";
 
 export function LandingPage() {
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 40);
+
+    window.addEventListener("scroll", onScroll);
+    onScroll();
+
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const softwareSettings = readSoftwareSettings();
   const productName =
     softwareSettings.companyName?.trim() || defaultSoftwareSettings.companyName;
@@ -21,22 +35,14 @@ export function LandingPage() {
     <div className="min-h-screen bg-slate-950 text-white">
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 shadow-[0_0_30px_rgba(34,211,238,0.12)]">
-              <Fuel className="h-5 w-5 text-cyan-300" />
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300/80">
-                Plataforma de operação
-              </p>
-              <div className="flex items-center">
-                <img
-                  src="/src/assets/logo.png"
-                  alt="EvFleet"
-                  className="h-10 w-auto object-contain"
-                />
-              </div>
+          <Link to="/landing" className="flex items-center gap-3">
+            <div className="flex items-center">
+              <img
+                src={logo}
+                alt="EvFleet"
+                className={`w-auto object-contain transition-all duration-300 ${isScrolled ? "h-10" : "h-14"
+                  }`}
+              />
             </div>
           </Link>
 
@@ -68,7 +74,6 @@ export function LandingPage() {
           </nav>
 
           <div className="flex items-center gap-3">
-
             <a
               href="#cta"
               className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
