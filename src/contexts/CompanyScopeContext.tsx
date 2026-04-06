@@ -57,7 +57,15 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
       try {
         setIsLoadingScopeOptions(true);
         setIsLoadingCurrentCompany(true);
-        const myCompany = await getMyCompany().catch(() => null);
+
+        let myCompany: Company | null = null;
+        let myCompanyError: any = null;
+
+        try {
+          myCompany = await getMyCompany();
+        } catch (error: any) {
+          myCompanyError = error;
+        }
 
         if (user.role === "ADMIN") {
           const companies = await getCompanies();
@@ -89,9 +97,34 @@ export function CompanyScopeProvider({ children }: { children: ReactNode }) {
         }
 
         if (!myCompany?.id) {
+          if (user.companyId) {
+            const fallbackCompany: Company = {
+              id: user.companyId,
+              name: "Empresa vinculada",
+              document: null,
+              slug: null,
+              active: true,
+              createdAt: new Date(0).toISOString(),
+            };
+
+            setCurrentCompany(fallbackCompany);
+            setOptions([{ id: fallbackCompany.id, name: fallbackCompany.name }]);
+
+            if (selectedCompanyId !== fallbackCompany.id) {
+              setSelectedCompanyIdState(fallbackCompany.id);
+              localStorage.setItem(COMPANY_SCOPE_STORAGE_KEY, fallbackCompany.id);
+              window.dispatchEvent(new Event("evfleet-company-scope-updated"));
+            }
+            return;
+          }
+
           setCurrentCompany(null);
           setOptions([]);
-          setCompanyErrorMessage("Empresa da sessão não encontrada.");
+          setCompanyErrorMessage(
+            myCompanyError?.response?.status === 401
+              ? "Seu usuário autenticado não está vinculado corretamente a uma empresa."
+              : "Empresa da sessão não encontrada.",
+          );
           return;
         }
 
