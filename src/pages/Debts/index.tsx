@@ -1,6 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Pencil } from "lucide-react";
 import type { Debt } from "../../types/debt";
 import type { Vehicle } from "../../types/vehicle";
 import {
@@ -12,6 +11,7 @@ import {
 import { getVehicles } from "../../services/vehicles";
 import { useBranch } from "../../contexts/BranchContext";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { QuickStatusAction } from "../../components/QuickStatusAction";
 import { TablePagination } from "../../components/TablePagination";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
@@ -154,6 +154,7 @@ export function DebtsPage() {
   const [deletingDebt, setDeletingDebt] = useState(false);
   const [selectedDebtIds, setSelectedDebtIds] = useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [quickStatusDebtId, setQuickStatusDebtId] = useState<string | null>(null);
   const [form, setForm] = useState<DebtFormData>(initialForm);
   const [highlightedDebtId, setHighlightedDebtId] = useState<string | null>(
     null,
@@ -478,6 +479,32 @@ export function DebtsPage() {
 
   async function handleDelete(debt: Debt) {
     setDebtToDelete(debt);
+  }
+
+  async function handleQuickStatusChange(debt: Debt, nextStatus: string) {
+    try {
+      setQuickStatusDebtId(debt.id);
+      const updated = await updateDebt(debt.id, {
+        description: debt.description,
+        category: debt.category,
+        amount: debt.amount,
+        points: debt.points || 0,
+        debtDate: String(debt.debtDate).slice(0, 10),
+        dueDate: debt.dueDate ? String(debt.dueDate).slice(0, 10) : undefined,
+        creditor: debt.creditor || undefined,
+        isRecurring: Boolean(debt.isRecurring),
+        status: nextStatus,
+        vehicleId: debt.vehicleId,
+      });
+      setDebts((prev) => prev.map((item) => (item.id === debt.id ? updated : item)));
+      setPageErrorMessage("");
+      notifyHeaderNotifications();
+    } catch (error) {
+      console.error("Erro ao atualizar status do d?bito:", error);
+      setPageErrorMessage("N?o foi poss?vel atualizar o status do d?bito.");
+    } finally {
+      setQuickStatusDebtId(null);
+    }
   }
 
   async function confirmDeleteDebt() {
@@ -824,15 +851,15 @@ export function DebtsPage() {
                           </span>
                           {effectiveStatus === "PENDING" ||
                           effectiveStatus === "OVERDUE" ? (
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(debt)}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-orange-200 bg-orange-50 text-orange-600 transition hover:bg-orange-100"
-                              title="Atualizar status"
-                              aria-label={`Atualizar status do d?bito ${debt.description}`}
-                            >
-                              <Pencil size={14} />
-                            </button>
+                            <QuickStatusAction
+                              label={`Atualizar status do d?bito ${debt.description}`}
+                              loading={quickStatusDebtId === debt.id}
+                              options={[
+                                { value: "PAID", label: "Marcar como paga" },
+                                { value: "APPEALED", label: "Marcar como recorrida" },
+                              ]}
+                              onSelect={(value) => handleQuickStatusChange(debt, value)}
+                            />
                           ) : null}
                         </div>
                       </td>

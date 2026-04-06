@@ -1,6 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { createVehicleDocument, deleteVehicleDocument, getVehicleDocuments, updateVehicleDocument, uploadVehicleDocumentFile } from "../../services/vehicleDocuments";
-import { Pencil } from "lucide-react";
 import { getVehicles } from "../../services/vehicles";
 import { useBranch } from "../../contexts/BranchContext";
 import type { Vehicle } from "../../types/vehicle";
@@ -8,6 +7,7 @@ import type { VehicleDocument, VehicleDocumentStatus, VehicleDocumentType } from
 import { api } from "../../services/api";
 import { normalizeApiBaseUrl } from "../../services/url";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { QuickStatusAction } from "../../components/QuickStatusAction";
 import { useLocation } from "react-router-dom";
 import { TablePagination } from "../../components/TablePagination";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
@@ -117,6 +117,7 @@ export function VehicleDocumentsPage() {
   const [deletingDocument, setDeletingDocument] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [quickStatusDocumentId, setQuickStatusDocumentId] = useState<string | null>(null);
   const [highlightedDocumentId, setHighlightedDocumentId] = useState<string | null>(null);
   const [form, setForm] = useState<DocumentFormData>(initialForm);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -372,7 +373,22 @@ export function VehicleDocumentsPage() {
       await loadData();
     } catch (error) {
       console.error("Erro ao excluir documento:", error);
-      setPageErrorMessage("Não foi possível excluir o documento.");
+      setPageErrorMessage("N?o foi poss?vel excluir o documento.");
+    }
+  }
+
+  async function handleQuickStatusChange(item: VehicleDocument, nextStatus: VehicleDocumentStatus) {
+    try {
+      setQuickStatusDocumentId(item.id);
+      const updated = await updateVehicleDocument(item.id, { status: nextStatus });
+      setDocuments((prev) => prev.map((entry) => (entry.id === item.id ? updated : entry)));
+      setPageErrorMessage("");
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+    } catch (error) {
+      console.error("Erro ao atualizar status do documento:", error);
+      setPageErrorMessage("N?o foi poss?vel atualizar o status do documento.");
+    } finally {
+      setQuickStatusDocumentId(null);
     }
   }
 
@@ -524,7 +540,7 @@ export function VehicleDocumentsPage() {
                     <td className="px-6 py-4 text-sm text-slate-700"><p className="font-medium text-slate-900">{item.name}</p><p className="text-xs text-slate-500">{item.number || "Sem número"}</p>{item.fileUrl ? <a href={resolveFileUrl(item.fileUrl)} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-blue-700 hover:underline">Ver anexo</a> : null}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{item.vehicle ? formatVehicleLabel(item.vehicle) : item.vehicleId}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{toDateText(item.expiryDate)}</td>
-                    <td className="px-6 py-4 text-sm"><div className="flex items-center gap-2"><span className={`status-pill ${statusClass(effectiveStatus)}`}>{statusLabel(effectiveStatus)}</span>{effectiveStatus !== "VALID" ? <button type="button" onClick={() => openEditModal(item)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-orange-200 bg-orange-50 text-orange-600 transition hover:bg-orange-100" title="Atualizar status" aria-label={`Atualizar status do documento ${item.name}`}><Pencil size={14} /></button> : null}</div></td>
+                    <td className="px-6 py-4 text-sm"><div className="flex items-center gap-2"><span className={`status-pill ${statusClass(effectiveStatus)}`}>{statusLabel(effectiveStatus)}</span>{effectiveStatus !== "VALID" ? <QuickStatusAction label={`Atualizar status do documento ${item.name}`} loading={quickStatusDocumentId === item.id} options={[{ value: "VALID", label: "Marcar como v?lido" }, { value: "EXPIRING", label: "Marcar como vencendo" }, { value: "EXPIRED", label: "Marcar como vencido" }]} onSelect={(value) => handleQuickStatusChange(item, value as VehicleDocumentStatus)} /> : null}</div></td>
                     <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openEditModal(item)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => handleDelete(item)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
                   </tr>
                 );

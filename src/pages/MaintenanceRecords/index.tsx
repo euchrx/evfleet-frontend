@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { LayoutGrid, Pencil, Table2 } from "lucide-react";
+import { LayoutGrid, Table2 } from "lucide-react";
 import { useBranch } from "../../contexts/BranchContext";
 import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import {
@@ -35,6 +35,7 @@ import {
   type CreateTireReadingInput,
 } from "../../services/tires";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
+import { QuickStatusAction } from "../../components/QuickStatusAction";
 import { TablePagination } from "../../components/TablePagination";
 import type { Vehicle } from "../../types/vehicle";
 import type { MaintenanceRecord } from "../../types/maintenance-record";
@@ -451,6 +452,7 @@ export function MaintenanceRecordsPage() {
   const [readingForm, setReadingForm] = useState<TireReadingFormState>(initialReadingForm);
   const [tireReadings, setTireReadings] = useState<TireReading[]>([]);
   const [recordToDelete, setRecordToDelete] = useState<MaintenanceRecord | null>(null);
+  const [quickStatusRecordId, setQuickStatusRecordId] = useState<string | null>(null);
   const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
   const [bulkDeleteRecordsOpen, setBulkDeleteRecordsOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<MaintenancePlan | null>(null);
@@ -1241,6 +1243,34 @@ export function MaintenanceRecordsPage() {
     setRecordToDelete(record);
   }
 
+  async function handleQuickRecordStatusChange(record: MaintenanceRecord, nextStatus: "OPEN" | "DONE") {
+    try {
+      setQuickStatusRecordId(record.id);
+      const updated = await updateMaintenanceRecord(record.id, {
+        vehicleId: record.vehicleId,
+        type: record.type,
+        description: record.description,
+        partsReplaced: Array.isArray(record.partsReplaced) ? record.partsReplaced : undefined,
+        workshop: record.workshop || undefined,
+        responsible: record.responsible || undefined,
+        cost: Number(record.cost || 0),
+        km: Number(record.km || 0),
+        maintenanceDate: String(record.maintenanceDate).slice(0, 10),
+        status: nextStatus,
+        notes: record.notes || undefined,
+      });
+      setRecords((prev) => prev.map((item) => (item.id === record.id ? updated : item)));
+      setErrorMessage("");
+      window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
+      window.dispatchEvent(new CustomEvent("evfleet-dashboard-updated"));
+    } catch (error) {
+      console.error("Erro ao atualizar status da manuten??o:", error);
+      setErrorMessage("N?o foi poss?vel atualizar o status da manuten??o.");
+    } finally {
+      setQuickStatusRecordId(null);
+    }
+  }
+
   function openCreatePlan() {
     setEditingPlan(null);
     setPlanFieldErrors({});
@@ -1834,7 +1864,7 @@ export function MaintenanceRecordsPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-700">{record.km?.toLocaleString("pt-BR") || "-"}</td>
                       <td className="px-6 py-4 text-sm text-slate-700">{toMoney(Number(record.cost || 0))}</td>
-                      <td className="px-6 py-4 text-sm"><div className="flex items-center gap-2"><span className={`status-pill ${record.status === "DONE" ? "status-active" : "status-pending"}`}>{maintenanceStatusLabel(record.status)}</span>{record.status !== "DONE" ? <button type="button" onClick={() => openEditRecord(record)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-orange-200 bg-orange-50 text-orange-600 transition hover:bg-orange-100" title="Atualizar status" aria-label={`Atualizar status da manuten??o ${record.description}`}><Pencil size={14} /></button> : null}</div></td>
+                      <td className="px-6 py-4 text-sm"><div className="flex items-center gap-2"><span className={`status-pill ${record.status === "DONE" ? "status-active" : "status-pending"}`}>{maintenanceStatusLabel(record.status)}</span>{record.status !== "DONE" ? <QuickStatusAction label={`Atualizar status da manuten??o ${record.description}`} loading={quickStatusRecordId === record.id} options={[{ value: "DONE", label: "Marcar como conclu?da" }]} onSelect={(value) => handleQuickRecordStatusChange(record, value as "OPEN" | "DONE")} /> : null}</div></td>
                       <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button type="button" onClick={() => openEditRecord(record)} className="btn-ui btn-ui-neutral">Editar</button><button type="button" onClick={() => removeRecord(record)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
                     </tr>
                   );
