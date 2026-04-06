@@ -15,10 +15,15 @@ import {
   saveMenuVisibilityMap,
   type MenuVisibilityMap,
 } from "../../services/menuVisibility";
+import {
+  fetchLegalAcceptanceSettings,
+  saveLegalAcceptanceSettings,
+} from "../../services/legalAcceptanceSettings";
 
 export function AdministrationPage() {
   const [settings, setSettings] = useState<SoftwareSettings>(defaultSoftwareSettings);
   const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>(getDefaultMenuVisibilityMap());
+  const [legalAcceptanceEnabled, setLegalAcceptanceEnabled] = useState(false);
   const [savedAt, setSavedAt] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [updateTitle, setUpdateTitle] = useState("");
@@ -33,6 +38,9 @@ export function AdministrationPage() {
   useEffect(() => {
     setSettings(readSoftwareSettings());
     fetchMenuVisibilityMap().then(setMenuVisibility);
+    fetchLegalAcceptanceSettings()
+      .then((data) => setLegalAcceptanceEnabled(data.enabled))
+      .catch(() => setLegalAcceptanceEnabled(false));
   }, []);
 
   function normalizeVersionInput(value: string) {
@@ -45,8 +53,9 @@ export function AdministrationPage() {
     setSettings((prev) => ({ ...prev, [field]: value }));
   }
 
-  function saveSettings() {
+  async function saveSettings() {
     saveSoftwareSettings(settings);
+    await saveLegalAcceptanceSettings(legalAcceptanceEnabled);
     window.dispatchEvent(new CustomEvent("evfleet-settings-updated"));
     const now = new Date().toLocaleString("pt-BR");
     setSavedAt(now);
@@ -54,9 +63,11 @@ export function AdministrationPage() {
     window.setTimeout(() => setSaveMessage(""), 2500);
   }
 
-  function restoreDefaults() {
+  async function restoreDefaults() {
     setSettings(defaultSoftwareSettings);
+    setLegalAcceptanceEnabled(false);
     saveSoftwareSettings(defaultSoftwareSettings);
+    await saveLegalAcceptanceSettings(false);
     window.dispatchEvent(new CustomEvent("evfleet-settings-updated"));
     const now = new Date().toLocaleString("pt-BR");
     setSavedAt(now);
@@ -216,6 +227,29 @@ export function AdministrationPage() {
             >
               <option value="BRL">Real (BRL)</option>
             </select>
+          </label>
+          <label className="space-y-2 lg:col-span-6">
+            <span className="text-sm font-medium text-slate-700">
+              Aceite de termos no login
+            </span>
+            <div className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-slate-800">
+                  Exigir aceite dos termos para a empresa
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Quando ativo, usuários não administradores só entram após o
+                  responsável da empresa aceitar os termos vigentes. Quando
+                  desativado, o login segue normalmente sem esse bloqueio.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={legalAcceptanceEnabled}
+                onChange={(e) => setLegalAcceptanceEnabled(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-slate-300"
+              />
+            </div>
           </label>
           
         </div>
