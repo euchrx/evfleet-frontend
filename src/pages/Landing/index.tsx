@@ -30,9 +30,13 @@ export function LandingPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300/80">
                 Plataforma de operação
               </p>
-              <p className="text-lg font-bold tracking-tight text-white">
-                {productName}
-              </p>
+              <div className="flex items-center">
+                <img
+                  src="/src/assets/logo.png"
+                  alt="EvFleet"
+                  className="h-10 w-auto object-contain"
+                />
+              </div>
             </div>
           </Link>
 
