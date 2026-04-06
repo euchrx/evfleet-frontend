@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
+import { createPortal } from "react-dom";
 
 type QuickStatusOption = {
   value: string;
@@ -21,6 +22,8 @@ export function QuickStatusAction({
 }: QuickStatusActionProps) {
   const [open, setOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (!open) return;
@@ -35,6 +38,35 @@ export function QuickStatusAction({
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) return;
+
+    function updatePosition() {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const menuWidth = 180;
+      const padding = 12;
+      const nextLeft = Math.min(
+        Math.max(padding, rect.right - menuWidth),
+        window.innerWidth - menuWidth - padding,
+      );
+
+      setMenuPosition({
+        top: rect.bottom + 8,
+        left: nextLeft,
+      });
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
+
   async function handleSelect(value: string) {
     await onSelect(value);
     setOpen(false);
@@ -43,6 +75,7 @@ export function QuickStatusAction({
   return (
     <div ref={shellRef} className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
         disabled={loading}
@@ -53,8 +86,12 @@ export function QuickStatusAction({
         <Pencil size={14} />
       </button>
 
-      {open ? (
-        <div className="absolute right-0 top-10 z-20 min-w-[180px] rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+      {open
+        ? createPortal(
+        <div
+          className="fixed z-[140] min-w-[180px] rounded-xl border border-slate-200 bg-white p-2 shadow-xl"
+          style={{ top: menuPosition.top, left: menuPosition.left }}
+        >
           <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Alterar status
           </p>
@@ -71,8 +108,10 @@ export function QuickStatusAction({
               </button>
             ))}
           </div>
-        </div>
-      ) : null}
+        </div>,
+        document.body,
+      )
+        : null}
     </div>
   );
 }
