@@ -436,11 +436,9 @@ export function MaintenanceRecordsPage() {
   const [tireFieldErrors, setTireFieldErrors] = useState<Partial<Record<TireFieldKey, string>>>({});
   const [editingTire, setEditingTire] = useState<Tire | null>(null);
   const [tireForm, setTireForm] = useState<TireFormState>(initialTireForm);
-  const [tireAxleInput, setTireAxleInput] = useState("");
   const [tireAxleBatch, setTireAxleBatch] = useState<string[]>([]);
   const [tireWheelInput, setTireWheelInput] = useState("");
   const [tireWheelBatch, setTireWheelBatch] = useState<string[]>([]);
-  const [tireAxleOpen, setTireAxleOpen] = useState(false);
   const [tireWheelOpen, setTireWheelOpen] = useState(false);
   const [tireVisualModalOpen, setTireVisualModalOpen] = useState(false);
   const [selectedTireVehicle, setSelectedTireVehicle] = useState<Vehicle | null>(null);
@@ -863,14 +861,6 @@ export function MaintenanceRecordsPage() {
       .sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [tireFormVehicleSlots, tireAxleBatch]);
 
-  const filteredTireAxleSuggestions = useMemo(() => {
-    const query = normalizeSearchText(tireAxleInput);
-    return tireFormAllowedAxles
-      .filter((item) => !tireAxleBatch.some((selected) => selected.toLowerCase() === item.toLowerCase()))
-      .filter((item) => (query ? normalizeSearchText(item).includes(query) : true))
-      .slice(0, 12);
-  }, [tireFormAllowedAxles, tireAxleBatch, tireAxleInput]);
-
   const filteredTireWheelSuggestions = useMemo(() => {
     const query = normalizeSearchText(tireWheelInput);
     return tireFormAllowedPositionLabels
@@ -1068,6 +1058,17 @@ export function MaintenanceRecordsPage() {
       );
       return next;
     });
+  }
+
+  function toggleTireAxle(value: string) {
+    const alreadySelected = tireAxleBatch.some(
+      (item) => normalizeSearchText(item) === normalizeSearchText(value),
+    );
+    if (alreadySelected) {
+      removeTireAxle(value);
+      return;
+    }
+    addTireAxles([value]);
   }
 
   function addTireWheels(values: string[]) {
@@ -1321,10 +1322,8 @@ export function MaintenanceRecordsPage() {
     setEditingTire(null);
     setTireFieldErrors({});
     setTireAxleBatch([]);
-    setTireAxleInput("");
     setTireWheelBatch([]);
     setTireWheelInput("");
-    setTireAxleOpen(false);
     setTireWheelOpen(false);
     const defaultVehicleId = "";
     const latestKm = undefined;
@@ -1340,10 +1339,8 @@ export function MaintenanceRecordsPage() {
     setEditingTire(null);
     setTireFieldErrors({});
     setTireAxleBatch([slot.axleValue]);
-    setTireAxleInput("");
     setTireWheelBatch([formatPositionLabel(slot.axleValue, slot.wheelValue)]);
     setTireWheelInput("");
-    setTireAxleOpen(false);
     setTireWheelOpen(false);
     const latestKm = latestKmByVehicle.get(vehicle.id);
     setTireForm({
@@ -1371,14 +1368,12 @@ export function MaintenanceRecordsPage() {
     setEditingTire(tire);
     setTireFieldErrors({});
     setTireAxleBatch(tire.axlePosition ? [tire.axlePosition] : []);
-    setTireAxleInput("");
     setTireWheelBatch(
       tire.axlePosition && tire.wheelPosition
         ? [formatPositionLabel(tire.axlePosition, tire.wheelPosition)]
         : [],
     );
     setTireWheelInput("");
-    setTireAxleOpen(false);
     setTireWheelOpen(false);
     setTireForm({
       serialNumber: tire.serialNumber || "",
@@ -1484,7 +1479,6 @@ export function MaintenanceRecordsPage() {
       }
       setTireModalOpen(false);
       setTireAxleBatch([]);
-      setTireAxleInput("");
       setTireWheelBatch([]);
       setTireWheelInput("");
       await loadData();
@@ -2490,66 +2484,47 @@ export function MaintenanceRecordsPage() {
                 <div><label className="block text-sm font-medium text-slate-700">Modelo</label><input value={tireForm.model} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, model: undefined })); setTireForm((prev) => ({ ...prev, model: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.model))} placeholder="Ex: X Multi D" />{tireFieldErrors.model ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.model}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Medida</label><input value={tireForm.size} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, size: undefined })); setTireForm((prev) => ({ ...prev, size: event.target.value })); }} className={getFieldClass(Boolean(tireFieldErrors.size))} placeholder="Ex: 295/80R22.5" />{tireFieldErrors.size ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.size}</p> : null}</div>
                 <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={tireForm.status} onChange={(event) => { setTireFieldErrors((prev) => ({ ...prev, status: undefined })); setTireForm((prev) => ({ ...prev, status: event.target.value as TireStatus | "" })); }} className={getFieldClass(Boolean(tireFieldErrors.status))}><option value="">Selecione o status</option><option value="IN_STOCK">Estoque</option><option value="INSTALLED">Instalado</option><option value="MAINTENANCE">Manutenção</option><option value="RETREADED">Recapado</option><option value="SCRAPPED">Descartado</option></select>{tireFieldErrors.status ? <p className="mt-1 text-xs text-red-600">{tireFieldErrors.status}</p> : null}</div>
-                <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => { const vehicleId = event.target.value; setTireAxleBatch([]); setTireAxleInput(""); setTireWheelBatch([]); setTireWheelInput(""); setTireAxleOpen(false); setTireWheelOpen(false); setTireForm((prev) => { if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; }); }} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select></div>
+                <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={tireForm.vehicleId} onChange={(event) => { const vehicleId = event.target.value; setTireAxleBatch([]); setTireWheelBatch([]); setTireWheelInput(""); setTireWheelOpen(false); setTireForm((prev) => { if (editingTire) return { ...prev, vehicleId }; const latestKm = latestKmByVehicle.get(vehicleId); return { ...prev, vehicleId, currentKm: typeof latestKm === "number" ? String(latestKm) : "" }; }); }} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"><option value="">Selecione um veículo</option>{activeVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select></div>
                 <div className="relative">
                   <label className="block text-sm font-medium text-slate-700">Posição do eixo</label>
-                  <div className="mt-1 rounded-xl border border-slate-300 px-3 py-3">
-                    {tireAxleBatch.length ? (
-                      <div className="mb-2 flex flex-wrap gap-2">
-                        {tireAxleBatch.map((axle) => (
-                          <span key={axle} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                            {axle}
-                            <button type="button" onClick={() => removeTireAxle(axle)} className="cursor-pointer text-slate-500 hover:text-slate-700">x</button>
-                          </span>
-                        ))}
+                  <div className="mt-1 rounded-xl border border-slate-300 px-4 py-4">
+                    {!tireForm.vehicleId ? (
+                      <p className="text-sm text-slate-500">
+                        Selecione um veículo para liberar os eixos disponíveis.
+                      </p>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {tireFormAllowedAxles.map((axle) => {
+                          const checked = tireAxleBatch.some(
+                            (item) =>
+                              normalizeSearchText(item) ===
+                              normalizeSearchText(axle),
+                          );
+                          return (
+                            <label
+                              key={axle}
+                              className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm transition ${
+                                checked
+                                  ? "border-orange-300 bg-orange-50 text-orange-700"
+                                  : "border-slate-200 bg-white text-slate-700 hover:border-orange-200 hover:bg-orange-50/40"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleTireAxle(axle)}
+                                className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                              />
+                              <span className="font-medium">{axle}</span>
+                            </label>
+                          );
+                        })}
                       </div>
-                    ) : null}
-                    <input
-                      value={tireAxleInput}
-                      disabled={!tireForm.vehicleId}
-                      onChange={(event) => {
-                        setTireAxleInput(event.target.value);
-                        setTireAxleOpen(true);
-                      }}
-                      onFocus={() => setTireAxleOpen(true)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === "," || event.key === ".") {
-                          event.preventDefault();
-                          const chunks = tireAxleInput.split(/[,.]/).map((item) => item.trim());
-                          addTireAxles(chunks);
-                          setTireAxleInput("");
-                        }
-                      }}
-                      onBlur={() => {
-                        if (tireAxleInput.trim()) {
-                          addTireAxles([tireAxleInput]);
-                          setTireAxleInput("");
-                        }
-                        setTimeout(() => setTireAxleOpen(false), 120);
-                      }}
-                      className="w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                      placeholder={tireForm.vehicleId ? "Digite uma posição do eixo e pressione Enter" : "Selecione um veículo"}
-                    />
+                    )}
                   </div>
-                  {tireAxleOpen && filteredTireAxleSuggestions.length > 0 ? (
-                    <div className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
-                      {filteredTireAxleSuggestions.map((value) => (
-                        <button
-                          key={`axle-suggestion-${value}`}
-                          type="button"
-                          onMouseDown={(event) => {
-                            event.preventDefault();
-                            addTireAxles([value]);
-                            setTireAxleInput("");
-                            setTireAxleOpen(false);
-                          }}
-                          className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                        >
-                          {value}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
+                  <p className="mt-2 text-xs text-slate-500">
+                    Marque rapidamente os eixos que receberão pneus neste cadastro.
+                  </p>
                 </div>
                 <div className="relative">
                   <label className="block text-sm font-medium text-slate-700">Posição da roda (eixo + lado)</label>

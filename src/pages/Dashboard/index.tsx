@@ -828,7 +828,10 @@ export function DashboardPage() {
       };
       current.totalValue += toSafeNumber(item.purchaseCost);
       current.records += 1;
-      current.totalKm += toSafeNumber(item.currentKm);
+      current.totalKm = Math.max(
+        current.totalKm,
+        toSafeNumber(item.currentKm),
+      );
       tiresByVehicle.set(key, current);
     });
 
