@@ -29,7 +29,6 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [resolvingProfile, setResolvingProfile] = useState(false);
   const [resolvedProfile, setResolvedProfile] =
     useState<ResolvedLoginProfile | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -66,7 +65,6 @@ export function LoginPage() {
 
     if (!isValidEmail(normalizedEmail)) {
       setResolvedProfile(null);
-      setResolvingProfile(false);
       setAcceptedTerms(false);
       return;
     }
@@ -74,7 +72,6 @@ export function LoginPage() {
     let active = true;
     const timer = window.setTimeout(async () => {
       try {
-        setResolvingProfile(true);
         const response = await api.post<ResolvedLoginProfile>(
           "/auth/login-profile",
           {
@@ -94,10 +91,6 @@ export function LoginPage() {
         if (!active) return;
         setResolvedProfile(null);
         setAcceptedTerms(false);
-      } finally {
-        if (active) {
-          setResolvingProfile(false);
-        }
       }
     }, 300);
 
@@ -169,16 +162,6 @@ export function LoginPage() {
               className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
 
-            {resolvingProfile ? (
-              <p className="mt-2 text-xs text-slate-500">Identificando perfil...</p>
-            ) : resolvedProfile?.userExists ? (
-              <p className="mt-2 text-xs text-slate-500">
-                Perfil identificado:{" "}
-                <span className="font-semibold text-slate-700">
-                  {resolvedProfile.role === "ADMIN" ? "Administrador" : "Gestor"}
-                </span>
-              </p>
-            ) : null}
           </div>
 
           <div>
