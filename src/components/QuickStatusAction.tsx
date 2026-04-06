@@ -22,6 +22,7 @@ export function QuickStatusAction({
 }: QuickStatusActionProps) {
   const [open, setOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
@@ -29,7 +30,11 @@ export function QuickStatusAction({
     if (!open) return;
 
     function handlePointerDown(event: MouseEvent) {
-      if (!shellRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !shellRef.current?.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
         setOpen(false);
       }
     }
@@ -89,6 +94,7 @@ export function QuickStatusAction({
       {open
         ? createPortal(
         <div
+          ref={menuRef}
           className="fixed z-[140] min-w-[180px] rounded-xl border border-slate-200 bg-white p-2 shadow-xl"
           style={{ top: menuPosition.top, left: menuPosition.left }}
         >
