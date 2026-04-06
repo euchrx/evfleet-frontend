@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { LayoutGrid, Table2 } from "lucide-react";
+import { LayoutGrid, Pencil, Table2 } from "lucide-react";
 import { useBranch } from "../../contexts/BranchContext";
 import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import {
@@ -209,7 +209,14 @@ function formatPositionLabel(axle: string, wheel: string) {
 }
 
 function parsePositionLabel(label: string) {
-  const [leftRaw, rightRaw] = label.split("|").map((item) => item.trim());
+  const normalizedLabel = String(label || "").trim();
+  if (!normalizedLabel) return null;
+  if (normalizedLabel.toLowerCase() === "estepe") {
+    return { axlePosition: "Reserva", wheelPosition: "Estepe" };
+  }
+  const [leftRaw, rightRaw] = normalizedLabel
+    .split("|")
+    .map((item) => item.trim());
   if (!leftRaw || !rightRaw) return null;
   const axle = formatAxleLabel(leftRaw);
   const wheel = normalizeWheelToMasculine(rightRaw.replace(/^lado\s+/i, "").trim());
@@ -1395,9 +1402,17 @@ export function MaintenanceRecordsPage() {
   async function saveTire(event: React.FormEvent) {
     event.preventDefault();
     const mergedAxles = [...tireAxleBatch];
-    const mergedPairs = tireWheelBatch
-      .map((label) => parsePositionLabel(label))
-      .filter((item): item is { axlePosition: string; wheelPosition: string } => Boolean(item));
+    const mergedPairs = Array.from(
+      new Map(
+        tireWheelBatch
+          .map((label) => parsePositionLabel(label))
+          .filter(
+            (item): item is { axlePosition: string; wheelPosition: string } =>
+              Boolean(item),
+          )
+          .map((item) => [`${item.axlePosition}|${item.wheelPosition}`, item]),
+      ).values(),
+    );
     const nextErrors: Partial<Record<TireFieldKey, string>> = {};
     if (!tireForm.status) nextErrors.status = "Selecione o status.";
     if (!tireForm.brand.trim()) nextErrors.brand = "Informe a marca.";
@@ -1825,7 +1840,7 @@ export function MaintenanceRecordsPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-700">{record.km?.toLocaleString("pt-BR") || "-"}</td>
                       <td className="px-6 py-4 text-sm text-slate-700">{toMoney(Number(record.cost || 0))}</td>
-                      <td className="px-6 py-4 text-sm"><span className={`status-pill ${record.status === "DONE" ? "status-active" : "status-pending"}`}>{maintenanceStatusLabel(record.status)}</span></td>
+                      <td className="px-6 py-4 text-sm"><div className="flex items-center gap-2"><span className={`status-pill ${record.status === "DONE" ? "status-active" : "status-pending"}`}>{maintenanceStatusLabel(record.status)}</span>{record.status !== "DONE" ? <button type="button" onClick={() => openEditRecord(record)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-orange-200 bg-orange-50 text-orange-600 transition hover:bg-orange-100" title="Atualizar status" aria-label={`Atualizar status da manuten??o ${record.description}`}><Pencil size={14} /></button> : null}</div></td>
                       <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button type="button" onClick={() => openEditRecord(record)} className="btn-ui btn-ui-neutral">Editar</button><button type="button" onClick={() => removeRecord(record)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
                     </tr>
                   );

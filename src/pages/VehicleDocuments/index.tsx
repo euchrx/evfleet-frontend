@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { createVehicleDocument, deleteVehicleDocument, getVehicleDocuments, updateVehicleDocument, uploadVehicleDocumentFile } from "../../services/vehicleDocuments";
+import { Pencil } from "lucide-react";
 import { getVehicles } from "../../services/vehicles";
 import { useBranch } from "../../contexts/BranchContext";
 import type { Vehicle } from "../../types/vehicle";
@@ -523,7 +524,7 @@ export function VehicleDocumentsPage() {
                     <td className="px-6 py-4 text-sm text-slate-700"><p className="font-medium text-slate-900">{item.name}</p><p className="text-xs text-slate-500">{item.number || "Sem número"}</p>{item.fileUrl ? <a href={resolveFileUrl(item.fileUrl)} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-blue-700 hover:underline">Ver anexo</a> : null}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{item.vehicle ? formatVehicleLabel(item.vehicle) : item.vehicleId}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{toDateText(item.expiryDate)}</td>
-                    <td className="px-6 py-4 text-sm"><span className={`status-pill ${statusClass(effectiveStatus)}`}>{statusLabel(effectiveStatus)}</span></td>
+                    <td className="px-6 py-4 text-sm"><div className="flex items-center gap-2"><span className={`status-pill ${statusClass(effectiveStatus)}`}>{statusLabel(effectiveStatus)}</span>{effectiveStatus !== "VALID" ? <button type="button" onClick={() => openEditModal(item)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-orange-200 bg-orange-50 text-orange-600 transition hover:bg-orange-100" title="Atualizar status" aria-label={`Atualizar status do documento ${item.name}`}><Pencil size={14} /></button> : null}</div></td>
                     <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openEditModal(item)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => handleDelete(item)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
                   </tr>
                 );

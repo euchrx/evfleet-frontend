@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { Pencil } from "lucide-react";
 import type { Debt } from "../../types/debt";
 import type { Vehicle } from "../../types/vehicle";
 import {
@@ -815,11 +816,25 @@ export function DebtsPage() {
                         })}
                       </td>
                       <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`status-pill ${statusClass(effectiveStatus)}`}
-                        >
-                          {statusLabel(effectiveStatus)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`status-pill ${statusClass(effectiveStatus)}`}
+                          >
+                            {statusLabel(effectiveStatus)}
+                          </span>
+                          {effectiveStatus === "PENDING" ||
+                          effectiveStatus === "OVERDUE" ? (
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(debt)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-orange-200 bg-orange-50 text-orange-600 transition hover:bg-orange-100"
+                              title="Atualizar status"
+                              aria-label={`Atualizar status do d?bito ${debt.description}`}
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm">
                         <div className="flex gap-2">

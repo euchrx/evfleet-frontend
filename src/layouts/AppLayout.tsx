@@ -527,7 +527,7 @@ export function AppLayout() {
       .filter((record) => {
         if (!isPendingMaintenanceStatus(record.status)) return false;
         const daysUntil = getDaysUntil(record.maintenanceDate);
-        return daysUntil >= 0 && daysUntil <= 5;
+        return daysUntil !== null && daysUntil >= 0;
       })
       .map((record) => {
         const daysUntil = getDaysUntil(record.maintenanceDate);
@@ -538,8 +538,8 @@ export function AppLayout() {
           title: `Manutenção programada - ${vehicleLabel}`,
           description:
             daysUntil === 0
-              ? "Há uma manutenção programada não realizada para hoje."
-              : `Há uma manutenção programada não realizada. Faltam ${daysUntil} dia(s).`,
+              ? "Há uma manutenção programada não realizada para hoje. Clique para conferir e atualizar o status."
+              : `Há uma manutenção programada não realizada. Faltam ${daysUntil} dia(s). Clique para conferir e atualizar o status.`,
           date: record.maintenanceDate,
           link: `/maintenance-records?tab=records&highlight=${record.id}`,
         };
@@ -559,8 +559,8 @@ export function AppLayout() {
           title: `Manutenção programada não realizada - ${vehicleLabel}`,
           description:
             overdueDays === 1
-              ? "Há uma manutenção programada não realizada há 1 dia."
-              : `Há uma manutenção programada não realizada há ${overdueDays} dia(s).`,
+              ? "Há uma manutenção programada não realizada há 1 dia. Clique para conferir e atualizar o status."
+              : `Há uma manutenção programada não realizada há ${overdueDays} dia(s). Clique para conferir e atualizar o status.`,
           date: record.maintenanceDate,
           link: `/maintenance-records?tab=records&highlight=${record.id}`,
         };
@@ -623,7 +623,7 @@ export function AppLayout() {
       .filter((debt) => {
         if (String(debt.status || "").toUpperCase() !== "PENDING") return false;
         const daysUntil = getDaysUntil(debt.dueDate || debt.debtDate);
-        return daysUntil >= 0 && daysUntil <= 5;
+        return daysUntil !== null && daysUntil >= 0;
       })
       .map((debt) => {
         const daysUntil = getDaysUntil(debt.dueDate || debt.debtDate);
@@ -634,8 +634,8 @@ export function AppLayout() {
           title: `Débito vencendo - ${vehicleLabel}`,
           description:
             daysUntil === 0
-              ? "O débito vence hoje."
-              : `Faltam ${daysUntil} dia(s) para o vencimento do débito.`,
+              ? "Há um débito pendente com vencimento hoje. Clique para conferir e atualizar o status."
+              : `Há um débito pendente com vencimento em ${daysUntil} dia(s). Clique para conferir e atualizar o status.`,
           date: debt.dueDate || debt.debtDate,
           link: `/debts?highlight=${debt.id}`,
         };
@@ -656,7 +656,7 @@ export function AppLayout() {
         return {
           id: `debt-overdue-${debt.id}`,
           title: `Débito vencido - ${vehicleLabel}`,
-          description: `Débito vencido há ${overdueDays} dia(s).`,
+          description: `Débito vencido há ${overdueDays} dia(s). Clique para conferir e atualizar o status.`,
           date: debt.dueDate || debt.debtDate,
           link: `/debts?highlight=${debt.id}`,
         };
@@ -664,9 +664,10 @@ export function AppLayout() {
 
     const expiringDocumentNotifications: AppNotification[] = vehicleDocuments
       .filter((document) => {
+        if (String(document.status || "").toUpperCase() === "EXPIRING") return true;
         if (!document.expiryDate) return false;
         const daysUntil = getDaysUntil(document.expiryDate);
-        return daysUntil >= 0 && daysUntil <= 30;
+        return daysUntil !== null && daysUntil >= 0;
       })
       .map((document) => {
         const daysUntil = getDaysUntil(
@@ -678,9 +679,11 @@ export function AppLayout() {
           id: `document-expiring-${document.id}`,
           title: `Documento vencendo - ${vehicleLabel}`,
           description:
-            daysUntil === 0
-              ? `${document.name} vence hoje.`
-              : `${document.name} vence em ${daysUntil} dia(s).`,
+            daysUntil === null
+              ? `${document.name} está com pendência para conferência. Clique para revisar e atualizar o status.`
+              : daysUntil === 0
+                ? `${document.name} vence hoje. Clique para revisar e atualizar o status.`
+                : `${document.name} vence em ${daysUntil} dia(s). Clique para revisar e atualizar o status.`,
           date: document.expiryDate || document.updatedAt || document.createdAt,
           link: `/vehicle-documents?highlight=${document.id}`,
         };
@@ -706,8 +709,8 @@ export function AppLayout() {
           id: `document-expired-${document.id}`,
           title: `Documento vencido - ${vehicleLabel}`,
           description: document.expiryDate
-            ? `${document.name} está vencido há ${overdueDays} dia(s).`
-            : `${document.name} está marcado como vencido.`,
+            ? `${document.name} está vencido há ${overdueDays} dia(s). Clique para revisar e atualizar o status.`
+            : `${document.name} está marcado como vencido. Clique para revisar e atualizar o status.`,
           date: document.expiryDate || document.updatedAt || document.createdAt,
           link: `/vehicle-documents?highlight=${document.id}`,
         };

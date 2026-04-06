@@ -11,6 +11,7 @@ import {
   updateVehicle,
 } from "../../services/vehicles";
 import { getBranches } from "../../services/branches";
+import { getCachedMenuVisibilityMap } from "../../services/menuVisibility";
 import { useBranch } from "../../contexts/BranchContext";
 import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import { useLocation } from "react-router-dom";
@@ -235,6 +236,9 @@ export function VehiclesPage() {
   const { selectedBranchId } = useBranch();
   const { selectedCompanyId, currentCompany } = useCompanyScope();
   const { pathname } = useLocation();
+  const [branchFieldsEnabled, setBranchFieldsEnabled] = useState(
+    () => getCachedMenuVisibilityMap()["/branches"] !== false,
+  );
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -271,7 +275,13 @@ export function VehiclesPage() {
     try {
       setLoading(true);
       setPageErrorMessage("");
-      const [v, b] = await Promise.all([getVehicles(), getBranches()]);
+      const visibility = getCachedMenuVisibilityMap();
+      const branchesEnabled = visibility["/branches"] !== false;
+      setBranchFieldsEnabled(branchesEnabled);
+      const [v, b] = await Promise.all([
+        getVehicles(),
+        branchesEnabled ? getBranches() : Promise.resolve([] as Branch[]),
+      ]);
       setVehicles(v);
       setBranches(b);
     } catch {
@@ -439,12 +449,16 @@ export function VehiclesPage() {
         status: form.status,
         photoUrls: safeExistingPhotoUrls,
         documentUrls: Array.from(new Set([...safeExistingDocumentUrls, ...safeUploadedDocumentUrls])),
-        branchId: editingVehicle
-          ? isUuid(form.branchId)
+        branchId: branchFieldsEnabled
+          ? editingVehicle
+            ? isUuid(form.branchId)
+              ? form.branchId
+              : null
+            : isUuid(form.branchId)
             ? form.branchId
-            : null
-          : isUuid(form.branchId)
-          ? form.branchId
+            : undefined
+          : editingVehicle
+          ? null
           : undefined,
       };
 
@@ -981,28 +995,30 @@ export function VehiclesPage() {
                     <input value={form.brand} onChange={(e) => { setForm({ ...form, brand: e.target.value }); clearFieldError("brand"); }} className={getFieldClass("brand")} placeholder="Volvo" />
                     {fieldErrors.brand ? <p className="text-xs text-red-600">{fieldErrors.brand}</p> : null}
                   </label>
-                  <label className="space-y-1">
-                    <span className="text-sm font-medium text-slate-700">Filial</span>
-                    <select
-                      value={form.branchId}
-                      onChange={(e) => {
-                        setForm({ ...form, branchId: e.target.value });
-                        clearFieldError("branchId");
-                      }}
-                      className={getFieldClass("branchId")}
-                    >
-                      <option value="">Sem filial vinculada</option>
-                      {branches.map((branch) => (
-                        <option key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-slate-500">
-                      Opcional. Use apenas se quiser organizar os veiculos por filial.
-                    </p>
-                    {fieldErrors.branchId ? <p className="text-xs text-red-600">{fieldErrors.branchId}</p> : null}
-                  </label>
+                  {branchFieldsEnabled ? (
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-slate-700">Filial</span>
+                      <select
+                        value={form.branchId}
+                        onChange={(e) => {
+                          setForm({ ...form, branchId: e.target.value });
+                          clearFieldError("branchId");
+                        }}
+                        className={getFieldClass("branchId")}
+                      >
+                        <option value="">Sem filial vinculada</option>
+                        {branches.map((branch) => (
+                          <option key={branch.id} value={branch.id}>
+                            {branch.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-slate-500">
+                        Opcional. Use apenas se quiser organizar os veículos por filial.
+                      </p>
+                      {fieldErrors.branchId ? <p className="text-xs text-red-600">{fieldErrors.branchId}</p> : null}
+                    </label>
+                  ) : null}
                   <label className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">Modelo</span>
                     <input value={form.model} onChange={(e) => { setForm({ ...form, model: e.target.value }); clearFieldError("model"); }} className={getFieldClass("model")} placeholder="FH 540" />
