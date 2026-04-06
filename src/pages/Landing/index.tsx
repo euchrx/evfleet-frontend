@@ -1,4 +1,4 @@
-import { Building2, LogIn } from "lucide-react";
+import { Building2, Fuel, LogIn } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   defaultSoftwareSettings,
@@ -18,71 +18,147 @@ export function LandingPage() {
     softwareSettings.companyName?.trim() || defaultSoftwareSettings.companyName;
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900">
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6 lg:px-8">
-          <Link to="/landing" className="inline-flex min-w-0 items-center gap-2">
-            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white">
-              <Building2 size={18} />
-            </span>
-            <span className="truncate text-base font-bold text-slate-900 sm:text-lg">
-              {productName}
-            </span>
+    <div className="min-h-screen bg-slate-950 text-white">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
+          <Link to="/" className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 shadow-[0_0_30px_rgba(34,211,238,0.12)]">
+              <Fuel className="h-5 w-5 text-cyan-300" />
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300/80">
+                Plataforma de operação
+              </p>
+              <p className="text-lg font-bold tracking-tight text-white">
+                {productName}
+              </p>
+            </div>
           </Link>
 
-          <nav className="hidden items-center gap-4 md:flex">
+          <nav className="hidden items-center gap-8 md:flex">
             <a
               href="#funcionalidades"
-              className="text-sm font-medium text-slate-600 transition hover:text-slate-900"
+              className="text-sm text-slate-300 transition hover:text-white"
             >
               Funcionalidades
             </a>
             <a
               href="#beneficios"
-              className="text-sm font-medium text-slate-600 transition hover:text-slate-900"
+              className="text-sm text-slate-300 transition hover:text-white"
             >
               Benefícios
             </a>
             <a
               href="#preview"
-              className="text-sm font-medium text-slate-600 transition hover:text-slate-900"
+              className="text-sm text-slate-300 transition hover:text-white"
             >
               Preview
             </a>
+            <a
+              href="#faq"
+              className="text-sm text-slate-300 transition hover:text-white"
+            >
+              FAQ
+            </a>
           </nav>
 
-          <Link
-            to="/login"
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-orange-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 sm:px-4"
-            aria-label="Entrar"
-          >
-            <LogIn size={16} />
-            <span className="hidden sm:inline">Entrar</span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/login"
+              className="hidden items-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/5 sm:flex"
+            >
+              <LogIn className="h-4 w-4" />
+              Entrar
+            </Link>
+
+            <a
+              href="#cta"
+              className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+            >
+              <Building2 className="h-4 w-4" />
+              Solicitar demonstração
+            </a>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+      <main>
         <HeroSection productName={productName} />
         <ProblemSolutionSection />
-        <div id="funcionalidades">
-          <FeaturesSection />
-        </div>
-        <div id="beneficios">
-          <BenefitsSection />
-        </div>
+        <FeaturesSection />
+        <BenefitsSection />
         <PreviewSection />
         <FaqSection />
         <CtaSection />
       </main>
 
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <p>
-            © {new Date().getFullYear()} {productName}. Todos os direitos
-            reservados.
-          </p>
-          <p>Gestão de frota com foco em eficiência, controle e escala.</p>
+      <footer className="border-t border-white/10 bg-slate-950">
+        <div className="mx-auto grid max-w-7xl gap-10 px-6 py-12 lg:grid-cols-[1.5fr_1fr_1fr] lg:px-8">
+          <div>
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10">
+                <Fuel className="h-5 w-5 text-cyan-300" />
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300/75">
+                  Gestão operacional
+                </p>
+                <p className="text-lg font-bold tracking-tight text-white">
+                  {productName}
+                </p>
+              </div>
+            </div>
+
+            <p className="max-w-xl text-sm leading-7 text-slate-400">
+              Plataforma SaaS para redes de postos e operações com frota própria,
+              com foco em controle por filial, redução de custos, compliance e
+              visão executiva da operação.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-slate-200">
+              Navegação
+            </h3>
+            <div className="space-y-3 text-sm text-slate-400">
+              <a href="#funcionalidades" className="block hover:text-white">
+                Funcionalidades
+              </a>
+              <a href="#beneficios" className="block hover:text-white">
+                Benefícios
+              </a>
+              <a href="#preview" className="block hover:text-white">
+                Preview
+              </a>
+              <a href="#faq" className="block hover:text-white">
+                FAQ
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-slate-200">
+              Posicionamento
+            </h3>
+            <div className="space-y-3 text-sm text-slate-400">
+              <p>Multiempresa e multifilial</p>
+              <p>Controle de custos por veículo</p>
+              <p>Rastreabilidade operacional</p>
+              <p>Operação pronta para escalar</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-white/10">
+          <div className="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-5 text-sm text-slate-500 md:flex-row md:items-center md:justify-between lg:px-8">
+            <p>
+              © {new Date().getFullYear()} {productName}. Todos os direitos
+              reservados.
+            </p>
+            <p>Gestão de frota com foco em rede de postos e operação real.</p>
+          </div>
         </div>
       </footer>
     </div>

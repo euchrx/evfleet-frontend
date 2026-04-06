@@ -3,58 +3,71 @@ import { CircleDollarSign, Clock3, Eye, LineChart } from "lucide-react";
 const benefits = [
   {
     icon: CircleDollarSign,
-    title: "Redução de custos operacionais",
+    title: "Mais controle sobre custo operacional",
     detail:
-      "Identifique desperdícios, anomalias de consumo e custos críticos por ativo.",
+      "Identifique veículos caros, gastos recorrentes, pontos de desperdício e oportunidades de correção por unidade.",
   },
   {
     icon: Eye,
-    title: "Visibilidade ponta a ponta",
+    title: "Visão clara da operação",
     detail:
-      "Consolide operação, finanças e conformidade em uma visão única por empresa.",
+      "A matriz acompanha a rede com mais segurança, enquanto cada posto enxerga o que realmente precisa executar.",
   },
   {
     icon: Clock3,
-    title: "Mais produtividade do time",
+    title: "Menos retrabalho e mais padrão",
     detail:
-      "Menos tarefas manuais com rotinas automatizadas e processos padronizados.",
+      "Centralize rotinas, reduza controles paralelos e dê mais fluidez para a operação do dia a dia.",
   },
   {
     icon: LineChart,
-    title: "Decisão orientada por indicadores",
+    title: "Decisão com base em dados",
     detail:
-      "Use dados de período, categoria e histórico para planejar crescimento com segurança.",
+      "Use indicadores, rankings e histórico para melhorar disponibilidade da frota e eficiência da operação.",
   },
 ];
 
 export function BenefitsSection() {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-900">
-          Benefícios para gestores e operação
-        </h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Mais controle, menos ruído e uma base sólida para escalar a gestão da
-          frota com eficiência.
-        </p>
-      </div>
+    <section id="beneficios" className="bg-slate-900/50">
+      <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <div className="max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300/80">
+            Benefícios
+          </p>
+          <h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">
+            Mais gestão para a matriz. Mais praticidade para a operação.
+          </h2>
+          <p className="mt-5 text-lg leading-8 text-slate-400">
+            O ganho não está só em registrar dados, mas em transformar a rotina
+            da frota em um processo mais organizado, confiável e previsível.
+          </p>
+        </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {benefits.map((benefit) => (
-          <article
-            key={benefit.title}
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-          >
-            <div className="mb-2 inline-flex rounded-xl bg-orange-100 p-2 text-orange-600">
-              <benefit.icon size={17} />
-            </div>
-            <h3 className="text-base font-semibold text-slate-900">
-              {benefit.title}
-            </h3>
-            <p className="mt-1 text-sm text-slate-600">{benefit.detail}</p>
-          </article>
-        ))}
+        <div className="mt-14 grid gap-6 md:grid-cols-2">
+          {benefits.map((benefit) => {
+            const Icon = benefit.icon;
+
+            return (
+              <div
+                key={benefit.title}
+                className="rounded-[1.75rem] border border-white/10 bg-slate-950/70 p-7"
+              >
+                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-300">
+                  <Icon className="h-6 w-6" />
+                </div>
+
+                <h3 className="text-xl font-bold text-white">
+                  {benefit.title}
+                </h3>
+
+                <p className="mt-3 text-sm leading-7 text-slate-400">
+                  {benefit.detail}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

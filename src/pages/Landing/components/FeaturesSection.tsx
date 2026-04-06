@@ -1,8 +1,9 @@
 import {
   BadgeAlert,
   BarChart3,
-  CreditCard,
+  Building2,
   FileSpreadsheet,
+  Fuel,
   Route,
   ShieldCheck,
   Wrench,
@@ -10,79 +11,97 @@ import {
 
 const features = [
   {
-    icon: BarChart3,
-    title: "Dashboard executivo em tempo real",
+    icon: Building2,
+    title: "Visão central por matriz e filial",
     description:
-      "Acompanhe custos, ativos, rankings e indicadores-chave em poucos cliques.",
+      "Acompanhe cada posto individualmente ou a operação consolidada, com leitura clara para gestores locais e direção.",
+  },
+  {
+    icon: Fuel,
+    title: "Controle de abastecimentos com rastreabilidade",
+    description:
+      "Registre, organize e acompanhe abastecimentos para entender consumo, frequência, desvios e impacto por veículo.",
   },
   {
     icon: Wrench,
-    title: "Gestão de manutenção preventiva e corretiva",
+    title: "Manutenção preventiva e corretiva",
     description:
-      "Controle planos, peças trocadas, status e histórico por veículo com rastreabilidade.",
-  },
-  {
-    icon: Route,
-    title: "Viagens e quilometragem integradas",
-    description:
-      "Tenha visão completa de rotas, uso da frota e produtividade operacional.",
+      "Gerencie histórico, pendências, planos de manutenção e status da frota para reduzir paradas inesperadas.",
   },
   {
     icon: BadgeAlert,
-    title: "Débitos, multas e documentos",
+    title: "Documentos, multas e débitos",
     description:
-      "Gerencie vencimentos, pendências e conformidade em um fluxo único.",
+      "Tenha mais controle sobre vencimentos, pendências e conformidade da frota em um fluxo único.",
   },
   {
-    icon: CreditCard,
-    title: "Assinatura SaaS multiempresa",
+    icon: Route,
+    title: "Viagens, deslocamentos e uso operacional",
     description:
-      "Escopo por empresa, plano atual, histórico de pagamentos e regularização rápida.",
+      "Monitore a rotina dos veículos e registre movimentações relevantes para apoiar decisões de operação.",
+  },
+  {
+    icon: BarChart3,
+    title: "Dashboard e relatórios gerenciais",
+    description:
+      "Visualize custos, rankings, indicadores e histórico por período, unidade, veículo e categoria.",
   },
   {
     icon: FileSpreadsheet,
-    title: "Importação e relatórios avançados",
+    title: "Importações e produtividade operacional",
     description:
-      "Importe dados em lote e gere relatórios com filtros completos para auditoria e gestão.",
+      "Reduza retrabalho com fluxos de importação e organização de dados voltados à rotina do time.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Base SaaS pronta para crescer",
+    description:
+      "Estrutura multiempresa, controle de acesso e organização adequada para operações com mais escala.",
   },
 ];
 
 export function FeaturesSection() {
   return (
-    <section>
-      <div className="mb-5">
-        <h2 className="text-2xl font-bold text-slate-900">
-          Funcionalidades que aceleram a operação
-        </h2>
-        <p className="mt-2 max-w-3xl text-sm text-slate-600">
-          Tudo o que um gestor de frota precisa para reduzir retrabalho,
-          aumentar previsibilidade e tomar decisões com dados confiáveis.
-        </p>
-      </div>
+    <section id="funcionalidades" className="bg-slate-950">
+      <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <div className="max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300/80">
+            Funcionalidades
+          </p>
+          <h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">
+            Tudo o que uma rede de postos precisa para controlar melhor sua
+            frota
+          </h2>
+          <p className="mt-5 text-lg leading-8 text-slate-400">
+            O EvFleet foi pensado para o dia a dia da operação. Menos improviso,
+            mais padrão, mais clareza e mais capacidade de decisão.
+          </p>
+        </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {features.map((feature) => (
-          <article
-            key={feature.title}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-orange-200"
-          >
-            <div className="mb-3 inline-flex rounded-xl bg-orange-100 p-2 text-orange-600">
-              <feature.icon size={18} />
-            </div>
-            <h3 className="text-base font-semibold text-slate-900">
-              {feature.title}
-            </h3>
-            <p className="mt-2 text-sm text-slate-600">{feature.description}</p>
-          </article>
-        ))}
-      </div>
+        <div className="mt-14 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {features.map((feature) => {
+            const Icon = feature.icon;
 
-      <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-900">
-        <span className="inline-flex items-center gap-1 font-semibold">
-          <ShieldCheck size={14} />
-          Compliance e segurança:
-        </span>{" "}
-        autenticação JWT, escopo por empresa e controle de acesso por perfil.
+            return (
+              <div
+                key={feature.title}
+                className="group rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-6 transition hover:-translate-y-1 hover:border-cyan-400/20 hover:bg-cyan-400/[0.05]"
+              >
+                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-300 transition group-hover:bg-cyan-400/15">
+                  <Icon className="h-6 w-6" />
+                </div>
+
+                <h3 className="text-lg font-bold leading-7 text-white">
+                  {feature.title}
+                </h3>
+
+                <p className="mt-3 text-sm leading-7 text-slate-400">
+                  {feature.description}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
