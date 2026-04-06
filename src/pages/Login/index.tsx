@@ -1,7 +1,7 @@
 import axios from "axios";
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../services/api";
 import { defaultSoftwareSettings, readSoftwareSettings } from "../../services/adminSettings";
@@ -12,9 +12,11 @@ export function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const companyName = readSoftwareSettings().companyName?.trim() || defaultSoftwareSettings.companyName;
+  const companyName =
+    readSoftwareSettings().companyName?.trim() || defaultSoftwareSettings.companyName;
 
   function getErrorMessage(error: unknown) {
     if (axios.isAxiosError(error)) {
@@ -42,6 +44,12 @@ export function LoginPage() {
 
   async function handleLogin(event: FormEvent) {
     event.preventDefault();
+
+    if (!acceptedTerms) {
+      setErrorMessage("Você precisa aceitar os termos de uso e a política de privacidade para continuar.");
+      return;
+    }
+
     setLoading(true);
     setErrorMessage("");
 
@@ -71,23 +79,17 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-6">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-6">
       <div className="w-full max-w-md rounded-2xl bg-white p-10 shadow-2xl">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-slate-900">
-            {companyName}
-          </h1>
+          <h1 className="text-3xl font-bold text-slate-900">{companyName}</h1>
 
-          <p className="mt-2 text-sm text-slate-500">
-            Painel de gestão de frota
-          </p>
+          <p className="mt-2 text-sm text-slate-500">Painel de gestão de frota</p>
         </div>
 
         <form className="space-y-5" onSubmit={handleLogin}>
           <div>
-            <label className="block text-sm font-medium text-slate-700">
-              E-mail
-            </label>
+            <label className="block text-sm font-medium text-slate-700">E-mail</label>
 
             <input
               type="email"
@@ -99,9 +101,7 @@ export function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
-              Senha
-            </label>
+            <label className="block text-sm font-medium text-slate-700">Senha</label>
 
             <input
               type="password"
@@ -111,6 +111,39 @@ export function LoginPage() {
               className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             />
           </div>
+
+          <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => {
+                setAcceptedTerms(e.target.checked);
+                if (errorMessage) setErrorMessage("");
+              }}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
+            />
+            <span>
+              Li e aceito os{" "}
+              <Link
+                to="/terms"
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-orange-600 hover:text-orange-700"
+              >
+                termos de uso
+              </Link>{" "}
+              e a{" "}
+              <Link
+                to="/privacy"
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-orange-600 hover:text-orange-700"
+              >
+                política de privacidade
+              </Link>
+              .
+            </span>
+          </label>
 
           {errorMessage && (
             <p className="text-sm font-medium text-red-600">{errorMessage}</p>

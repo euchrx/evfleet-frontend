@@ -3,6 +3,8 @@ import { AppLayout } from "../layouts/AppLayout";
 import { LandingPage } from "../pages/Landing";
 import { DashboardPage } from "../pages/Dashboard";
 import { LoginPage } from "../pages/Login";
+import { TermsPage } from "../pages/Terms";
+import { PrivacyPage } from "../pages/Privacy";
 import { UsersPage } from "../pages/Users";
 import { CompaniesPage } from "../pages/Companies";
 import { BranchesPage } from "../pages/Branches";
@@ -31,6 +33,8 @@ export function AppRoutes() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
 
         <Route element={<PrivateRoute />}>
           <Route element={<AppLayout />}>

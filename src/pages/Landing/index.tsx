@@ -40,8 +40,9 @@ export function LandingPage() {
               <img
                 src={logo}
                 alt="EvFleet"
-                className={`w-auto object-contain transition-all duration-300 ${isScrolled ? "h-10" : "h-14"
-                  }`}
+                className={`w-auto object-contain transition-all duration-300 ${
+                  isScrolled ? "h-10" : "h-14"
+                }`}
               />
             </div>
           </Link>
