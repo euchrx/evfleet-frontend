@@ -527,7 +527,7 @@ export function AppLayout() {
       .filter((record) => {
         if (!isPendingMaintenanceStatus(record.status)) return false;
         const daysUntil = getDaysUntil(record.maintenanceDate);
-        return daysUntil !== null && daysUntil >= 0;
+        return daysUntil !== null && daysUntil >= 0 && daysUntil <= 15;
       })
       .map((record) => {
         const daysUntil = getDaysUntil(record.maintenanceDate);
@@ -623,7 +623,7 @@ export function AppLayout() {
       .filter((debt) => {
         if (String(debt.status || "").toUpperCase() !== "PENDING") return false;
         const daysUntil = getDaysUntil(debt.dueDate || debt.debtDate);
-        return daysUntil !== null && daysUntil >= 0;
+        return daysUntil !== null && daysUntil >= 0 && daysUntil <= 30;
       })
       .map((debt) => {
         const daysUntil = getDaysUntil(debt.dueDate || debt.debtDate);
@@ -664,10 +664,11 @@ export function AppLayout() {
 
     const expiringDocumentNotifications: AppNotification[] = vehicleDocuments
       .filter((document) => {
-        if (String(document.status || "").toUpperCase() === "EXPIRING") return true;
-        if (!document.expiryDate) return false;
+        if (!document.expiryDate) {
+          return String(document.status || "").toUpperCase() === "EXPIRING";
+        }
         const daysUntil = getDaysUntil(document.expiryDate);
-        return daysUntil !== null && daysUntil >= 0;
+        return daysUntil !== null && daysUntil >= 0 && daysUntil <= 30;
       })
       .map((document) => {
         const daysUntil = getDaysUntil(
