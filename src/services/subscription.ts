@@ -3,9 +3,29 @@ import { readAuthToken } from "./authToken";
 import { api } from "./api";
 import { readSoftwareSettings } from "./adminSettings";
 
-export type SubscriptionStatus = "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED";
+export type SubscriptionStatus =
+  | "DRAFT"
+  | "ACTIVE"
+  | "TRIALING"
+  | "PAST_DUE"
+  | "CANCELED";
+
+export type BillingAccessStatus =
+  | "NO_PLAN"
+  | "SETUP_REQUIRED"
+  | "TRIALING"
+  | "ACTIVE"
+  | "GRACE_PERIOD"
+  | "BLOCKED";
+
 export type PlanInterval = "MONTHLY" | "YEARLY";
-export type PaymentStatus = "PENDING" | "PAID" | "EXPIRED" | "FAILED" | "REFUNDED" | "CANCELED";
+export type PaymentStatus =
+  | "PENDING"
+  | "PAID"
+  | "EXPIRED"
+  | "FAILED"
+  | "REFUNDED"
+  | "CANCELED";
 
 type BillingPlanApi = {
   id: string;
@@ -16,24 +36,60 @@ type BillingPlanApi = {
   vehicleLimit?: number | null;
   currency: string;
   interval: PlanInterval;
-  isActive?: boolean;
   active?: boolean;
+  isPublic?: boolean;
+  isEnterprise?: boolean;
+  companyId?: string | null;
+  defaultTrialDays?: number | null;
+  defaultGraceDays?: number | null;
+  allowsCustomPrice?: boolean;
+  allowsCustomVehicleLimit?: boolean;
+  sortOrder?: number | null;
 };
 
 type BillingSubscriptionApi = {
   id: string;
   status: SubscriptionStatus;
+  startedAt?: string | null;
   currentPeriodStart?: string | null;
   currentPeriodEnd?: string | null;
   nextBillingAt?: string | null;
-  plan: {
+  trialDays?: number | null;
+  graceDays?: number | null;
+  trialEndsAt?: string | null;
+  graceEndsAt?: string | null;
+  accessBlockedAt?: string | null;
+  isCustomConfiguration?: boolean;
+  customPriceCents?: number | null;
+  customVehicleLimit?: number | null;
+  planNameSnapshot?: string | null;
+  planCodeSnapshot?: string | null;
+  priceCentsSnapshot?: number | null;
+  vehicleLimitSnapshot?: number | null;
+  currencySnapshot?: string | null;
+  intervalSnapshot?: PlanInterval | null;
+  plan?: {
     id: string;
     code: string;
     name: string;
     priceCents: number;
     currency: string;
     interval: PlanInterval;
-  };
+  } | null;
+};
+
+type BillingAccessStatusApi = {
+  companyId: string;
+  subscriptionId: string | null;
+  subscriptionStatus: SubscriptionStatus | null;
+  accessStatus: BillingAccessStatus;
+  isBlocked: boolean;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  nextBillingAt: string | null;
+  graceEndsAt: string | null;
+  accessBlockedAt: string | null;
+  message: string;
 };
 
 type BillingPaymentApi = {
@@ -52,18 +108,42 @@ type BillingPaymentApi = {
   gatewayReference?: string | null;
 };
 
+export type SubscriptionAccessOverview = {
+  companyId: string;
+  subscriptionId?: string;
+  subscriptionStatus?: SubscriptionStatus | null;
+  accessStatus: BillingAccessStatus;
+  isBlocked: boolean;
+  trialEndsAt?: string;
+  currentPeriodEnd?: string;
+  nextBillingAt?: string;
+  graceEndsAt?: string;
+  accessBlockedAt?: string;
+  message: string;
+};
+
 export type SubscriptionOverview = {
   companyId: string;
   companyName: string;
   subscriptionId: string;
   planId: string;
   planName: string;
+  planCode?: string;
   status: SubscriptionStatus;
   billingCycle: PlanInterval;
   amountCents: number;
   currency: string;
   startedAt?: string;
+  currentPeriodEnd?: string;
   nextBillingDate?: string;
+  trialDays?: number;
+  graceDays?: number;
+  trialEndsAt?: string;
+  graceEndsAt?: string;
+  accessBlockedAt?: string;
+  isCustomConfiguration: boolean;
+  customPriceCents?: number;
+  customVehicleLimit?: number;
 };
 
 export type SubscriptionPlan = {
@@ -76,6 +156,15 @@ export type SubscriptionPlan = {
   billingCycle: PlanInterval;
   description: string;
   isCurrent: boolean;
+  active?: boolean;
+  isPublic?: boolean;
+  isEnterprise?: boolean;
+  companyId?: string | null;
+  defaultTrialDays?: number | null;
+  defaultGraceDays?: number | null;
+  allowsCustomPrice?: boolean;
+  allowsCustomVehicleLimit?: boolean;
+  sortOrder?: number | null;
 };
 
 export type SubscriptionInvoice = {
@@ -92,6 +181,7 @@ export type SubscriptionInvoice = {
 
 export type SubscriptionPageData = {
   overview: SubscriptionOverview | null;
+  access: SubscriptionAccessOverview | null;
   plans: SubscriptionPlan[];
   invoices: SubscriptionInvoice[];
   companyId: string;
@@ -118,9 +208,32 @@ export type CreateBillingPlanInput = {
   currency?: string;
   interval: PlanInterval;
   active?: boolean;
+  isPublic?: boolean;
+  isEnterprise?: boolean;
+  companyId?: string;
+  defaultTrialDays?: number;
+  defaultGraceDays?: number;
+  allowsCustomPrice?: boolean;
+  allowsCustomVehicleLimit?: boolean;
+  sortOrder?: number;
 };
 
 export type UpdateBillingPlanInput = CreateBillingPlanInput;
+
+export type SelectCompanyPlanInput = {
+  initialStatus?: Extract<SubscriptionStatus, "DRAFT" | "ACTIVE" | "TRIALING">;
+  trialDays?: number;
+  graceDays?: number;
+  customPriceCents?: number;
+  customVehicleLimit?: number;
+  isCustomConfiguration?: boolean;
+  planNameSnapshot?: string;
+  planCodeSnapshot?: string;
+  priceCentsSnapshot?: number;
+  vehicleLimitSnapshot?: number;
+  currencySnapshot?: string;
+  intervalSnapshot?: PlanInterval;
+};
 
 function decodeTokenPayload(token: string) {
   try {
@@ -174,6 +287,17 @@ function toPlanView(plan: BillingPlanApi, currentPlanId?: string): SubscriptionP
     billingCycle: plan.interval,
     description: (plan.description || "Plano corporativo de assinatura.").trim(),
     isCurrent: currentPlanId === plan.id,
+    active: plan.active ?? true,
+    companyId: typeof plan.companyId === "string" ? plan.companyId : null,
+    isPublic: plan.isPublic,
+    isEnterprise: plan.isEnterprise,
+    defaultTrialDays:
+      typeof plan.defaultTrialDays === "number" ? plan.defaultTrialDays : null,
+    defaultGraceDays:
+      typeof plan.defaultGraceDays === "number" ? plan.defaultGraceDays : null,
+    allowsCustomPrice: Boolean(plan.allowsCustomPrice),
+    allowsCustomVehicleLimit: Boolean(plan.allowsCustomVehicleLimit),
+    sortOrder: typeof plan.sortOrder === "number" ? plan.sortOrder : null,
   };
 }
 
@@ -198,11 +322,140 @@ function toInvoiceView(payment: BillingPaymentApi, planName: string): Subscripti
   };
 }
 
+
+function buildFallbackAccessFromSubscription(
+  subscription: BillingSubscriptionApi | null,
+  companyId: string,
+): SubscriptionAccessOverview | null {
+  if (!subscription) {
+    return {
+      companyId,
+      accessStatus: "NO_PLAN",
+      subscriptionStatus: null,
+      isBlocked: false,
+      message: "Nenhum plano vinculado.",
+    };
+  }
+
+  const status = subscription.status;
+  const accessStatus: BillingAccessStatus =
+    status === "ACTIVE"
+      ? "ACTIVE"
+      : status === "TRIALING"
+        ? "TRIALING"
+        : status === "PAST_DUE"
+          ? "BLOCKED"
+          : "NO_PLAN";
+
+  return {
+    companyId,
+    subscriptionId: subscription.id,
+    subscriptionStatus: status,
+    accessStatus,
+    isBlocked: accessStatus === "BLOCKED",
+    trialEndsAt: subscription.trialEndsAt || undefined,
+    currentPeriodEnd: subscription.currentPeriodEnd || undefined,
+    nextBillingAt: subscription.nextBillingAt || undefined,
+    graceEndsAt: subscription.graceEndsAt || undefined,
+    accessBlockedAt: subscription.accessBlockedAt || undefined,
+    message:
+      accessStatus === "ACTIVE"
+        ? "Assinatura ativa."
+        : accessStatus === "TRIALING"
+          ? "Período de teste ativo."
+          : accessStatus === "BLOCKED"
+            ? "Acesso bloqueado por pendência de pagamento."
+            : "Nenhum plano vinculado.",
+  };
+}
+
+async function fetchAccessStatusWithFallback(companyId?: string): Promise<SubscriptionAccessOverview | null> {
+  const context = getUserContext();
+  const resolvedCompanyId = context.isAdmin
+    ? String(companyId || context.effectiveCompanyId || "").trim()
+    : "";
+
+  try {
+    if (context.isAdmin) {
+      if (!resolvedCompanyId) return null;
+      const { data } = await api.get<BillingSubscriptionApi | null>(
+        `/billing/companies/${resolvedCompanyId}/subscription`,
+      );
+      return buildFallbackAccessFromSubscription(data, resolvedCompanyId);
+    }
+
+    const { data } = await api.get<BillingSubscriptionApi | null>("/billing/me/subscription");
+    return buildFallbackAccessFromSubscription(data, "me");
+  } catch {
+    return null;
+  }
+}
+export function toAccessOverview(access: BillingAccessStatusApi | null): SubscriptionAccessOverview | null {
+  if (!access) return null;
+
+  return {
+    companyId: access.companyId,
+    subscriptionId: access.subscriptionId || undefined,
+    subscriptionStatus: access.subscriptionStatus ?? null,
+    accessStatus: access.accessStatus,
+    isBlocked: Boolean(access.isBlocked),
+    trialEndsAt: access.trialEndsAt || undefined,
+    currentPeriodEnd: access.currentPeriodEnd || undefined,
+    nextBillingAt: access.nextBillingAt || undefined,
+    graceEndsAt: access.graceEndsAt || undefined,
+    accessBlockedAt: access.accessBlockedAt || undefined,
+    message: String(access.message || "").trim(),
+  };
+}
+
+function normalizeSubscriptionCommandPayload(options?: SelectCompanyPlanInput) {
+  return {
+    ...(options?.planNameSnapshot ? { planNameSnapshot: options.planNameSnapshot.trim() } : {}),
+    ...(options?.planCodeSnapshot ? { planCodeSnapshot: options.planCodeSnapshot.trim() } : {}),
+    ...(typeof options?.trialDays === "number" ? { trialDays: options.trialDays } : {}),
+    ...(typeof options?.graceDays === "number" ? { graceDays: options.graceDays } : {}),
+    ...(typeof options?.customPriceCents === "number"
+      ? { customPriceCents: options.customPriceCents }
+      : {}),
+    ...(typeof options?.customVehicleLimit === "number"
+      ? { customVehicleLimit: options.customVehicleLimit }
+      : {}),
+    ...(typeof options?.isCustomConfiguration === "boolean"
+      ? { isCustomConfiguration: options.isCustomConfiguration }
+      : {}),
+    ...(typeof options?.priceCentsSnapshot === "number"
+      ? { priceCentsSnapshot: options.priceCentsSnapshot }
+      : {}),
+    ...(typeof options?.vehicleLimitSnapshot === "number"
+      ? { vehicleLimitSnapshot: options.vehicleLimitSnapshot }
+      : {}),
+    ...(options?.currencySnapshot
+      ? { currencySnapshot: options.currencySnapshot.trim().toUpperCase() }
+      : {}),
+    ...(options?.intervalSnapshot ? { intervalSnapshot: options.intervalSnapshot } : {}),
+  };
+}
+
+export async function getBillingAccessStatus(
+  companyId?: string,
+): Promise<SubscriptionAccessOverview | null> {
+  return fetchAccessStatusWithFallback(companyId);
+}
+
 export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
   const context = getUserContext();
   const companyId = context.effectiveCompanyId;
 
-  const plansPromise = api.get<BillingPlanApi[]>("/billing/plans");
+  const plansPromise = context.isAdmin
+    ? api.get<BillingPlanApi[]>("/billing/plans", {
+        params: {
+          scope: "ADMIN",
+          includeInactive: true,
+          ...(companyId ? { companyId } : {}),
+        },
+      })
+    : api.get<BillingPlanApi[]>("/billing/plans");
+
   const subscriptionPromise = context.isAdmin
     ? companyId
       ? api.get<BillingSubscriptionApi | null>(`/billing/companies/${companyId}/subscription`)
@@ -215,50 +468,92 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
       : Promise.resolve({ data: [] as BillingPaymentApi[] })
     : api.get<BillingPaymentApi[]>("/billing/me/payments");
 
-  const [subscriptionResponse, plansResponse, paymentsResponse] = await Promise.all([
+  const accessPromise = getBillingAccessStatus(companyId || undefined);
+
+  const [subscriptionResponse, plansResponse, paymentsResponse, accessOverview] = await Promise.all([
     subscriptionPromise,
     plansPromise,
     paymentsPromise,
+    accessPromise,
   ]);
 
   const subscription = subscriptionResponse.data;
+  const access = accessOverview;
   const plansData = Array.isArray(plansResponse.data) ? plansResponse.data : [];
   const paymentsData = Array.isArray(paymentsResponse.data) ? paymentsResponse.data : [];
 
-  const activePlans = plansData.filter((plan) => plan.isActive !== false && plan.active !== false);
-  const plans = activePlans.map((plan) => toPlanView(plan, subscription?.plan?.id));
+  const plans = plansData.map((plan) => toPlanView(plan, subscription?.plan?.id || undefined));
 
-  const overview: SubscriptionOverview | null = subscription && subscription.plan
-    ? {
-        companyId,
-        companyName: readSoftwareSettings().companyName || "Empresa",
-        subscriptionId: subscription.id,
-        planId: subscription.plan.id,
-        planName: subscription.plan.name,
-        status: subscription.status,
-        billingCycle: subscription.plan.interval,
-        amountCents: Number(subscription.plan.priceCents || 0),
-        currency: subscription.plan.currency || "BRL",
-        startedAt: subscription.currentPeriodStart || undefined,
-        nextBillingDate: subscription.nextBillingAt || undefined,
-      }
-    : null;
+  const amountCents = Number(
+    subscription?.customPriceCents ??
+      subscription?.priceCentsSnapshot ??
+      subscription?.plan?.priceCents ??
+      0,
+  );
 
-  const invoices = paymentsData
-    .filter((payment) => payment.status === "PAID")
-    .map((payment) => toInvoiceView(payment, subscription?.plan?.name || "Plano"));
+  const currency =
+    subscription?.currencySnapshot ||
+    subscription?.plan?.currency ||
+    "BRL";
 
-  const hasPendingPayment = paymentsData.some((payment) => payment.status === "PENDING");
+  const billingCycle =
+    subscription?.intervalSnapshot ||
+    subscription?.plan?.interval ||
+    "MONTHLY";
+
+  const overview: SubscriptionOverview | null =
+    subscription && subscription.plan
+      ? {
+          companyId,
+          companyName: readSoftwareSettings().companyName || "Empresa",
+          subscriptionId: subscription.id,
+          planId: subscription.plan.id,
+          planName: subscription.planNameSnapshot || subscription.plan.name,
+          planCode: subscription.planCodeSnapshot || subscription.plan.code,
+          status: subscription.status,
+          billingCycle,
+          amountCents,
+          currency,
+          startedAt: subscription.startedAt || subscription.currentPeriodStart || undefined,
+          currentPeriodEnd: subscription.currentPeriodEnd || undefined,
+          nextBillingDate: access?.nextBillingAt || subscription.nextBillingAt || undefined,
+          trialDays:
+            typeof subscription.trialDays === "number" ? subscription.trialDays : undefined,
+          graceDays:
+            typeof subscription.graceDays === "number" ? subscription.graceDays : undefined,
+          trialEndsAt: access?.trialEndsAt || subscription.trialEndsAt || undefined,
+          graceEndsAt: access?.graceEndsAt || subscription.graceEndsAt || undefined,
+          accessBlockedAt:
+            access?.accessBlockedAt || subscription.accessBlockedAt || undefined,
+          isCustomConfiguration: Boolean(subscription.isCustomConfiguration),
+          customPriceCents:
+            typeof subscription.customPriceCents === "number"
+              ? subscription.customPriceCents
+              : undefined,
+          customVehicleLimit:
+            typeof subscription.customVehicleLimit === "number"
+              ? subscription.customVehicleLimit
+              : undefined,
+        }
+      : null;
+
+  const invoices = paymentsData.map((payment) =>
+    toInvoiceView(payment, subscription?.planNameSnapshot || subscription?.plan?.name || "Plano"),
+  );
+
   const pendingPayment = paymentsData.find((payment) => payment.status === "PENDING");
   const canPayNow = Boolean(
-    subscription &&
-      (subscription.status === "PAST_DUE" ||
-        subscription.status === "CANCELED" ||
-        !hasPendingPayment),
+    overview &&
+      access &&
+      (access.accessStatus === "GRACE_PERIOD" ||
+        access.accessStatus === "BLOCKED" ||
+        overview.status === "PAST_DUE" ||
+        overview.status === "CANCELED"),
   );
 
   return {
     overview,
+    access,
     plans,
     invoices,
     companyId,
@@ -270,9 +565,18 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
 export async function selectCompanyPlan(
   companyId: string,
   planId: string,
-  initialStatus?: Extract<SubscriptionStatus, "ACTIVE" | "TRIALING">,
+  options?: Extract<SubscriptionStatus, "DRAFT" | "ACTIVE" | "TRIALING"> | SelectCompanyPlanInput,
 ) {
   const context = getUserContext();
+
+  const payload =
+    typeof options === "string"
+      ? { initialStatus: options }
+      : {
+          ...(options?.initialStatus ? { initialStatus: options.initialStatus } : {}),
+          ...normalizeSubscriptionCommandPayload(options),
+        };
+
   if (context.isAdmin) {
     const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
     if (!targetCompanyId) {
@@ -281,15 +585,79 @@ export async function selectCompanyPlan(
 
     await api.post(`/billing/companies/${targetCompanyId}/subscription`, {
       planId,
-      ...(initialStatus ? { initialStatus } : {}),
+      ...payload,
     });
     return;
   }
 
   await api.post("/billing/me/subscription", {
     planId,
-    ...(initialStatus ? { initialStatus } : {}),
+    ...payload,
   });
+}
+
+export async function setCompanySubscriptionSetup(
+  companyId: string,
+  planId: string,
+  options?: Omit<SelectCompanyPlanInput, "initialStatus" | "trialDays">,
+) {
+  const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
+  if (!targetCompanyId) {
+    throw new Error("Selecione uma empresa no escopo para continuar.");
+  }
+
+  await api.post(`/billing/companies/${targetCompanyId}/subscription`, {
+    planId,
+    initialStatus: "DRAFT",
+    ...normalizeSubscriptionCommandPayload(options),
+  });
+}
+
+export async function setCompanySubscriptionTrial(
+  companyId: string,
+  planId: string,
+  options?: Omit<SelectCompanyPlanInput, "initialStatus">,
+) {
+  const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
+  if (!targetCompanyId) {
+    throw new Error("Selecione uma empresa no escopo para continuar.");
+  }
+
+  await api.post(`/billing/companies/${targetCompanyId}/subscription`, {
+    planId,
+    initialStatus: "TRIALING",
+    ...normalizeSubscriptionCommandPayload(options),
+    ...(typeof options?.trialDays === "number" ? { trialDays: options.trialDays } : {}),
+  });
+}
+
+export async function setCompanySubscriptionActive(
+  companyId: string,
+  planId: string,
+  options?: Omit<SelectCompanyPlanInput, "initialStatus" | "trialDays">,
+) {
+  const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
+  if (!targetCompanyId) {
+    throw new Error("Selecione uma empresa no escopo para continuar.");
+  }
+
+  await api.post(`/billing/companies/${targetCompanyId}/subscription`, {
+    planId,
+    initialStatus: "ACTIVE",
+    ...normalizeSubscriptionCommandPayload(options),
+  });
+}
+
+export async function resetCompanySubscriptionOperationalState(companyId: string) {
+  const targetCompanyId = getSelectedCompanyScopeId() || companyId || readCompanyIdFromToken();
+  if (!targetCompanyId) {
+    throw new Error("Selecione uma empresa no escopo para continuar.");
+  }
+
+  const { data } = await api.post(
+    `/billing/companies/${targetCompanyId}/subscription/reset-operational-state`,
+  );
+  return data;
 }
 
 export async function generateSubscriptionPayment(subscriptionId: string, planId?: string) {
@@ -311,9 +679,9 @@ export async function generateSubscriptionPayment(subscriptionId: string, planId
 
 export async function createBillingPlan(input: CreateBillingPlanInput) {
   const payload = {
-    code: input.code.trim(),
+    code: input.code.trim().toUpperCase(),
     name: input.name.trim(),
-    description: input.description?.trim() || undefined,
+    ...(input.description?.trim() ? { description: input.description.trim() } : {}),
     priceCents: Number(input.priceCents),
     vehicleLimit:
       typeof input.vehicleLimit === "number" && Number.isFinite(input.vehicleLimit)
@@ -322,6 +690,11 @@ export async function createBillingPlan(input: CreateBillingPlanInput) {
     currency: (input.currency || "BRL").trim().toUpperCase(),
     interval: input.interval,
     active: input.active ?? true,
+    isPublic: input.isPublic ?? true,
+    isEnterprise: input.isEnterprise ?? false,
+    ...((input.isEnterprise ?? false) && input.companyId?.trim()
+      ? { companyId: input.companyId.trim() }
+      : {}),
   };
 
   await api.post("/billing/plans", payload);
@@ -329,9 +702,9 @@ export async function createBillingPlan(input: CreateBillingPlanInput) {
 
 export async function updateBillingPlan(planId: string, input: UpdateBillingPlanInput) {
   const payload = {
-    code: input.code.trim(),
+    code: input.code.trim().toUpperCase(),
     name: input.name.trim(),
-    description: input.description?.trim() || undefined,
+    ...(input.description?.trim() ? { description: input.description.trim() } : {}),
     priceCents: Number(input.priceCents),
     vehicleLimit:
       typeof input.vehicleLimit === "number" && Number.isFinite(input.vehicleLimit)
@@ -340,6 +713,11 @@ export async function updateBillingPlan(planId: string, input: UpdateBillingPlan
     currency: (input.currency || "BRL").trim().toUpperCase(),
     interval: input.interval,
     active: input.active ?? true,
+    isPublic: input.isPublic ?? true,
+    isEnterprise: input.isEnterprise ?? false,
+    ...((input.isEnterprise ?? false) && input.companyId?.trim()
+      ? { companyId: input.companyId.trim() }
+      : {}),
   };
 
   await api.patch(`/billing/plans/${planId}`, payload);
@@ -395,6 +773,6 @@ export async function checkSubscriptionPayment(input: {
     ...(input.transactionNsu ? { transaction_nsu: input.transactionNsu } : {}),
     ...(input.slug ? { slug: input.slug } : {}),
   };
-  const { data } = await api.post<CheckPaymentResult>('/billing/check-payment', payload);
+  const { data } = await api.post<CheckPaymentResult>("/billing/check-payment", payload);
   return data;
 }

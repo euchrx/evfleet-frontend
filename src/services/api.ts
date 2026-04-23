@@ -32,7 +32,6 @@ function isPublicRoute(url?: string) {
   return (
     /^\/auth\/login(\/|$)/i.test(path) ||
     /^\/auth\/register(\/|$)/i.test(path) ||
-    /^\/companies\/me(\/|$)/i.test(path) ||
     /^\/kiosk\/feedback(\/|$)/i.test(path)
   );
 }
@@ -93,5 +92,5 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(localizeAxiosError(error))
+  (error) => Promise.reject(localizeAxiosError(error)),
 );

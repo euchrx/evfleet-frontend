@@ -9,6 +9,7 @@ import {
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { TablePagination } from "../../components/TablePagination";
 import { useCompanyScope } from "../../contexts/CompanyScopeContext";
+import { useStatusToast } from "../../contexts/StatusToastContext";
 
 type BranchFormData = {
   name: string;
@@ -27,6 +28,7 @@ const TABLE_PAGE_SIZE = 10;
 export function BranchesPage() {
   type BranchSortBy = "name" | "city" | "state" | "createdAt";
   const { canSelectCompanyScope, selectedCompanyId, currentCompany } = useCompanyScope();
+  const { showToast } = useStatusToast();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -326,6 +328,20 @@ export function BranchesPage() {
     };
   }, [branches]);
 
+  useEffect(() => {
+    if (!pageErrorMessage) return;
+
+    const normalized = pageErrorMessage.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const tone = /sucesso|concluid|excluid/.test(normalized) ? "success" : "error";
+
+    showToast({
+      tone,
+      title: tone === "success" ? "Operação concluída" : "Atenção",
+      message: pageErrorMessage,
+    });
+    setPageErrorMessage("");
+  }, [pageErrorMessage, showToast]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -376,12 +392,6 @@ export function BranchesPage() {
           className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
         />
       </div>
-
-      {pageErrorMessage && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {pageErrorMessage}
-        </div>
-      )}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-4 py-3">

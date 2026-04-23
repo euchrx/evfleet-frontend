@@ -3,6 +3,8 @@ import { createTrip, deleteTrip, getTrips, updateTrip } from "../../services/tri
 import { getVehicles } from "../../services/vehicles";
 import { getDrivers } from "../../services/drivers";
 import { useBranch } from "../../contexts/BranchContext";
+import { useCompanyScope } from "../../contexts/CompanyScopeContext";
+import { useStatusToast } from "../../contexts/StatusToastContext";
 import type { Trip, TripStatus } from "../../types/trip";
 import type { Vehicle } from "../../types/vehicle";
 import type { Driver } from "../../types/driver";
@@ -24,6 +26,7 @@ type TripFormData = {
   status: TripStatus;
   notes: string;
 };
+
 type TripFieldErrors = Partial<Record<keyof TripFormData, string>>;
 
 type TripSortBy =
@@ -34,6 +37,15 @@ type TripSortBy =
   | "returnAt"
   | "kmDriven"
   | "status";
+
+type TripFilters = {
+  vehicleId: string; // CSV
+  driverId: string; // CSV
+  status: string; // CSV | ALL
+  text: string;
+  startDate: string;
+  endDate: string;
+};
 
 const initialForm: TripFormData = {
   vehicleId: "",
@@ -48,7 +60,24 @@ const initialForm: TripFormData = {
   status: "OPEN",
   notes: "",
 };
+
+const initialFilters: TripFilters = {
+  vehicleId: "",
+  driverId: "",
+  status: "ALL",
+  text: "",
+  startDate: "",
+  endDate: "",
+};
+
 const TABLE_PAGE_SIZE = 10;
+
+function splitCsv(value: string) {
+  return String(value || "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
 
 function parseLocalDate(value?: string | null) {
   if (!value) return null;
@@ -80,14 +109,20 @@ function statusClass(status: TripStatus) {
 
 export function TripsPage() {
   const { selectedBranchId } = useBranch();
+  const { currentCompany } = useCompanyScope();
+  const { showToast } = useStatusToast();
+
   const [trips, setTrips] = useState<Trip[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<TripFieldErrors>({});
-  const [search, setSearch] = useState("");
+  const [draftFilters, setDraftFilters] = useState<TripFilters>(initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState<TripFilters>(initialFilters);
+  const [hasSearched, setHasSearched] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<TripSortBy>("departureAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -99,36 +134,78 @@ export function TripsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [form, setForm] = useState<TripFormData>(initialForm);
 
-  async function loadData() {
+  async function loadReferenceData() {
     try {
       setLoading(true);
       setPageErrorMessage("");
-      const [tripsData, vehiclesData, driversData] = await Promise.all([
-        getTrips(),
-        getVehicles(),
-        getDrivers(),
-      ]);
-      setTrips(Array.isArray(tripsData) ? tripsData : []);
+      const [vehiclesData, driversData] = await Promise.all([getVehicles(), getDrivers()]);
       setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
       setDrivers(Array.isArray(driversData) ? driversData : []);
     } catch (error) {
-      console.error("Erro ao carregar viagens:", error);
-      setPageErrorMessage("Não foi possível carregar as viagens.");
+      console.error("Erro ao carregar referências de viagens:", error);
+      setPageErrorMessage("Não foi possível carregar os filtros de viagens.");
     } finally {
       setLoading(false);
     }
   }
 
+  async function runSearch(nextFilters: TripFilters = draftFilters) {
+    try {
+      setSearchLoading(true);
+      setPageErrorMessage("");
+      const tripsData = await getTrips();
+      setTrips(Array.isArray(tripsData) ? tripsData : []);
+      setAppliedFilters({ ...nextFilters });
+      setHasSearched(true);
+      setCurrentPage(1);
+      setSelectedTripIds([]);
+    } catch (error) {
+      console.error("Erro ao carregar viagens:", error);
+      setTrips([]);
+      setHasSearched(true);
+      setPageErrorMessage("Não foi possível consultar as viagens.");
+    } finally {
+      setSearchLoading(false);
+    }
+  }
+
   useEffect(() => {
-    loadData();
+    void loadReferenceData();
   }, []);
 
-  const availableVehicles = useMemo(() => {
+  const baseVehicles = useMemo(() => {
     let filtered = vehicles;
     if (selectedBranchId) filtered = filtered.filter((item) => item.branchId === selectedBranchId);
-    filtered = filtered.filter((item) => item.status === "ACTIVE" || item.id === form.vehicleId);
-    return [...filtered].sort((a, b) => a.plate.localeCompare(b.plate, "pt-BR", { sensitivity: "base" }));
-  }, [vehicles, selectedBranchId, form.vehicleId]);
+    filtered = filtered.filter((item) => item.category !== "IMPLEMENT");
+    return [...filtered].sort((a, b) =>
+      a.plate.localeCompare(b.plate, "pt-BR", { sensitivity: "base" }),
+    );
+  }, [vehicles, selectedBranchId]);
+
+  const filterVehicleOptions = useMemo(() => baseVehicles, [baseVehicles]);
+
+  const availableVehicles = useMemo(() => {
+    return baseVehicles.filter(
+      (item) => item.status === "ACTIVE" || item.id === form.vehicleId,
+    );
+  }, [baseVehicles, form.vehicleId]);
+
+  const filterDriverOptions = useMemo(() => {
+    let filtered = drivers;
+    const selectedVehicleIds = splitCsv(draftFilters.vehicleId);
+
+    if (selectedBranchId) {
+      filtered = filtered.filter((driver) => !driver.vehicle || driver.vehicle.branchId === selectedBranchId);
+    }
+
+    if (selectedVehicleIds.length) {
+      filtered = filtered.filter((driver) => driver.vehicleId && selectedVehicleIds.includes(driver.vehicleId));
+    }
+
+    return [...filtered].sort((a, b) =>
+      a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }),
+    );
+  }, [drivers, selectedBranchId, draftFilters.vehicleId]);
 
   const availableDrivers = useMemo(() => {
     let filtered = drivers;
@@ -136,7 +213,9 @@ export function TripsPage() {
       filtered = filtered.filter((driver) => !driver.vehicle || driver.vehicle.branchId === selectedBranchId);
     }
     filtered = filtered.filter((item) => item.status === "ACTIVE" || item.id === form.driverId);
-    return [...filtered].sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
+    return [...filtered].sort((a, b) =>
+      a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }),
+    );
   }, [drivers, selectedBranchId, form.driverId]);
 
   const latestKmByVehicle = useMemo(
@@ -145,10 +224,44 @@ export function TripsPage() {
   );
 
   const filteredTrips = useMemo(() => {
+    if (!hasSearched) return [];
+
     let filtered = trips;
-    if (selectedBranchId) filtered = filtered.filter((trip) => trip.vehicle?.branchId === selectedBranchId);
-    if (search.trim()) {
-      const term = search.toLowerCase();
+    if (selectedBranchId) {
+      filtered = filtered.filter((trip) => trip.vehicle?.branchId === selectedBranchId);
+    }
+
+    const vehicleIds = splitCsv(appliedFilters.vehicleId);
+    const driverIds = splitCsv(appliedFilters.driverId);
+    const statuses = appliedFilters.status === "ALL" ? [] : splitCsv(appliedFilters.status);
+
+    if (vehicleIds.length) {
+      filtered = filtered.filter((trip) => vehicleIds.includes(trip.vehicleId));
+    }
+
+    if (driverIds.length) {
+      filtered = filtered.filter((trip) => trip.driverId && driverIds.includes(trip.driverId));
+    }
+
+    if (statuses.length) {
+      filtered = filtered.filter((trip) => statuses.includes(trip.status));
+    }
+
+    if (appliedFilters.startDate) {
+      const start = parseLocalDate(appliedFilters.startDate)?.getTime() || 0;
+      filtered = filtered.filter((trip) => (parseLocalDate(trip.departureAt)?.getTime() || 0) >= start);
+    }
+
+    if (appliedFilters.endDate) {
+      const endDate = parseLocalDate(appliedFilters.endDate);
+      const end = endDate
+        ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999).getTime()
+        : 0;
+      filtered = filtered.filter((trip) => (parseLocalDate(trip.departureAt)?.getTime() || 0) <= end);
+    }
+
+    if (appliedFilters.text.trim()) {
+      const term = appliedFilters.text.trim().toLowerCase();
       filtered = filtered.filter((trip) =>
         [
           trip.vehicle ? formatVehicleLabel(trip.vehicle) : "",
@@ -156,11 +269,12 @@ export function TripsPage() {
           trip.driver?.name || "",
           trip.origin,
           trip.destination,
+          trip.reason || "",
           statusLabel(trip.status),
         ]
           .join(" ")
           .toLowerCase()
-          .includes(term)
+          .includes(term),
       );
     }
 
@@ -174,35 +288,27 @@ export function TripsPage() {
       if (sortBy === "driver") {
         return (a.driver?.name || "").localeCompare(b.driver?.name || "", "pt-BR", { sensitivity: "base" }) * direction;
       }
-      if (sortBy === "origin")
-        return a.origin.localeCompare(b.origin, "pt-BR", {
-          sensitivity: "base",
-        }) * direction;
-      if (sortBy === "departureAt")
-        return (
-          (parseLocalDate(a.departureAt)?.getTime() || 0) -
-          (parseLocalDate(b.departureAt)?.getTime() || 0)
-        ) * direction;
-      if (sortBy === "returnAt")
-        return (
-          (parseLocalDate(a.returnAt)?.getTime() || 0) -
-          (parseLocalDate(b.returnAt)?.getTime() || 0)
-        ) * direction;
-      if (sortBy === "status")
-        return (
-          statusLabel(a.status).localeCompare(statusLabel(b.status), "pt-BR", {
-            sensitivity: "base",
-          }) * direction
-        );
+      if (sortBy === "origin") {
+        return `${a.origin} ${a.destination}`.localeCompare(`${b.origin} ${b.destination}`, "pt-BR", { sensitivity: "base" }) * direction;
+      }
+      if (sortBy === "departureAt") {
+        return ((parseLocalDate(a.departureAt)?.getTime() || 0) - (parseLocalDate(b.departureAt)?.getTime() || 0)) * direction;
+      }
+      if (sortBy === "returnAt") {
+        return ((parseLocalDate(a.returnAt)?.getTime() || 0) - (parseLocalDate(b.returnAt)?.getTime() || 0)) * direction;
+      }
+      if (sortBy === "status") {
+        return statusLabel(a.status).localeCompare(statusLabel(b.status), "pt-BR", { sensitivity: "base" }) * direction;
+      }
       const aKmDriven = Math.max((a.returnKm || 0) - (a.departureKm || 0), 0);
       const bKmDriven = Math.max((b.returnKm || 0) - (b.departureKm || 0), 0);
       return (aKmDriven - bKmDriven) * direction;
     });
-  }, [trips, selectedBranchId, search, sortBy, sortDirection]);
+  }, [trips, selectedBranchId, hasSearched, appliedFilters, sortBy, sortDirection]);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredTrips.length / TABLE_PAGE_SIZE)),
-    [filteredTrips.length]
+    [filteredTrips.length],
   );
 
   const paginatedTrips = useMemo(() => {
@@ -212,27 +318,28 @@ export function TripsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, sortBy, sortDirection, selectedBranchId]);
+  }, [appliedFilters, sortBy, sortDirection, selectedBranchId]);
 
   useEffect(() => {
     setSelectedTripIds([]);
-  }, [search, sortBy, sortDirection, selectedBranchId, currentPage]);
+  }, [appliedFilters, sortBy, sortDirection, selectedBranchId, currentPage, hasSearched]);
 
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
+    if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
   const summary = useMemo(() => {
-    const scoped = selectedBranchId ? trips.filter((trip) => trip.vehicle?.branchId === selectedBranchId) : trips;
-    const total = scoped.length;
-    const open = scoped.filter((trip) => trip.status === "OPEN").length;
-    const completed = scoped.filter((trip) => trip.status === "COMPLETED").length;
-    const cancelled = scoped.filter((trip) => trip.status === "CANCELLED").length;
-    const totalKm = scoped.reduce((sum, trip) => sum + Math.max((trip.returnKm || 0) - trip.departureKm, 0), 0);
+    if (!hasSearched) return { total: 0, open: 0, completed: 0, cancelled: 0, totalKm: 0 };
+    const total = filteredTrips.length;
+    const open = filteredTrips.filter((trip) => trip.status === "OPEN").length;
+    const completed = filteredTrips.filter((trip) => trip.status === "COMPLETED").length;
+    const cancelled = filteredTrips.filter((trip) => trip.status === "CANCELLED").length;
+    const totalKm = filteredTrips.reduce(
+      (sum, trip) => sum + Math.max((trip.returnKm || 0) - trip.departureKm, 0),
+      0,
+    );
     return { total, open, completed, cancelled, totalKm };
-  }, [trips, selectedBranchId]);
+  }, [filteredTrips, hasSearched]);
 
   function getSortArrow(column: TripSortBy) {
     if (sortBy !== column) return "↕";
@@ -245,7 +352,24 @@ export function TripsPage() {
       return;
     }
     setSortBy(column);
-    setSortDirection("asc");
+    setSortDirection(column === "departureAt" ? "desc" : "asc");
+  }
+
+  function updateDraftFilter<K extends keyof TripFilters>(field: K, value: TripFilters[K]) {
+    setDraftFilters((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleSearchClick() {
+    void runSearch(draftFilters);
+  }
+
+  function handleClearFilters() {
+    setDraftFilters(initialFilters);
+    setAppliedFilters(initialFilters);
+    setTrips([]);
+    setHasSearched(false);
+    setCurrentPage(1);
+    setSelectedTripIds([]);
   }
 
   function openCreateModal() {
@@ -300,9 +424,7 @@ export function TripsPage() {
     }
     const latestKm = latestKmByVehicle.get(vehicleId);
     const suggestedDriver = drivers.find(
-      (driver) =>
-        driver.vehicleId === vehicleId &&
-        (driver.status === "ACTIVE" || driver.id === form.driverId)
+      (driver) => driver.vehicleId === vehicleId && (driver.status === "ACTIVE" || driver.id === form.driverId),
     );
     setForm((prev) => ({
       ...prev,
@@ -345,8 +467,14 @@ export function TripsPage() {
         setFieldErrors((prev) => ({ ...prev, departureKm: "KM de saída inválido." }));
         return;
       }
-      if (payload.returnKm !== undefined && (Number.isNaN(payload.returnKm) || payload.returnKm < payload.departureKm)) {
-        setFieldErrors((prev) => ({ ...prev, returnKm: "KM de retorno deve ser maior ou igual ao KM de saída." }));
+      if (
+        payload.returnKm !== undefined &&
+        (Number.isNaN(payload.returnKm) || payload.returnKm < payload.departureKm)
+      ) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          returnKm: "KM de retorno deve ser maior ou igual ao KM de saída.",
+        }));
         return;
       }
 
@@ -354,10 +482,16 @@ export function TripsPage() {
       else await createTrip(payload);
 
       closeModal();
-      await loadData();
+      if (hasSearched) await runSearch(appliedFilters);
     } catch (error: any) {
-      const apiMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "";
-      const apiText = Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage || "Não foi possível salvar a viagem.");
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "";
+      const apiText = Array.isArray(apiMessage)
+        ? apiMessage.join(", ")
+        : String(apiMessage || "Não foi possível salvar a viagem.");
       setFieldErrors((prev) => ({ ...prev, origin: apiText }));
     } finally {
       setSaving(false);
@@ -374,7 +508,7 @@ export function TripsPage() {
       setDeletingTrip(true);
       await deleteTrip(tripToDelete.id);
       setTripToDelete(null);
-      await loadData();
+      if (hasSearched) await runSearch(appliedFilters);
     } catch (error) {
       console.error("Erro ao excluir viagem:", error);
       setPageErrorMessage("Não foi possível excluir a viagem.");
@@ -414,7 +548,7 @@ export function TripsPage() {
       }
       setBulkDeleteOpen(false);
       setSelectedTripIds([]);
-      await loadData();
+      if (hasSearched) await runSearch(appliedFilters);
     } catch (error) {
       console.error("Erro ao excluir viagens em lote:", error);
       setPageErrorMessage("Não foi possível concluir a exclusão em lote das viagens.");
@@ -425,6 +559,27 @@ export function TripsPage() {
 
   const allTripsOnPageSelected =
     paginatedTrips.length > 0 && paginatedTrips.every((item) => selectedTripIds.includes(item.id));
+
+  const selectedVehicleIds = useMemo(() => splitCsv(draftFilters.vehicleId), [draftFilters.vehicleId]);
+  const selectedDriverIds = useMemo(() => splitCsv(draftFilters.driverId), [draftFilters.driverId]);
+  const selectedStatusIds = useMemo(
+    () => (draftFilters.status === "ALL" ? [] : splitCsv(draftFilters.status)),
+    [draftFilters.status],
+  );
+
+  useEffect(() => {
+    if (!pageErrorMessage) return;
+
+    const normalized = pageErrorMessage.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const tone = /sucesso|concluid|excluid/.test(normalized) ? "success" : "error";
+
+    showToast({
+      tone,
+      title: tone === "success" ? "Operação concluída" : "Atenção",
+      message: pageErrorMessage,
+    });
+    setPageErrorMessage("");
+  }, [pageErrorMessage, showToast]);
 
   return (
     <div className="min-w-0 space-y-6">
@@ -444,16 +599,118 @@ export function TripsPage() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Totais</p><p className="mt-1 text-2xl font-bold text-slate-900">{summary.total}</p></div>
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Abertas</p><p className="mt-1 text-2xl font-bold text-amber-800">{summary.open}</p></div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Concluidas</p><p className="mt-1 text-2xl font-bold text-emerald-800">{summary.completed}</p></div>
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Concluídas</p><p className="mt-1 text-2xl font-bold text-emerald-800">{summary.completed}</p></div>
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-red-700">Canceladas</p><p className="mt-1 text-2xl font-bold text-red-800">{summary.cancelled}</p></div>
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">KM Rodados</p><p className="mt-1 text-2xl font-bold text-blue-800">{summary.totalKm.toLocaleString("pt-BR")} km</p></div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por veículo, motorista, origem, destino ou status" className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
-      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <label className="text-sm text-slate-700 xl:col-span-2">
+            <span className="font-medium text-slate-700">Empresa</span>
+            <input
+              value={currentCompany?.name || "Empresa não selecionada"}
+              disabled
+              className="mt-1 h-12 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 px-4 text-sm text-slate-500 outline-none"
+            />
+          </label>
 
-      {pageErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{pageErrorMessage}</div> : null}
+          <label className="text-sm text-slate-700">
+            <span className="font-medium text-slate-700">Veículo</span>
+            <select
+              value={draftFilters.vehicleId}
+              onChange={(e) => updateDraftFilter("vehicleId", e.target.value)}
+              className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+            >
+              <option value="">Todos</option>
+              {filterVehicleOptions.map((vehicle) => (
+                <option key={vehicle.id} value={vehicle.id}>
+                  {formatVehicleLabel(vehicle)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-sm text-slate-700">
+            <span className="font-medium text-slate-700">Motorista</span>
+            <select
+              value={draftFilters.driverId}
+              onChange={(e) => updateDraftFilter("driverId", e.target.value)}
+              className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+            >
+              <option value="">Todos</option>
+              {filterDriverOptions.map((driver) => (
+                <option key={driver.id} value={driver.id}>
+                  {driver.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-sm text-slate-700">
+            <span className="font-medium text-slate-700">Status</span>
+            <select
+              value={draftFilters.status}
+              onChange={(e) => updateDraftFilter("status", e.target.value)}
+              className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+            >
+              <option value="ALL">Todos</option>
+              <option value="OPEN">Aberta</option>
+              <option value="COMPLETED">Concluída</option>
+              <option value="CANCELLED">Cancelada</option>
+            </select>
+          </label>
+
+          <label className="text-sm text-slate-700">
+            <span className="font-medium text-slate-700">Busca</span>
+            <input
+              type="text"
+              value={draftFilters.text}
+              onChange={(e) => updateDraftFilter("text", e.target.value)}
+              placeholder="Origem, destino, motivo..."
+              className="mt-1 h-12 w-full rounded-xl border border-slate-300 px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+            />
+          </label>
+
+          <label className="text-sm text-slate-700">
+            <span className="font-medium text-slate-700">Data inicial</span>
+            <input
+              type="date"
+              value={draftFilters.startDate}
+              onChange={(e) => updateDraftFilter("startDate", e.target.value)}
+              className="mt-1 h-12 w-full rounded-xl border border-slate-300 px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+            />
+          </label>
+
+          <label className="text-sm text-slate-700">
+            <span className="font-medium text-slate-700">Data final</span>
+            <input
+              type="date"
+              value={draftFilters.endDate}
+              onChange={(e) => updateDraftFilter("endDate", e.target.value)}
+              className="mt-1 h-12 w-full rounded-xl border border-slate-300 px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+            />
+          </label>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={handleSearchClick}
+            disabled={searchLoading}
+            className="btn-ui btn-ui-primary disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {searchLoading ? "Consultando..." : "Consultar"}
+          </button>
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            className="btn-ui btn-ui-neutral"
+          >
+            Limpar
+          </button>
+        </div>
+      </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm">
@@ -487,23 +744,33 @@ export function TripsPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">Carregando viagens...</td></tr> : filteredTrips.length === 0 ? <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma viagem encontrada.</td></tr> : paginatedTrips.map((trip) => (
-                <tr key={trip.id} className="border-t border-slate-200">
-                  <td className="px-6 py-4 text-sm text-slate-700"><input type="checkbox" checked={selectedTripIds.includes(trip.id)} onChange={() => handleToggleTrip(trip.id)} aria-label={`Selecionar viagem ${trip.origin} para ${trip.destination}`} className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500" /></td>
-                  <td className="px-6 py-4 text-sm text-slate-700">{trip.vehicle ? formatVehicleLabel(trip.vehicle) : trip.vehicleId}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700">{trip.driver?.name || "Sem motorista"}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700"><span className="font-medium">{trip.origin}</span><span className="mx-2 text-slate-400">→</span>{trip.destination}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700">{toDateText(trip.departureAt)}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700">{toDateText(trip.returnAt)}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700">{trip.returnKm ? Math.max(trip.returnKm - trip.departureKm, 0).toLocaleString("pt-BR") : "-"} km</td>
-                  <td className="px-6 py-4 text-sm"><span className={`status-pill ${statusClass(trip.status)}`}>{statusLabel(trip.status)}</span></td>
-                  <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openEditModal(trip)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => handleDelete(trip)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
-                </tr>
-              ))}
+              {loading ? (
+                <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">Carregando filtros de viagens...</td></tr>
+              ) : !hasSearched ? (
+                <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">Faça uma consulta para visualizar as viagens.</td></tr>
+              ) : searchLoading ? (
+                <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">Consultando viagens...</td></tr>
+              ) : filteredTrips.length === 0 ? (
+                <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">Nenhuma viagem encontrada.</td></tr>
+              ) : (
+                paginatedTrips.map((trip) => (
+                  <tr key={trip.id} className="border-t border-slate-200">
+                    <td className="px-6 py-4 text-sm text-slate-700"><input type="checkbox" checked={selectedTripIds.includes(trip.id)} onChange={() => handleToggleTrip(trip.id)} aria-label={`Selecionar viagem ${trip.origin} para ${trip.destination}`} className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500" /></td>
+                    <td className="px-6 py-4 text-sm text-slate-700">{trip.vehicle ? formatVehicleLabel(trip.vehicle) : trip.vehicleId}</td>
+                    <td className="px-6 py-4 text-sm text-slate-700">{trip.driver?.name || "Sem motorista"}</td>
+                    <td className="px-6 py-4 text-sm text-slate-700"><span className="font-medium">{trip.origin}</span><span className="mx-2 text-slate-400">→</span>{trip.destination}</td>
+                    <td className="px-6 py-4 text-sm text-slate-700">{toDateText(trip.departureAt)}</td>
+                    <td className="px-6 py-4 text-sm text-slate-700">{toDateText(trip.returnAt)}</td>
+                    <td className="px-6 py-4 text-sm text-slate-700">{trip.returnKm ? Math.max(trip.returnKm - trip.departureKm, 0).toLocaleString("pt-BR") : "-"} km</td>
+                    <td className="px-6 py-4 text-sm"><span className={`status-pill ${statusClass(trip.status)}`}>{statusLabel(trip.status)}</span></td>
+                    <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openEditModal(trip)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => handleDelete(trip)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-        {!loading && filteredTrips.length > 0 ? (
+        {!loading && hasSearched && filteredTrips.length > 0 ? (
           <TablePagination
             currentPage={currentPage}
             totalPages={totalPages}
@@ -557,14 +824,11 @@ export function TripsPage() {
           </div>
         </div>
       ) : null}
+
       <ConfirmDeleteModal
         isOpen={Boolean(tripToDelete)}
         title="Excluir viagem"
-        description={
-          tripToDelete
-            ? `Deseja excluir a viagem ${tripToDelete.origin} > ${tripToDelete.destination}?`
-            : ""
-        }
+        description={tripToDelete ? `Deseja excluir a viagem ${tripToDelete.origin} > ${tripToDelete.destination}?` : ""}
         loading={deletingTrip}
         onCancel={() => setTripToDelete(null)}
         onConfirm={confirmDeleteTrip}

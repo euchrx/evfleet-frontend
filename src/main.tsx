@@ -5,15 +5,18 @@ import App from "./App.tsx";
 import { AuthProvider } from "./contexts/AuthContext";
 import { BranchProvider } from "./contexts/BranchContext";
 import { CompanyScopeProvider } from "./contexts/CompanyScopeContext";
+import { StatusToastProvider } from "./contexts/StatusToastContext";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
-      <CompanyScopeProvider>
-        <BranchProvider>
-          <App />
-        </BranchProvider>
-      </CompanyScopeProvider>
+      <StatusToastProvider>
+        <CompanyScopeProvider>
+          <BranchProvider>
+            <App />
+          </BranchProvider>
+        </CompanyScopeProvider>
+      </StatusToastProvider>
     </AuthProvider>
-  </StrictMode>
+  </StrictMode>,
 );

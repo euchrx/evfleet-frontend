@@ -24,6 +24,26 @@ const categoryOptions: Array<{ value: RetailProductCategory; label: string }> = 
   { value: "OUTROS", label: "Outros" },
 ];
 
+type ProductPageFilters = {
+  dateFrom: string;
+  dateTo: string;
+  category: RetailProductFilters["category"];
+  description: string;
+  productCode: string;
+  supplierName: string;
+  invoiceNumber: string;
+};
+
+const initialPageFilters: ProductPageFilters = {
+  dateFrom: "",
+  dateTo: "",
+  category: "",
+  description: "",
+  productCode: "",
+  supplierName: "",
+  invoiceNumber: "",
+};
+
 function toNumber(value: string | number | null | undefined) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   if (typeof value === "string") {
@@ -62,7 +82,8 @@ function categoryLabel(category: RetailProductCategory) {
 }
 
 export function RetailProductsPage() {
-  const { selectedCompanyId } = useCompanyScope();
+  const { selectedCompanyId, currentCompany } = useCompanyScope();
+
   const [items, setItems] = useState<RetailProductItem[]>([]);
   const [lastSuccessfulItems, setLastSuccessfulItems] = useState<RetailProductItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,17 +93,21 @@ export function RetailProductsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [filters, setFilters] = useState<RetailProductFilters>({
+
+  const [serviceFilters, setServiceFilters] = useState<RetailProductFilters>({
     dateFrom: "",
     dateTo: "",
     category: "",
   });
-  const [search, setSearch] = useState("");
 
-  async function loadData(nextFilters = filters, manualRefresh = false) {
+  const [draftFilters, setDraftFilters] = useState<ProductPageFilters>(initialPageFilters);
+  const [appliedFilters, setAppliedFilters] = useState<ProductPageFilters>(initialPageFilters);
+
+  async function loadData(nextFilters = serviceFilters, manualRefresh = false) {
     try {
       if (manualRefresh) setRefreshing(true);
       else setLoading(true);
+
       setErrorMessage("");
       const data = await getRetailProducts(nextFilters);
       setItems(data);
@@ -98,32 +123,44 @@ export function RetailProductsPage() {
   }
 
   useEffect(() => {
-    loadData();
+    void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCompanyId]);
 
-  function handleFilterChange<K extends keyof RetailProductFilters>(
+  function handleDraftFilterChange<K extends keyof ProductPageFilters>(
     key: K,
-    value: RetailProductFilters[K],
+    value: ProductPageFilters[K],
   ) {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    setDraftFilters((prev) => ({ ...prev, [key]: value }));
   }
 
   async function handleSearch() {
+    const nextServiceFilters: RetailProductFilters = {
+      dateFrom: draftFilters.dateFrom,
+      dateTo: draftFilters.dateTo,
+      category: draftFilters.category,
+    };
+
+    setServiceFilters(nextServiceFilters);
+    setAppliedFilters(draftFilters);
     setCurrentPage(1);
-    await loadData(filters, true);
+    setSelectedItemIds([]);
+    await loadData(nextServiceFilters, true);
   }
 
   async function handleClear() {
-    const emptyFilters: RetailProductFilters = {
+    const emptyServiceFilters: RetailProductFilters = {
       dateFrom: "",
       dateTo: "",
       category: "",
     };
-    setFilters(emptyFilters);
-    setSearch("");
+
+    setDraftFilters(initialPageFilters);
+    setAppliedFilters(initialPageFilters);
+    setServiceFilters(emptyServiceFilters);
     setCurrentPage(1);
-    await loadData(emptyFilters, true);
+    setSelectedItemIds([]);
+    await loadData(emptyServiceFilters, true);
   }
 
   const summary = useMemo(() => {
@@ -138,22 +175,43 @@ export function RetailProductsPage() {
   }, [items]);
 
   const filteredItems = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return items;
-
     return items.filter((item) => {
-      const haystack = [
-        item.description,
-        item.productCode || "",
-        item.retailProductImport.supplierName || "",
-        item.retailProductImport.invoiceNumber || "",
-      ]
-        .join(" ")
-        .toLowerCase();
+      const description = String(item.description || "").toLowerCase();
+      const productCode = String(item.productCode || "").toLowerCase();
+      const supplierName = String(item.retailProductImport.supplierName || "").toLowerCase();
+      const invoiceNumber = String(item.retailProductImport.invoiceNumber || "").toLowerCase();
 
-      return haystack.includes(term);
+      if (
+        appliedFilters.description &&
+        !description.includes(appliedFilters.description.trim().toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        appliedFilters.productCode &&
+        !productCode.includes(appliedFilters.productCode.trim().toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        appliedFilters.supplierName &&
+        !supplierName.includes(appliedFilters.supplierName.trim().toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        appliedFilters.invoiceNumber &&
+        !invoiceNumber.includes(appliedFilters.invoiceNumber.trim().toLowerCase())
+      ) {
+        return false;
+      }
+
+      return true;
     });
-  }, [items, search]);
+  }, [items, appliedFilters]);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE)),
@@ -172,7 +230,16 @@ export function RetailProductsPage() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedItemIds([]);
-  }, [selectedCompanyId, filters.dateFrom, filters.dateTo, filters.category, search]);
+  }, [
+    selectedCompanyId,
+    appliedFilters.dateFrom,
+    appliedFilters.dateTo,
+    appliedFilters.category,
+    appliedFilters.description,
+    appliedFilters.productCode,
+    appliedFilters.supplierName,
+    appliedFilters.invoiceNumber,
+  ]);
 
   function toggleItemSelection(itemId: string) {
     setSelectedItemIds((prev) =>
@@ -207,7 +274,7 @@ export function RetailProductsPage() {
       await deleteRetailProducts(selectedItemIds);
       setSelectedItemIds([]);
       setBulkDeleteOpen(false);
-      await loadData(filters, true);
+      await loadData(serviceFilters, true);
     } catch (error) {
       console.error("Erro ao excluir produtos em lote:", error);
       setErrorMessage("Não foi possível excluir os produtos selecionados.");
@@ -225,11 +292,12 @@ export function RetailProductsPage() {
             Controle de itens comprados para o veículo, organizados por categoria e nota fiscal.
           </p>
         </div>
+
         <div className="flex flex-col gap-3 sm:flex-row">
-          <ProductXmlImportButton onImported={() => loadData(filters, true)} />
+          <ProductXmlImportButton onImported={() => loadData(serviceFilters, true)} />
           <button
             type="button"
-            onClick={() => loadData(filters, true)}
+            onClick={() => loadData(serviceFilters, true)}
             disabled={refreshing}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -245,13 +313,17 @@ export function RetailProductsPage() {
           <p className="mt-1 text-2xl font-bold text-slate-900">{summary.totalItems}</p>
         </div>
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Valor total</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+            Valor total
+          </p>
           <p className="mt-1 text-2xl font-bold text-emerald-800">
             {formatMoney(summary.totalValue)}
           </p>
         </div>
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Quantidade</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+            Quantidade
+          </p>
           <p className="mt-1 text-2xl font-bold text-blue-800">
             {formatQuantity(summary.totalQuantity)}
           </p>
@@ -264,53 +336,103 @@ export function RetailProductsPage() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 p-4">
+      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="p-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <input
-              type="date"
-              value={filters.dateFrom || ""}
-              onChange={(event) => handleFilterChange("dateFrom", event.target.value)}
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            />
-            <input
-              type="date"
-              value={filters.dateTo || ""}
-              onChange={(event) => handleFilterChange("dateTo", event.target.value)}
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por produto, fornecedor ou NF-e"
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            />
-            <select
-              value={filters.category || ""}
-              onChange={(event) =>
-                handleFilterChange(
-                  "category",
-                  (event.target.value || "") as RetailProductFilters["category"],
-                )
-              }
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            >
-              <option value="">Todas as categorias</option>
-              {categoryOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <label className="space-y-1.5 xl:col-span-2">
+              <span className="mb-1 block text-sm font-semibold text-slate-700">Empresa</span>
+              <input
+                value={currentCompany?.name || ""}
+                disabled
+                className="w-full cursor-not-allowed rounded-xl border border-slate-300 bg-slate-200 px-3 py-2 text-sm text-slate-600 outline-none"
+              />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="mb-1 block text-sm font-semibold text-slate-700">Data inicial</span>
+              <input
+                type="date"
+                value={draftFilters.dateFrom}
+                onChange={(event) => handleDraftFilterChange("dateFrom", event.target.value)}
+                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="mb-1 block text-sm font-semibold text-slate-700">Data final</span>
+              <input
+                type="date"
+                value={draftFilters.dateTo}
+                onChange={(event) => handleDraftFilterChange("dateTo", event.target.value)}
+                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="mb-1 block text-sm font-semibold text-slate-700">Produto</span>
+              <input
+                value={draftFilters.description}
+                onChange={(event) => handleDraftFilterChange("description", event.target.value)}
+                placeholder="Descrição do produto"
+                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="mb-1 block text-sm font-semibold text-slate-700">
+                Código do produto
+              </span>
+              <input
+                value={draftFilters.productCode}
+                onChange={(event) => handleDraftFilterChange("productCode", event.target.value)}
+                placeholder="Código"
+                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="mb-1 block text-sm font-semibold text-slate-700">Fornecedor</span>
+              <input
+                value={draftFilters.supplierName}
+                onChange={(event) => handleDraftFilterChange("supplierName", event.target.value)}
+                placeholder="Nome do fornecedor"
+                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="mb-1 block text-sm font-semibold text-slate-700">NF-e</span>
+              <input
+                value={draftFilters.invoiceNumber}
+                onChange={(event) => handleDraftFilterChange("invoiceNumber", event.target.value)}
+                placeholder="Número da nota"
+                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="mb-1 block text-sm font-semibold text-slate-700">Categoria</span>
+              <select
+                value={draftFilters.category || ""}
+                onChange={(event) =>
+                  handleDraftFilterChange(
+                    "category",
+                    (event.target.value || "") as ProductPageFilters["category"],
+                  )
+                }
+                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              >
+                <option value="">Todas as categorias</option>
+                {categoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSearch}
-              className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
-            >
-              Filtrar
-            </button>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleClear}
@@ -318,24 +440,36 @@ export function RetailProductsPage() {
             >
               Limpar filtros
             </button>
+            <button
+              type="button"
+              onClick={handleSearch}
+              className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
+            >
+              Consultar
+            </button>
           </div>
         </div>
+      </section>
 
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-4 py-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-slate-500">
               {selectedItemIds.length > 0
                 ? `${selectedItemIds.length} item(ns) selecionado(s)`
-                : "Selecione registros para excluir em lote"}
+                : `${filteredItems.length} item(ns) encontrado(s)`}
             </p>
-            <button
-              type="button"
-              onClick={() => setBulkDeleteOpen(true)}
-              disabled={selectedItemIds.length === 0}
-              className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Excluir selecionados
-            </button>
+
+            {selectedItemIds.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setBulkDeleteOpen(true)}
+                disabled={selectedItemIds.length === 0}
+                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Excluir selecionados
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -374,6 +508,9 @@ export function RetailProductsPage() {
                   NF-e
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  Fornecedor
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                   Data
                 </th>
               </tr>
@@ -381,13 +518,13 @@ export function RetailProductsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={10} className="px-6 py-8 text-center text-sm text-slate-500">
                     Carregando produtos...
                   </td>
                 </tr>
               ) : paginatedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={10} className="px-6 py-8 text-center text-sm text-slate-500">
                     Nenhum produto encontrado.
                   </td>
                 </tr>
@@ -436,6 +573,9 @@ export function RetailProductsPage() {
                       {item.retailProductImport.invoiceNumber || "-"}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
+                      {item.retailProductImport.supplierName || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
                       {formatDate(item.retailProductImport.issuedAt)}
                     </td>
                   </tr>
@@ -456,7 +596,7 @@ export function RetailProductsPage() {
             onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
           />
         ) : null}
-      </div>
+      </section>
 
       <ConfirmDeleteModal
         isOpen={bulkDeleteOpen}

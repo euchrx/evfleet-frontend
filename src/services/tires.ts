@@ -7,19 +7,24 @@ export type CreateTireInput = {
   brand: string;
   model: string;
   size: string;
+  rim?: number;
+
   purchaseDate?: string;
   purchaseCost?: number;
+
   status?: TireStatus;
   axlePosition?: string;
   wheelPosition?: string;
+
   currentKm?: number;
   currentTreadDepthMm?: number;
   currentPressurePsi?: number;
   targetPressurePsi?: number;
   minTreadDepthMm?: number;
+
   installedAt?: string;
   notes?: string;
-  vehicleId?: string;
+  vehicleId?: string | null;
 };
 
 export type UpdateTireInput = Partial<CreateTireInput>;
@@ -31,12 +36,15 @@ export type CreateTireReadingInput = {
   pressurePsi: number;
   condition?: string;
   notes?: string;
-  vehicleId?: string;
+  vehicleId?: string | null;
 };
 
 export async function getTires() {
   try {
-    const response = await api.get("/tires");
+    const response = await api.get("/tires", {
+      params: { _ts: Date.now() },
+    });
+
     if (Array.isArray(response.data)) return response.data as Tire[];
     if (Array.isArray(response.data?.items)) return response.data.items as Tire[];
     if (Array.isArray(response.data?.data)) return response.data.data as Tire[];
@@ -48,7 +56,12 @@ export async function getTires() {
 }
 
 export async function getTireAlerts() {
-  const response = await api.get("/tires/alerts/summary");
+  const response = await api.get("/tires/alerts/summary", {
+    params: {
+      _ts: Date.now(),
+    },
+  });
+
   return response.data as { totalTires: number; totalAlerts: number; alerts: TireAlert[] };
 }
 
@@ -72,6 +85,11 @@ export async function createTireReading(tireId: string, data: CreateTireReadingI
 }
 
 export async function getTireReadings(tireId: string) {
-  const response = await api.get<TireReading[]>(`/tires/${tireId}/readings`);
+  const response = await api.get<TireReading[]>(`/tires/${tireId}/readings`, {
+    params: {
+      _ts: Date.now(),
+    },
+  });
+
   return response.data;
 }

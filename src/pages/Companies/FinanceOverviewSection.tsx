@@ -4,16 +4,18 @@ import { TablePagination } from "../../components/TablePagination";
 import { getFinanceOverview, type FinanceCompanyItem } from "../../services/finance";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 
-type SubscriptionStatusFilter =
+type AccessStatusFilter =
   | "ALL"
-  | "ACTIVE"
+  | "NO_PLAN"
+  | "SETUP_REQUIRED"
   | "TRIALING"
-  | "PAST_DUE"
-  | "CANCELED"
-  | "NONE";
+  | "ACTIVE"
+  | "GRACE_PERIOD"
+  | "BLOCKED";
 
 type FinanceSortBy =
   | "companyName"
+  | "accessStatus"
   | "subscriptionStatus"
   | "planName"
   | "amountCents"
@@ -30,11 +32,22 @@ type FinanceOverviewSectionProps = {
 const PAGE_SIZE = 10;
 
 function subscriptionStatusLabel(status?: string) {
+  if (status === "DRAFT") return "Em configuração";
   if (status === "ACTIVE") return "Ativa";
   if (status === "TRIALING") return "Período de teste";
   if (status === "PAST_DUE") return "Inadimplente";
   if (status === "CANCELED") return "Cancelada";
   return "Sem assinatura";
+}
+
+function accessStatusLabel(status?: string) {
+  if (status === "NO_PLAN") return "Sem plano";
+  if (status === "SETUP_REQUIRED") return "Configuração pendente";
+  if (status === "TRIALING") return "Período de teste";
+  if (status === "ACTIVE") return "Assinatura ativa";
+  if (status === "GRACE_PERIOD") return "Em tolerância";
+  if (status === "BLOCKED") return "Bloqueado";
+  return "Sem status";
 }
 
 function paymentStatusLabel(status?: string) {
@@ -47,11 +60,13 @@ function paymentStatusLabel(status?: string) {
   return "-";
 }
 
-function subscriptionStatusClass(status?: string) {
+function accessStatusClass(status?: string) {
   if (status === "ACTIVE") return "status-active";
   if (status === "TRIALING") return "status-pending";
-  if (status === "PAST_DUE") return "status-anomaly";
-  if (status === "CANCELED") return "status-inactive";
+  if (status === "GRACE_PERIOD") return "status-anomaly";
+  if (status === "BLOCKED") return "status-inactive";
+  if (status === "SETUP_REQUIRED") return "status-pending";
+  if (status === "NO_PLAN") return "status-inactive";
   return "status-inactive";
 }
 
@@ -75,7 +90,7 @@ export function FinanceOverviewSection({
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<SubscriptionStatusFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<AccessStatusFilter>("ALL");
   const [sortBy, setSortBy] = useState<FinanceSortBy>("companyName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -127,10 +142,7 @@ export function FinanceOverviewSection({
     let base = [...items];
 
     if (statusFilter !== "ALL") {
-      base = base.filter((item) => {
-        const status = item.subscriptionStatus || "NONE";
-        return status === statusFilter;
-      });
+      base = base.filter((item) => item.accessStatus === statusFilter);
     }
 
     if (search.trim()) {
@@ -140,6 +152,7 @@ export function FinanceOverviewSection({
           item.companyName,
           item.companyDocument || "",
           item.planName || "",
+          accessStatusLabel(item.accessStatus),
           subscriptionStatusLabel(item.subscriptionStatus),
           cycleLabel(item.billingCycle),
         ]
@@ -152,6 +165,15 @@ export function FinanceOverviewSection({
     const direction = sortDirection === "asc" ? 1 : -1;
 
     return base.sort((a, b) => {
+      if (sortBy === "accessStatus") {
+        return (
+          accessStatusLabel(a.accessStatus).localeCompare(
+            accessStatusLabel(b.accessStatus),
+            "pt-BR",
+          ) * direction
+        );
+      }
+
       if (sortBy === "subscriptionStatus") {
         return (
           subscriptionStatusLabel(a.subscriptionStatus).localeCompare(
@@ -241,11 +263,12 @@ export function FinanceOverviewSection({
   const summary = useMemo(
     () => ({
       companies: items.length,
-      active: items.filter((item) => item.subscriptionStatus === "ACTIVE").length,
-      trialing: items.filter((item) => item.subscriptionStatus === "TRIALING").length,
-      pastDue: items.filter((item) => item.subscriptionStatus === "PAST_DUE").length,
+      active: items.filter((item) => item.accessStatus === "ACTIVE").length,
+      trialing: items.filter((item) => item.accessStatus === "TRIALING").length,
+      grace: items.filter((item) => item.accessStatus === "GRACE_PERIOD").length,
+      blocked: items.filter((item) => item.accessStatus === "BLOCKED").length,
       monthlyRevenueCents: items.reduce((sum, item) => {
-        if (item.subscriptionStatus !== "ACTIVE" && item.subscriptionStatus !== "TRIALING") {
+        if (item.accessStatus !== "ACTIVE" && item.accessStatus !== "TRIALING") {
           return sum;
         }
         return sum + item.amountCents;
@@ -260,7 +283,7 @@ export function FinanceOverviewSection({
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Empresas</h1>
           <p className="text-sm text-slate-500">
-            Visão administrativa das empresas, assinaturas, status de cobrança e datas.
+            Visão administrativa das empresas, assinaturas, status operacional e cobrança.
           </p>
         </div>
         <button
@@ -280,22 +303,26 @@ export function FinanceOverviewSection({
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Empresas</p>
           <p className="mt-1 text-3xl font-bold text-slate-900">{summary.companies}</p>
         </div>
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Assinaturas ativas</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Operação ativa</p>
           <p className="mt-1 text-3xl font-bold text-emerald-900">{summary.active}</p>
         </div>
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Em teste</p>
           <p className="mt-1 text-3xl font-bold text-amber-900">{summary.trialing}</p>
         </div>
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">Em tolerância</p>
+          <p className="mt-1 text-3xl font-bold text-orange-900">{summary.grace}</p>
+        </div>
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Inadimplentes</p>
-          <p className="mt-1 text-3xl font-bold text-rose-900">{summary.pastDue}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Bloqueadas</p>
+          <p className="mt-1 text-3xl font-bold text-rose-900">{summary.blocked}</p>
         </div>
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Receita mensal prevista</p>
@@ -306,36 +333,42 @@ export function FinanceOverviewSection({
       </div>
 
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+        <div className="grid gap-3 md:grid-cols-[1fr_260px]">
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por empresa, documento, plano ou status..."
+            placeholder="Buscar por empresa, plano, status operacional ou assinatura..."
             className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
           />
           <select
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as SubscriptionStatusFilter)}
+            onChange={(event) => setStatusFilter(event.target.value as AccessStatusFilter)}
             className="rounded-xl border border-slate-300 px-3 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
           >
             <option value="ALL">Todos os status</option>
-            <option value="ACTIVE">Ativa</option>
+            <option value="NO_PLAN">Sem plano</option>
+            <option value="SETUP_REQUIRED">Configuração pendente</option>
             <option value="TRIALING">Período de teste</option>
-            <option value="PAST_DUE">Inadimplente</option>
-            <option value="CANCELED">Cancelada</option>
-            <option value="NONE">Sem assinatura</option>
+            <option value="ACTIVE">Assinatura ativa</option>
+            <option value="GRACE_PERIOD">Em tolerância</option>
+            <option value="BLOCKED">Bloqueado</option>
           </select>
         </div>
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-[1200px] w-full text-sm">
+          <table className="min-w-[1450px] w-full text-sm">
             <thead className="bg-slate-50 text-slate-700">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold">
                   <button type="button" onClick={() => handleSort("companyName")} className="cursor-pointer">
                     Empresa {getSortArrow("companyName")}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold">
+                  <button type="button" onClick={() => handleSort("accessStatus")} className="cursor-pointer">
+                    Operação {getSortArrow("accessStatus")}
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left font-semibold">
@@ -368,6 +401,7 @@ export function FinanceOverviewSection({
                     Próxima cobrança {getSortArrow("nextBillingAt")}
                   </button>
                 </th>
+                <th className="px-4 py-3 text-left font-semibold">Trial / tolerância</th>
                 <th className="px-4 py-3 text-left font-semibold">
                   <button type="button" onClick={() => handleSort("paymentsCount")} className="cursor-pointer">
                     Pagamentos {getSortArrow("paymentsCount")}
@@ -383,13 +417,13 @@ export function FinanceOverviewSection({
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={11} className="px-4 py-12 text-center text-slate-500">
                     Carregando dados financeiros...
                   </td>
                 </tr>
               ) : paginatedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={11} className="px-4 py-12 text-center text-slate-500">
                     Nenhum registro financeiro encontrado.
                   </td>
                 </tr>
@@ -415,7 +449,15 @@ export function FinanceOverviewSection({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={subscriptionStatusClass(item.subscriptionStatus)}>
+                      <span className={accessStatusClass(item.accessStatus)}>
+                        {accessStatusLabel(item.accessStatus)}
+                      </span>
+                      {item.accessMessage ? (
+                        <p className="mt-2 max-w-[220px] text-xs text-slate-500">{item.accessMessage}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={accessStatusClass(item.subscriptionStatus)}>
                         {subscriptionStatusLabel(item.subscriptionStatus)}
                       </span>
                       {item.subscriptionId ? (
@@ -432,6 +474,13 @@ export function FinanceOverviewSection({
                     <td className="px-4 py-3 text-slate-700">{formatDate(item.currentPeriodStart)}</td>
                     <td className="px-4 py-3 text-slate-700">{formatDate(item.currentPeriodEnd)}</td>
                     <td className="px-4 py-3 text-slate-700">{formatDate(item.nextBillingAt)}</td>
+                    <td className="px-4 py-3 text-slate-700">
+                      <div className="space-y-1 text-xs">
+                        <p>Trial: {formatDate(item.trialEndsAt)}</p>
+                        <p>Tolerância: {formatDate(item.graceEndsAt)}</p>
+                        <p>Bloqueio: {formatDate(item.accessBlockedAt)}</p>
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <p className="font-semibold text-slate-900">{item.paymentsCount}</p>
                       <p className="text-xs text-slate-500">

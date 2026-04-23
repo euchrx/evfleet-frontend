@@ -13,7 +13,13 @@ export type UpdateUserInput = {
   name: string;
   email: string;
   role: "ADMIN" | "FLEET_MANAGER";
+  companyId?: string;
 };
+
+function resolveCompanyScope(companyId?: string) {
+  const normalized = companyId?.trim();
+  return normalized || "__ALL__";
+}
 
 export async function getUsers() {
   const response = await api.get("/users");
@@ -26,12 +32,22 @@ export async function getUsers() {
 }
 
 export async function createUser(data: CreateUserInput) {
-  const response = await api.post<User>("/users", data);
+  const response = await api.post<User>("/users", data, {
+    headers: {
+      "x-company-scope": resolveCompanyScope(data.companyId),
+    },
+  });
+
   return response.data;
 }
 
 export async function updateUser(id: string, data: UpdateUserInput) {
-  const response = await api.patch<User>(`/users/${id}`, data);
+  const response = await api.patch<User>(`/users/${id}`, data, {
+    headers: {
+      "x-company-scope": resolveCompanyScope(data.companyId),
+    },
+  });
+
   return response.data;
 }
 

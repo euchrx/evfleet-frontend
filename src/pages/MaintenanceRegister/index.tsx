@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useBranch } from "../../contexts/BranchContext";
 import { getVehicles } from "../../services/vehicles";
+import { getTires } from "../../services/tires";
 import {
   createMaintenanceRecord,
   getMaintenanceRecords,
   updateMaintenanceRecord,
   type CreateMaintenanceRecordInput,
 } from "../../services/maintenanceRecords";
+import type { Tire } from "../../types/tire";
 import type { Vehicle } from "../../types/vehicle";
 import { resolveLatestVehicleKmMap } from "../../utils/vehicle-km";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
@@ -50,6 +52,7 @@ export function MaintenanceRegisterPage() {
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [tires, setTires] = useState<Tire[]>([]);
   const [form, setForm] = useState<RegisterForm>(initialForm);
 
   const isEditing = Boolean(form.recordId);
@@ -58,16 +61,19 @@ export function MaintenanceRegisterPage() {
     try {
       setLoading(true);
       setErrorMessage("");
-      const [vehiclesData, recordsData] = await Promise.all([
+      const [vehiclesData, recordsData, tiresData] = await Promise.all([
         getVehicles(),
         getMaintenanceRecords(),
+        getTires(),
       ]);
       const nextVehicles = Array.isArray(vehiclesData) ? vehiclesData : [];
       const nextActiveVehicles = nextVehicles.filter(
         (vehicle) => vehicle.status === "ACTIVE"
       );
       const nextRecords = Array.isArray(recordsData) ? recordsData : [];
+      const nextTires = Array.isArray(tiresData) ? tiresData : [];
       setVehicles(nextVehicles);
+      setTires(nextTires);
       const latestKmByVehicle = resolveLatestVehicleKmMap({
         vehicles: nextVehicles,
         maintenanceRecords: nextRecords,
@@ -75,8 +81,12 @@ export function MaintenanceRegisterPage() {
 
       const vehicleIdParam = searchParams.get("vehicleId") || "";
       const recordIdParam = searchParams.get("recordId") || "";
+      const tireIdParam = searchParams.get("tireId") || "";
       const editingRecord = recordIdParam
         ? nextRecords.find((record) => record.id === recordIdParam)
+        : null;
+      const selectedTire = tireIdParam
+        ? nextTires.find((tire) => tire.id === tireIdParam) || null
         : null;
 
       if (editingRecord) {
@@ -102,13 +112,20 @@ export function MaintenanceRegisterPage() {
         (selectedBranchId
           ? nextActiveVehicles.find((vehicle) => vehicle.branchId === selectedBranchId)?.id || ""
           : nextActiveVehicles[0]?.id || "");
-      const latestKm = defaultVehicleId
-        ? latestKmByVehicle.get(defaultVehicleId)
+      const initialVehicleId = selectedTire?.vehicleId || defaultVehicleId;
+      const latestKm = initialVehicleId
+        ? latestKmByVehicle.get(initialVehicleId)
         : undefined;
 
       setForm((prev) => ({
         ...initialForm,
-        vehicleId: defaultVehicleId,
+        vehicleId: initialVehicleId,
+        description: selectedTire
+          ? `Manutenção do pneu ${selectedTire.serialNumber}`
+          : initialForm.description,
+        notes: selectedTire
+          ? `Pneu selecionado: ${selectedTire.serialNumber}${selectedTire.axlePosition || selectedTire.wheelPosition ? ` • ${selectedTire.axlePosition || "-"} / ${selectedTire.wheelPosition || "-"}` : ""}`
+          : initialForm.notes,
         km: typeof latestKm === "number" ? String(latestKm) : "",
         maintenanceDate: prev.maintenanceDate,
       }));
@@ -141,6 +158,11 @@ export function MaintenanceRegisterPage() {
   const selectedVehicle = useMemo(
     () => vehicles.find((vehicle) => vehicle.id === form.vehicleId) || null,
     [vehicles, form.vehicleId]
+  );
+
+  const selectedTire = useMemo(
+    () => tires.find((tire) => tire.id === (searchParams.get("tireId") || "")) || null,
+    [searchParams, tires],
   );
 
   const latestKmByVehicle = useMemo(
@@ -195,7 +217,9 @@ export function MaintenanceRegisterPage() {
       if (form.recordId) await updateMaintenanceRecord(form.recordId, payload);
       else await createMaintenanceRecord(payload);
       notifyHeaderNotifications();
-      navigate("/maintenance-records");
+      navigate(
+        `/maintenance-records${form.vehicleId ? `?vehicleId=${encodeURIComponent(form.vehicleId)}` : ""}`,
+      );
     } catch (error: any) {
       const apiMessage = error?.response?.data?.message;
       setErrorMessage(
@@ -237,6 +261,11 @@ export function MaintenanceRegisterPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
           <form onSubmit={handleSubmit} className="space-y-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            {selectedTire ? (
+              <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+                Contexto do pneu: <span className="font-semibold">{selectedTire.serialNumber}</span>
+              </div>
+            ) : null}
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm text-slate-700">
                 Veículo

@@ -50,7 +50,7 @@ const manualSteps = [
   },
   {
     title: "5. Controle débitos e documentos",
-    route: "Caminho: Débitos e Multas / Gestão de Documentos",
+    route: "Caminho: Gestão de Finanças / Gestão de Documentos",
     steps:
       "Registre vencimentos, status e responsáveis. Monitore as notificações para itens a vencer e pendências vencidas.",
   },

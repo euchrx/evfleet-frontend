@@ -6,12 +6,15 @@ export type CreateVehicleInput = {
   model: string;
   brand: string;
   year: number;
+  fipeValue?: number | null;
   vehicleType: "LIGHT" | "HEAVY";
   category: "CAR" | "TRUCK" | "UTILITY" | "IMPLEMENT";
+  axleCount?: number;
+  axleConfiguration?: "SINGLE" | "DUAL";
   chassis: string;
   renavam: string;
   acquisitionDate?: string;
-  fuelType:
+  fuelType?:
     | "GASOLINE"
     | "ETHANOL"
     | "DIESEL"
@@ -20,7 +23,7 @@ export type CreateVehicleInput = {
     | "ELECTRIC"
     | "HYBRID"
     | "CNG";
-  tankCapacity: number;
+  tankCapacity?: number | null;
   status: "ACTIVE" | "MAINTENANCE" | "SOLD";
   photoUrls?: string[];
   documentUrls?: string[];
@@ -78,6 +81,7 @@ export async function uploadVehicleFiles(
 export async function uploadVehicleProfilePhoto(vehicleId: string, file: File) {
   const formData = new FormData();
   formData.append("file", file);
+
   const response = await api.post<{ vehicleId: string; profilePhotoUrl: string }>(
     `/vehicles/${vehicleId}/profile-photo`,
     formData,
@@ -87,6 +91,7 @@ export async function uploadVehicleProfilePhoto(vehicleId: string, file: File) {
       },
     }
   );
+
   return response.data;
 }
 

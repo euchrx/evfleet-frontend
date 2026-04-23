@@ -1,18 +1,34 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { createVehicleDocument, deleteVehicleDocument, getVehicleDocuments, updateVehicleDocument, uploadVehicleDocumentFile } from "../../services/vehicleDocuments";
-import { getVehicles } from "../../services/vehicles";
-import { useBranch } from "../../contexts/BranchContext";
-import type { Vehicle } from "../../types/vehicle";
-import type { VehicleDocument, VehicleDocumentStatus, VehicleDocumentType } from "../../types/vehicle-document";
-import { api } from "../../services/api";
-import { normalizeApiBaseUrl } from "../../services/url";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { QuickStatusAction } from "../../components/QuickStatusAction";
-import { useLocation } from "react-router-dom";
 import { TablePagination } from "../../components/TablePagination";
+import { useBranch } from "../../contexts/BranchContext";
+import { getDrivers } from "../../services/drivers";
+import { api } from "../../services/api";
+import { normalizeApiBaseUrl } from "../../services/url";
+import {
+  createVehicleDocument,
+  deleteVehicleDocument,
+  getVehicleDocuments,
+  updateVehicleDocument,
+  uploadVehicleDocumentFile,
+} from "../../services/vehicleDocuments";
+import { getVehicles } from "../../services/vehicles";
+import type { Driver } from "../../types/driver";
+import type { Vehicle } from "../../types/vehicle";
+import type {
+  VehicleDocument,
+  VehicleDocumentOwnerType,
+  VehicleDocumentStatus,
+  VehicleDocumentType,
+} from "../../types/vehicle-document";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
+type DocumentTab = "VEHICLE" | "DRIVER" | "GENERAL";
+
 type DocumentFormData = {
+  ownerType: VehicleDocumentOwnerType;
   type: VehicleDocumentType | "";
   name: string;
   number: string;
@@ -23,12 +39,61 @@ type DocumentFormData = {
   fileUrl: string;
   notes: string;
   vehicleId: string;
+  driverId: string;
 };
 
-type DocumentSortBy = "type" | "name" | "vehicle" | "expiryDate" | "status";
-type DocumentFieldErrors = Partial<Record<"vehicleId" | "type" | "status" | "name", string>>;
+type DocumentSortBy = "type" | "name" | "reference" | "expiryDate" | "status";
+type DocumentFieldErrors = Partial<
+  Record<"vehicleId" | "driverId" | "type" | "status" | "name", string>
+>;
+
+type DocumentFilters = {
+  vehicleId: string;
+  driverId: string;
+  type: VehicleDocumentType | "";
+  status: VehicleDocumentStatus | "";
+  issuer: string;
+  startDate: string;
+  endDate: string;
+};
+
+const TABLE_PAGE_SIZE = 10;
+
+const vehicleTypeOptions: Array<{ value: VehicleDocumentType; label: string }> = [
+  { value: "CRLV", label: "CRLV" },
+  { value: "CIV", label: "CIV" },
+  { value: "CIPP", label: "CIPP" },
+  { value: "LICENSING", label: "Licenciamento" },
+  { value: "INSURANCE", label: "Seguro" },
+  { value: "IPVA", label: "IPVA" },
+  { value: "LEASING_CONTRACT", label: "Contrato de leasing" },
+  { value: "INSPECTION", label: "Inspeção" },
+  { value: "OTHER", label: "Outro" },
+];
+
+const driverTypeOptions: Array<{ value: VehicleDocumentType; label: string }> = [
+  { value: "CNH", label: "CNH" },
+  { value: "MOPP", label: "MOPP" },
+  { value: "TOXICOLOGICAL_EXAM", label: "Exame toxicológico" },
+  { value: "EMPLOYMENT_RECORD", label: "Ficha de registro / contrato" },
+  { value: "RG", label: "RG" },
+  { value: "CPF_DOCUMENT", label: "CPF" },
+  { value: "DEFENSIVE_DRIVING", label: "Direção defensiva" },
+  { value: "TRUCAO_TRANSPORTE", label: "Trucão Comunicação em Transporte" },
+  { value: "OTHER", label: "Outro" },
+];
+
+const generalTypeOptions: Array<{ value: VehicleDocumentType; label: string }> = [
+  {
+    value: "ENVIRONMENTAL_AUTHORIZATION",
+    label: "Autorização ambiental para transporte",
+  },
+  { value: "RNTRC", label: "RNTRC" },
+  { value: "OTHER", label: "Outro" },
+];
 
 const initialForm: DocumentFormData = {
+  ownerType: "VEHICLE",
   type: "",
   name: "",
   number: "",
@@ -39,21 +104,18 @@ const initialForm: DocumentFormData = {
   fileUrl: "",
   notes: "",
   vehicleId: "",
+  driverId: "",
 };
-const TABLE_PAGE_SIZE = 10;
 
-const documentTypeOptions: Array<{ value: VehicleDocumentType; label: string }> = [
-  { value: "LICENSING", label: "Licenciamento" },
-  { value: "INSURANCE", label: "Seguro" },
-  { value: "IPVA", label: "IPVA" },
-  { value: "LEASING_CONTRACT", label: "Contrato de leasing" },
-  { value: "INSPECTION", label: "Inspeção" },
-  { value: "OTHER", label: "Outro" },
-];
-
-function documentTypeLabel(value?: VehicleDocumentType | null) {
-  return documentTypeOptions.find((item) => item.value === value)?.label || "Outro";
-}
+const initialFilters: DocumentFilters = {
+  vehicleId: "",
+  driverId: "",
+  type: "",
+  status: "",
+  issuer: "",
+  startDate: "",
+  endDate: "",
+};
 
 function parseLocalDate(value?: string | null) {
   if (!value) return null;
@@ -98,16 +160,44 @@ function statusClass(status: VehicleDocumentStatus) {
   return "status-inactive";
 }
 
+function documentTypeLabel(value?: VehicleDocumentType | null) {
+  const allOptions = [...vehicleTypeOptions, ...driverTypeOptions, ...generalTypeOptions];
+  return allOptions.find((item) => item.value === value)?.label || "Outro";
+}
+
+function getReferenceLabel(item: VehicleDocument) {
+  if (item.ownerType === "DRIVER") return item.driver?.name || "Motorista não vinculado";
+  if (item.ownerType === "GENERAL") return item.company?.name || "Documento geral";
+  return item.vehicle ? formatVehicleLabel(item.vehicle) : "Veículo não vinculado";
+}
+
+function getTabTitle(tab: DocumentTab) {
+  if (tab === "VEHICLE") return "Veículos";
+  if (tab === "DRIVER") return "Motoristas";
+  return "Documentos gerais";
+}
+
+function getTypeOptionsByTab(tab: DocumentTab) {
+  if (tab === "VEHICLE") return vehicleTypeOptions;
+  if (tab === "DRIVER") return driverTypeOptions;
+  return generalTypeOptions;
+}
+
 export function VehicleDocumentsPage() {
   const location = useLocation();
   const { selectedBranchId } = useBranch();
+
+  const [activeTab, setActiveTab] = useState<DocumentTab>("VEHICLE");
   const [documents, setDocuments] = useState<VehicleDocument[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageErrorMessage, setPageErrorMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<DocumentFieldErrors>({});
-  const [search, setSearch] = useState("");
+  const [draftFilters, setDraftFilters] = useState<DocumentFilters>(initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState<DocumentFilters>(initialFilters);
+  const [hasSearched, setHasSearched] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<DocumentSortBy>("expiryDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -119,16 +209,23 @@ export function VehicleDocumentsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [quickStatusDocumentId, setQuickStatusDocumentId] = useState<string | null>(null);
   const [highlightedDocumentId, setHighlightedDocumentId] = useState<string | null>(null);
+  const [focusedDriverId, setFocusedDriverId] = useState<string | null>(null);
   const [form, setForm] = useState<DocumentFormData>(initialForm);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const isCpfDocument = form.type === "CPF_DOCUMENT";
 
   async function loadData() {
     try {
       setLoading(true);
       setPageErrorMessage("");
-      const [documentsData, vehiclesData] = await Promise.all([getVehicleDocuments(), getVehicles()]);
+      const [documentsData, vehiclesData, driversData] = await Promise.all([
+        getVehicleDocuments(),
+        getVehicles(),
+        getDrivers(),
+      ]);
       setDocuments(Array.isArray(documentsData) ? documentsData : []);
       setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
+      setDrivers(Array.isArray(driversData) ? driversData : []);
     } catch (error) {
       console.error("Erro ao carregar documentos:", error);
       setPageErrorMessage("Não foi possível carregar os documentos.");
@@ -143,17 +240,36 @@ export function VehicleDocumentsPage() {
 
   useEffect(() => {
     const query = new URLSearchParams(location.search);
+    const incomingTab = query.get("tab");
     const incomingHighlight = query.get("highlight");
-    if (!incomingHighlight) return;
+    const incomingDriverId = query.get("driverId");
 
-    setHighlightedDocumentId(incomingHighlight);
+    if (incomingTab === "VEHICLE" || incomingTab === "DRIVER" || incomingTab === "GENERAL") {
+      setActiveTab(incomingTab);
+    }
+
+    if (incomingDriverId) {
+      setFocusedDriverId(incomingDriverId);
+      setActiveTab("DRIVER");
+    }
+
+    if (!incomingHighlight && !incomingDriverId && !incomingTab) return;
+
+    if (incomingHighlight) {
+      setHighlightedDocumentId(incomingHighlight);
+    }
+
     const timer = window.setTimeout(() => {
-      document
-        .getElementById(`vehicle-document-row-${incomingHighlight}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (incomingHighlight) {
+        document
+          .getElementById(`vehicle-document-row-${incomingHighlight}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
     }, 120);
 
+    query.delete("tab");
     query.delete("highlight");
+    query.delete("driverId");
     const next = query.toString();
     const nextUrl = `${window.location.pathname}${next ? `?${next}` : ""}${window.location.hash || ""}`;
     window.history.replaceState({}, "", nextUrl);
@@ -174,48 +290,121 @@ export function VehicleDocumentsPage() {
 
   const availableVehicles = useMemo(() => {
     let filtered = vehicles;
-    if (selectedBranchId) filtered = filtered.filter((item) => item.branchId === selectedBranchId);
-    return [...filtered].sort((a, b) => a.plate.localeCompare(b.plate, "pt-BR", { sensitivity: "base" }));
+    if (selectedBranchId) {
+      filtered = filtered.filter((item) => item.branchId === selectedBranchId);
+    }
+    return [...filtered].sort((a, b) =>
+      a.plate.localeCompare(b.plate, "pt-BR", { sensitivity: "base" }),
+    );
   }, [vehicles, selectedBranchId]);
 
+  const availableDrivers = useMemo(() => {
+    let filtered = drivers;
+    if (selectedBranchId) {
+      filtered = filtered.filter((item) => item.vehicle?.branchId === selectedBranchId);
+    }
+    return [...filtered].sort((a, b) =>
+      a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }),
+    );
+  }, [drivers, selectedBranchId]);
+
+  const scopedDocuments = useMemo(() => {
+    return documents.filter((item) => {
+      if (item.ownerType !== activeTab) return false;
+      if (activeTab === "DRIVER" && focusedDriverId && item.driverId !== focusedDriverId) return false;
+      if (!selectedBranchId) return true;
+      if (activeTab === "GENERAL") return true;
+      if (activeTab === "DRIVER") return item.driver?.vehicle?.branchId === selectedBranchId;
+      return item.vehicle?.branchId === selectedBranchId;
+    });
+  }, [documents, activeTab, focusedDriverId, selectedBranchId]);
+
   const filteredDocuments = useMemo(() => {
-    let filtered = documents;
-    if (selectedBranchId) filtered = filtered.filter((item) => item.vehicle?.branchId === selectedBranchId);
-    if (search.trim()) {
-      const term = search.toLowerCase();
-      filtered = filtered.filter((item) =>
-        [
-          item.name,
-          documentTypeLabel(item.type),
-          item.number || "",
-          item.issuer || "",
-          item.vehicle ? formatVehicleLabel(item.vehicle) : "",
-          item.vehicle?.plate || "",
-          statusLabel(getEffectiveStatus(item)),
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(term)
-      );
+    if (!hasSearched) return [];
+
+    let filtered = scopedDocuments;
+
+    if (activeTab === "VEHICLE" && appliedFilters.vehicleId) {
+      filtered = filtered.filter((item) => item.vehicleId === appliedFilters.vehicleId);
+    }
+
+    if (activeTab === "DRIVER" && appliedFilters.driverId) {
+      filtered = filtered.filter((item) => item.driverId === appliedFilters.driverId);
+    }
+
+    if (appliedFilters.type) {
+      filtered = filtered.filter((item) => item.type === appliedFilters.type);
+    }
+
+    if (appliedFilters.status) {
+      filtered = filtered.filter((item) => getEffectiveStatus(item) === appliedFilters.status);
+    }
+
+    if (appliedFilters.issuer.trim()) {
+      const issuerTerm = appliedFilters.issuer.trim().toLowerCase();
+      filtered = filtered.filter((item) => String(item.issuer || "").toLowerCase().includes(issuerTerm));
+    }
+
+    if (appliedFilters.startDate) {
+      const startDate = parseLocalDate(appliedFilters.startDate)?.getTime() || 0;
+      filtered = filtered.filter((item) => {
+        const issueDate = parseLocalDate(item.issueDate)?.getTime() || 0;
+        const expiryDate = parseLocalDate(item.expiryDate)?.getTime() || 0;
+        return issueDate >= startDate || expiryDate >= startDate;
+      });
+    }
+
+    if (appliedFilters.endDate) {
+      const endDateBase = parseLocalDate(appliedFilters.endDate);
+      const endDate = endDateBase
+        ? new Date(endDateBase.getFullYear(), endDateBase.getMonth(), endDateBase.getDate(), 23, 59, 59, 999).getTime()
+        : 0;
+      filtered = filtered.filter((item) => {
+        const issueDate = parseLocalDate(item.issueDate)?.getTime() || 0;
+        const expiryDate = parseLocalDate(item.expiryDate)?.getTime() || 0;
+        return issueDate <= endDate || expiryDate <= endDate;
+      });
     }
 
     const direction = sortDirection === "asc" ? 1 : -1;
     return [...filtered].sort((a, b) => {
-      if (sortBy === "type") return documentTypeLabel(a.type).localeCompare(documentTypeLabel(b.type), "pt-BR", { sensitivity: "base" }) * direction;
-      if (sortBy === "name") return a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }) * direction;
-      if (sortBy === "vehicle") {
-        const av = a.vehicle ? formatVehicleLabel(a.vehicle) : "";
-        const bv = b.vehicle ? formatVehicleLabel(b.vehicle) : "";
-        return av.localeCompare(bv, "pt-BR", { sensitivity: "base" }) * direction;
+      if (sortBy === "type") {
+        return (
+          documentTypeLabel(a.type).localeCompare(documentTypeLabel(b.type), "pt-BR", {
+            sensitivity: "base",
+          }) * direction
+        );
       }
-      if (sortBy === "expiryDate") return ((parseLocalDate(a.expiryDate)?.getTime() || 0) - (parseLocalDate(b.expiryDate)?.getTime() || 0)) * direction;
-      return statusLabel(getEffectiveStatus(a)).localeCompare(statusLabel(getEffectiveStatus(b)), "pt-BR", { sensitivity: "base" }) * direction;
+      if (sortBy === "name") {
+        return a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }) * direction;
+      }
+      if (sortBy === "reference") {
+        return (
+          getReferenceLabel(a).localeCompare(getReferenceLabel(b), "pt-BR", {
+            sensitivity: "base",
+          }) * direction
+        );
+      }
+      if (sortBy === "expiryDate") {
+        return (
+          ((parseLocalDate(a.expiryDate)?.getTime() || 0) -
+            (parseLocalDate(b.expiryDate)?.getTime() || 0)) *
+          direction
+        );
+      }
+      return (
+        statusLabel(getEffectiveStatus(a)).localeCompare(
+          statusLabel(getEffectiveStatus(b)),
+          "pt-BR",
+          { sensitivity: "base" },
+        ) * direction
+      );
     });
-  }, [documents, selectedBranchId, search, sortBy, sortDirection]);
+  }, [activeTab, appliedFilters, hasSearched, scopedDocuments, sortBy, sortDirection]);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredDocuments.length / TABLE_PAGE_SIZE)),
-    [filteredDocuments.length]
+    [filteredDocuments.length],
   );
 
   const paginatedDocuments = useMemo(() => {
@@ -225,11 +414,8 @@ export function VehicleDocumentsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, sortBy, sortDirection, selectedBranchId]);
-
-  useEffect(() => {
     setSelectedDocumentIds([]);
-  }, [search, sortBy, sortDirection, selectedBranchId, currentPage]);
+  }, [activeTab, appliedFilters, hasSearched, sortBy, sortDirection, selectedBranchId, focusedDriverId]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -237,14 +423,47 @@ export function VehicleDocumentsPage() {
     }
   }, [currentPage, totalPages]);
 
+  useEffect(() => {
+    setDraftFilters(initialFilters);
+    setAppliedFilters(initialFilters);
+    setHasSearched(false);
+    setSelectedDocumentIds([]);
+    setCurrentPage(1);
+  }, [activeTab, focusedDriverId, selectedBranchId]);
+
+
   const summary = useMemo(() => {
-    const scoped = selectedBranchId ? documents.filter((item) => item.vehicle?.branchId === selectedBranchId) : documents;
-    const total = scoped.length;
-    const valid = scoped.filter((item) => getEffectiveStatus(item) === "VALID").length;
-    const expiring = scoped.filter((item) => getEffectiveStatus(item) === "EXPIRING").length;
-    const expired = scoped.filter((item) => getEffectiveStatus(item) === "EXPIRED").length;
+    if (!hasSearched) {
+      return { total: 0, valid: 0, expiring: 0, expired: 0 };
+    }
+    const total = filteredDocuments.length;
+    const valid = filteredDocuments.filter((item) => getEffectiveStatus(item) === "VALID").length;
+    const expiring = filteredDocuments.filter((item) => getEffectiveStatus(item) === "EXPIRING").length;
+    const expired = filteredDocuments.filter((item) => getEffectiveStatus(item) === "EXPIRED").length;
     return { total, valid, expiring, expired };
-  }, [documents, selectedBranchId]);
+  }, [filteredDocuments, hasSearched]);
+
+  function handleFilterChange<K extends keyof DocumentFilters>(
+    field: K,
+    value: DocumentFilters[K],
+  ) {
+    setDraftFilters((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleSearch() {
+    setAppliedFilters({ ...draftFilters });
+    setHasSearched(true);
+    setCurrentPage(1);
+    setSelectedDocumentIds([]);
+  }
+
+  function handleClearFilters() {
+    setDraftFilters(initialFilters);
+    setAppliedFilters(initialFilters);
+    setHasSearched(false);
+    setCurrentPage(1);
+    setSelectedDocumentIds([]);
+  }
 
   function getSortArrow(column: DocumentSortBy) {
     if (sortBy !== column) return "↕";
@@ -260,9 +479,12 @@ export function VehicleDocumentsPage() {
     setSortDirection("asc");
   }
 
-  function openCreateModal() {
+  function openCreateModal(tab = activeTab) {
     setEditingDocument(null);
-    setForm(initialForm);
+    setForm({
+      ...initialForm,
+      ownerType: tab,
+    });
     setSelectedFile(null);
     setFieldErrors({});
     setIsModalOpen(true);
@@ -271,7 +493,8 @@ export function VehicleDocumentsPage() {
   function openEditModal(item: VehicleDocument) {
     setEditingDocument(item);
     setForm({
-      type: item.type || "LICENSING",
+      ownerType: item.ownerType,
+      type: item.type || "",
       name: item.name || "",
       number: item.number || "",
       issueDate: item.issueDate ? String(item.issueDate).slice(0, 10) : "",
@@ -281,6 +504,7 @@ export function VehicleDocumentsPage() {
       fileUrl: item.fileUrl || "",
       notes: item.notes || "",
       vehicleId: item.vehicleId || "",
+      driverId: item.driverId || "",
     });
     setSelectedFile(null);
     setFieldErrors({});
@@ -295,9 +519,27 @@ export function VehicleDocumentsPage() {
     setIsModalOpen(false);
   }
 
-  function handleChange<K extends keyof DocumentFormData>(field: K, value: DocumentFormData[K]) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    if (field === "vehicleId" || field === "type" || field === "status" || field === "name") {
+  function handleChange<K extends keyof DocumentFormData>(
+    field: K,
+    value: DocumentFormData[K],
+  ) {
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+
+      if (field === "type" && value === "CPF_DOCUMENT") {
+        next.issueDate = "";
+        next.expiryDate = "";
+      }
+
+      return next;
+    });
+    if (
+      field === "vehicleId" ||
+      field === "driverId" ||
+      field === "type" ||
+      field === "status" ||
+      field === "name"
+    ) {
       setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   }
@@ -329,55 +571,63 @@ export function VehicleDocumentsPage() {
       }
 
       const payload = {
+        ownerType: form.ownerType,
         type: form.type as VehicleDocumentType,
         name: form.name.trim(),
         number: form.number.trim() || undefined,
-        issueDate: form.issueDate || undefined,
-        expiryDate: form.expiryDate || undefined,
+        issueDate: isCpfDocument ? undefined : form.issueDate || undefined,
+        expiryDate: isCpfDocument ? undefined : form.expiryDate || undefined,
         status: form.status as VehicleDocumentStatus,
         issuer: form.issuer.trim() || undefined,
         fileUrl: nextFileUrl,
         notes: form.notes.trim() || undefined,
-        vehicleId: form.vehicleId,
+        vehicleId: form.ownerType === "VEHICLE" ? form.vehicleId || undefined : undefined,
+        driverId: form.ownerType === "DRIVER" ? form.driverId || undefined : undefined,
       };
 
       const nextErrors: DocumentFieldErrors = {};
-      if (!payload.vehicleId) nextErrors.vehicleId = "Selecione o veículo.";
       if (!payload.type) nextErrors.type = "Selecione o tipo.";
       if (!payload.status) nextErrors.status = "Selecione o status.";
       if (!payload.name) nextErrors.name = "Informe o nome do documento.";
+      if (payload.ownerType === "VEHICLE" && !payload.vehicleId) {
+        nextErrors.vehicleId = "Selecione o veículo.";
+      }
+      if (payload.ownerType === "DRIVER" && !payload.driverId) {
+        nextErrors.driverId = "Selecione o motorista.";
+      }
       if (Object.keys(nextErrors).length > 0) {
         setFieldErrors(nextErrors);
         return;
       }
 
-      if (editingDocument) await updateVehicleDocument(editingDocument.id, payload);
-      else await createVehicleDocument(payload);
+      if (editingDocument) {
+        await updateVehicleDocument(editingDocument.id, payload);
+      } else {
+        await createVehicleDocument(payload);
+      }
 
       closeModal();
       await loadData();
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
     } catch (error: any) {
-      const apiMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "";
-      const apiText = Array.isArray(apiMessage) ? apiMessage.join(", ") : String(apiMessage || "Não foi possível salvar o documento.");
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "";
+      const apiText = Array.isArray(apiMessage)
+        ? apiMessage.join(", ")
+        : String(apiMessage || "Não foi possível salvar o documento.");
       setFieldErrors((prev) => ({ ...prev, name: apiText }));
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleDelete(item: VehicleDocument) {
-    setDocumentToDelete(item);
-    try {
-      return;
-      await loadData();
-    } catch (error) {
-      console.error("Erro ao excluir documento:", error);
-      setPageErrorMessage("N?o foi poss?vel excluir o documento.");
-    }
-  }
-
-  async function handleQuickStatusChange(item: VehicleDocument, nextStatus: VehicleDocumentStatus) {
+  async function handleQuickStatusChange(
+    item: VehicleDocument,
+    nextStatus: VehicleDocumentStatus,
+  ) {
     try {
       setQuickStatusDocumentId(item.id);
       const updated = await updateVehicleDocument(item.id, { status: nextStatus });
@@ -386,10 +636,14 @@ export function VehicleDocumentsPage() {
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
     } catch (error) {
       console.error("Erro ao atualizar status do documento:", error);
-      setPageErrorMessage("N?o foi poss?vel atualizar o status do documento.");
+      setPageErrorMessage("Não foi possível atualizar o status do documento.");
     } finally {
       setQuickStatusDocumentId(null);
     }
+  }
+
+  function handleDelete(item: VehicleDocument) {
+    setDocumentToDelete(item);
   }
 
   async function confirmDeleteDocument() {
@@ -417,7 +671,9 @@ export function VehicleDocumentsPage() {
   function handleToggleAllDocuments() {
     const pageIds = paginatedDocuments.map((item) => item.id);
     const allSelected =
-      pageIds.length > 0 && pageIds.every((id) => selectedDocumentIds.includes(id));
+      pageIds.length > 0 &&
+      pageIds.every((id) => selectedDocumentIds.includes(id));
+
     setSelectedDocumentIds((prev) =>
       allSelected ? prev.filter((id) => !pageIds.includes(id)) : [...new Set([...prev, ...pageIds])],
     );
@@ -431,6 +687,7 @@ export function VehicleDocumentsPage() {
         selectedDocumentIds.map((id) => deleteVehicleDocument(id)),
       );
       const failedCount = results.filter((result) => result.status === "rejected").length;
+
       if (failedCount > 0) {
         setPageErrorMessage(
           failedCount === selectedDocumentIds.length
@@ -440,6 +697,7 @@ export function VehicleDocumentsPage() {
       } else {
         setPageErrorMessage("");
       }
+
       setBulkDeleteOpen(false);
       setSelectedDocumentIds([]);
       await loadData();
@@ -456,33 +714,201 @@ export function VehicleDocumentsPage() {
     paginatedDocuments.length > 0 &&
     paginatedDocuments.every((item) => selectedDocumentIds.includes(item.id));
 
+  const typeOptions = getTypeOptionsByTab(form.ownerType);
+
+
   return (
     <div className="min-w-0 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Gestão de Documentos</h1>
-          <p className="text-sm text-slate-500">Controle de validade, vencimentos e rastreabilidade documental da frota.</p>
+          <p className="text-sm text-slate-500">
+            Controle de validade, vencimentos e rastreabilidade documental da operação.
+          </p>
         </div>
         <button
-          onClick={openCreateModal}
+          onClick={() => openCreateModal(activeTab)}
           className="w-full cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
         >
           + Cadastrar documento
         </button>
       </div>
 
+      <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="grid gap-2 md:grid-cols-3">
+          {(["VEHICLE", "DRIVER", "GENERAL"] as DocumentTab[]).map((tab) => {
+            const active = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${active
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-slate-50 text-slate-700 hover:bg-orange-50 hover:text-orange-700"
+                  }`}
+              >
+                {getTabTitle(tab)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Totais</p><p className="mt-1 text-2xl font-bold text-slate-900">{summary.total}</p></div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Válidos</p><p className="mt-1 text-2xl font-bold text-emerald-800">{summary.valid}</p></div>
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Vencendo (30d)</p><p className="mt-1 text-2xl font-bold text-amber-800">{summary.expiring}</p></div>
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-red-700">Vencidos</p><p className="mt-1 text-2xl font-bold text-red-800">{summary.expired}</p></div>
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Totais</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{summary.total}</p>
+        </div>
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Válidos</p>
+          <p className="mt-1 text-2xl font-bold text-emerald-800">{summary.valid}</p>
+        </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Vencendo (30d)</p>
+          <p className="mt-1 text-2xl font-bold text-amber-800">{summary.expiring}</p>
+        </div>
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Vencidos</p>
+          <p className="mt-1 text-2xl font-bold text-red-800">{summary.expired}</p>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por documento, tipo, veículo, placa, status ou órgão emissor" className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <label className="text-sm text-slate-700 xl:col-span-2">
+            <span className="font-medium text-slate-700">Empresa</span>
+            <input
+              value={"Empresa atual"}
+              disabled
+              className="mt-1 h-12 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 px-4 text-sm text-slate-500 outline-none"
+            />
+          </label>
+
+          {activeTab === "VEHICLE" ? (
+            <label className="text-sm text-slate-700">
+              <span className="font-medium text-slate-700">Veículo</span>
+              <select
+                value={draftFilters.vehicleId}
+                onChange={(e) => handleFilterChange("vehicleId", e.target.value)}
+                className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+              >
+                <option value="">Todos</option>
+                {availableVehicles.map((vehicle) => (
+                  <option key={vehicle.id} value={vehicle.id}>
+                    {formatVehicleLabel(vehicle)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          {activeTab === "DRIVER" ? (
+            <label className="text-sm text-slate-700">
+              <span className="font-medium text-slate-700">Motorista</span>
+              <select
+                value={draftFilters.driverId}
+                onChange={(e) => handleFilterChange("driverId", e.target.value)}
+                className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+              >
+                <option value="">Todos</option>
+                {availableDrivers.map((driver) => (
+                  <option key={driver.id} value={driver.id}>
+                    {driver.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          <label className="text-sm text-slate-700">
+            <span className="font-medium text-slate-700">Tipo</span>
+            <select
+              value={draftFilters.type}
+              onChange={(e) =>
+                handleFilterChange("type", e.target.value as VehicleDocumentType | "")
+              }
+              className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+            >
+              <option value="">Todos</option>
+              {getTypeOptionsByTab(activeTab).map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-sm text-slate-700">
+            <span className="font-medium text-slate-700">Status</span>
+            <select
+              value={draftFilters.status}
+              onChange={(e) =>
+                handleFilterChange("status", e.target.value as VehicleDocumentStatus | "")
+              }
+              className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+            >
+              <option value="">Todos</option>
+              <option value="VALID">Válido</option>
+              <option value="EXPIRING">Vencendo</option>
+              <option value="EXPIRED">Vencido</option>
+            </select>
+          </label>
+
+          <label className="text-sm text-slate-700">
+            <span className="font-medium text-slate-700">Emissor</span>
+            <input
+              value={draftFilters.issuer}
+              onChange={(e) => handleFilterChange("issuer", e.target.value)}
+              className="mt-1 h-12 w-full rounded-xl border border-slate-300 px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+              placeholder="Ex.: Detran"
+            />
+          </label>
+
+          <label className="text-sm text-slate-700">
+            <span className="font-medium text-slate-700">Data inicial</span>
+            <input
+              type="date"
+              value={draftFilters.startDate}
+              onChange={(e) => handleFilterChange("startDate", e.target.value)}
+              className="mt-1 h-12 w-full rounded-xl border border-slate-300 px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+            />
+          </label>
+
+          <label className="text-sm text-slate-700">
+            <span className="font-medium text-slate-700">Data final</span>
+            <input
+              type="date"
+              value={draftFilters.endDate}
+              onChange={(e) => handleFilterChange("endDate", e.target.value)}
+              className="mt-1 h-12 w-full rounded-xl border border-slate-300 px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+            />
+          </label>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={handleSearch}
+            className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
+          >
+            Consultar
+          </button>
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-600 sm:w-auto"
+          >
+            Limpar
+          </button>
+        </div>
       </div>
 
-      {pageErrorMessage ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{pageErrorMessage}</div> : null}
+      {pageErrorMessage ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {pageErrorMessage}
+        </div>
+      ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm">
@@ -513,42 +939,141 @@ export function VehicleDocumentsPage() {
                     className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
                   />
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("type")} className="cursor-pointer">Tipo {getSortArrow("type")}</button></th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("name")} className="cursor-pointer">Documento {getSortArrow("name")}</button></th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("vehicle")} className="cursor-pointer">Veículo {getSortArrow("vehicle")}</button></th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("expiryDate")} className="cursor-pointer">Vencimento {getSortArrow("expiryDate")}</button></th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600"><button type="button" onClick={() => handleSort("status")} className="cursor-pointer">Status {getSortArrow("status")}</button></th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button type="button" onClick={() => handleSort("type")} className="cursor-pointer">
+                    Tipo {getSortArrow("type")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button type="button" onClick={() => handleSort("name")} className="cursor-pointer">
+                    Documento {getSortArrow("name")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button type="button" onClick={() => handleSort("reference")} className="cursor-pointer">
+                    {activeTab === "VEHICLE"
+                      ? `Veículo ${getSortArrow("reference")}`
+                      : activeTab === "DRIVER"
+                        ? `Motorista ${getSortArrow("reference")}`
+                        : `Referência ${getSortArrow("reference")}`}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button type="button" onClick={() => handleSort("expiryDate")} className="cursor-pointer">
+                    Vencimento {getSortArrow("expiryDate")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
+                  <button type="button" onClick={() => handleSort("status")} className="cursor-pointer">
+                    Status {getSortArrow("status")}
+                  </button>
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Carregando documentos...</td></tr> : filteredDocuments.length === 0 ? <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum documento encontrado.</td></tr> : paginatedDocuments.map((item) => {
-                const effectiveStatus = getEffectiveStatus(item);
-                const isHighlighted = highlightedDocumentId === item.id;
-                return (
-                  <tr id={`vehicle-document-row-${item.id}`} key={item.id} className={`border-t border-slate-200 ${isHighlighted ? "notification-highlight" : ""}`}>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={selectedDocumentIds.includes(item.id)}
-                        onChange={() => handleToggleDocument(item.id)}
-                        aria-label={`Selecionar documento ${item.name}`}
-                        className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
-                      />
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{documentTypeLabel(item.type)}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700"><p className="font-medium text-slate-900">{item.name}</p><p className="text-xs text-slate-500">{item.number || "Sem número"}</p>{item.fileUrl ? <a href={resolveFileUrl(item.fileUrl)} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-blue-700 hover:underline">Ver anexo</a> : null}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{item.vehicle ? formatVehicleLabel(item.vehicle) : item.vehicleId}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{toDateText(item.expiryDate)}</td>
-                    <td className="px-6 py-4 text-sm"><div className="flex items-center gap-2"><span className={`status-pill ${statusClass(effectiveStatus)}`}>{statusLabel(effectiveStatus)}</span>{effectiveStatus !== "VALID" ? <QuickStatusAction label={`Atualizar status do documento ${item.name}`} loading={quickStatusDocumentId === item.id} options={[{ value: "VALID", label: "Marcar como v?lido" }, { value: "EXPIRING", label: "Marcar como vencendo" }, { value: "EXPIRED", label: "Marcar como vencido" }]} onSelect={(value) => handleQuickStatusChange(item, value as VehicleDocumentStatus)} /> : null}</div></td>
-                    <td className="px-6 py-4 text-sm"><div className="flex gap-2"><button onClick={() => openEditModal(item)} className="btn-ui btn-ui-neutral">Editar</button><button onClick={() => handleDelete(item)} className="btn-ui btn-ui-danger">Excluir</button></div></td>
-                  </tr>
-                );
-              })}
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">
+                    Carregando documentos...
+                  </td>
+                </tr>
+              ) : !hasSearched ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">
+                    Faça uma consulta para visualizar os documentos.
+                  </td>
+                </tr>
+              ) : filteredDocuments.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">
+                    Nenhum documento encontrado.
+                  </td>
+                </tr>
+              ) : (
+                paginatedDocuments.map((item) => {
+                  const effectiveStatus = getEffectiveStatus(item);
+                  const isHighlighted = highlightedDocumentId === item.id;
+
+                  return (
+                    <tr
+                      id={`vehicle-document-row-${item.id}`}
+                      key={item.id}
+                      className={`border-t border-slate-200 ${isHighlighted ? "notification-highlight" : ""}`}
+                    >
+                      <td className="px-6 py-4 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={selectedDocumentIds.includes(item.id)}
+                          onChange={() => handleToggleDocument(item.id)}
+                          aria-label={`Selecionar documento ${item.name}`}
+                          className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                        />
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-700">{documentTypeLabel(item.type)}</td>
+                      <td className="px-6 py-4 text-sm text-slate-700">
+                        <p className="font-medium text-slate-900">{item.name}</p>
+                        <p className="text-xs text-slate-500">{item.number || "Sem número"}</p>
+                        {item.fileUrl ? (
+                          <a
+                            href={resolveFileUrl(item.fileUrl)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 inline-flex text-xs font-semibold text-blue-700 hover:underline"
+                          >
+                            Ver anexo
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(item)}
+                            className="mt-1 inline-flex text-xs font-semibold text-orange-700 hover:underline"
+                          >
+                            Anexar
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-700">{getReferenceLabel(item)}</td>
+                      <td className="px-6 py-4 text-sm text-slate-700">{toDateText(item.expiryDate)}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className={`status-pill ${statusClass(effectiveStatus)}`}>
+                            {statusLabel(effectiveStatus)}
+                          </span>
+                          {effectiveStatus !== "VALID" ? (
+                            <QuickStatusAction
+                              label={`Atualizar status do documento ${item.name}`}
+                              loading={quickStatusDocumentId === item.id}
+                              options={[
+                                { value: "VALID", label: "Marcar como válido" },
+                                { value: "EXPIRING", label: "Marcar como vencendo" },
+                                { value: "EXPIRED", label: "Marcar como vencido" },
+                              ]}
+                              onSelect={(value) =>
+                                handleQuickStatusChange(item, value as VehicleDocumentStatus)
+                              }
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="flex gap-2">
+                          <button onClick={() => openEditModal(item)} className="btn-ui btn-ui-neutral">
+                            Editar
+                          </button>
+                          <button onClick={() => handleDelete(item)} className="btn-ui btn-ui-danger">
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
-        {!loading && filteredDocuments.length > 0 ? (
+        {!loading && hasSearched && filteredDocuments.length > 0 ? (
           <TablePagination
             currentPage={currentPage}
             totalPages={totalPages}
@@ -563,92 +1088,156 @@ export function VehicleDocumentsPage() {
 
       {isModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
-          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-4xl rounded-2xl bg-white shadow-2xl flex flex-col">
+          <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">{editingDocument ? "Editar documento" : "Cadastrar documento"}</h2>
-                <p className="text-sm text-slate-500">Gerencie validade e rastreabilidade documental do veículo.</p>
+                <h2 className="text-xl font-bold text-slate-900">
+                  {editingDocument ? "Editar documento" : "Cadastrar documento"}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Gerencie validade e rastreabilidade documental de {getTabTitle(form.ownerType).toLowerCase()}.
+                </p>
               </div>
-              <button onClick={closeModal} className="btn-ui btn-ui-neutral">Fechar</button>
+              <button onClick={closeModal} className="btn-ui btn-ui-neutral">
+                Fechar
+              </button>
             </div>
             <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto p-6">
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Identificação</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="block text-sm font-medium text-slate-700">Veículo</label><select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className={inputClass("vehicleId")}><option value="">Selecione um veículo</option>{availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{formatVehicleLabel(vehicle)}</option>)}</select>{fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}</div>
-                  <div><label className="block text-sm font-medium text-slate-700">Tipo</label><select value={form.type} onChange={(e) => handleChange("type", e.target.value as VehicleDocumentType | "")} className={inputClass("type")}><option value="">Selecione o tipo</option>{documentTypeOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>{fieldErrors.type ? <p className="mt-1 text-xs text-red-600">{fieldErrors.type}</p> : null}</div>
-                  <div><label className="block text-sm font-medium text-slate-700">Nome do documento</label><input value={form.name} onChange={(e) => handleChange("name", e.target.value)} className={inputClass("name")} placeholder="Ex: Seguro veicular 2026" />{fieldErrors.name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p> : null}</div>
-                  <div><label className="block text-sm font-medium text-slate-700">Número</label><input value={form.number} onChange={(e) => handleChange("number", e.target.value)} className={inputClass()} placeholder="Opcional" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Órgão emissor</label><input value={form.issuer} onChange={(e) => handleChange("issuer", e.target.value)} className={inputClass()} placeholder="Detran, seguradora..." /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Status</label><select value={form.status} onChange={(e) => handleChange("status", e.target.value as VehicleDocumentStatus | "")} className={inputClass("status")}><option value="">Selecione o status</option><option value="VALID">Válido</option><option value="EXPIRING">Vencendo</option><option value="EXPIRED">Vencido</option></select>{fieldErrors.status ? <p className="mt-1 text-xs text-red-600">{fieldErrors.status}</p> : null}</div>
+                  {form.ownerType === "VEHICLE" ? (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700">Veículo</label>
+                      <select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className={inputClass("vehicleId")}>
+                        <option value="">Selecione um veículo</option>
+                        {availableVehicles.map((vehicle) => (
+                          <option key={vehicle.id} value={vehicle.id}>
+                            {formatVehicleLabel(vehicle)}
+                          </option>
+                        ))}
+                      </select>
+                      {fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}
+                    </div>
+                  ) : null}
+                  {form.ownerType === "DRIVER" ? (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700">Motorista</label>
+                      <select value={form.driverId} onChange={(e) => handleChange("driverId", e.target.value)} className={inputClass("driverId")}>
+                        <option value="">Selecione um motorista</option>
+                        {availableDrivers.map((driver) => (
+                          <option key={driver.id} value={driver.id}>
+                            {driver.name}
+                          </option>
+                        ))}
+                      </select>
+                      {fieldErrors.driverId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.driverId}</p> : null}
+                    </div>
+                  ) : null}
+                  {form.ownerType === "GENERAL" ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 md:col-span-2">
+                      Este documento será cadastrado como documento geral da empresa selecionada no escopo.
+                    </div>
+                  ) : null}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Tipo</label>
+                    <select value={form.type} onChange={(e) => handleChange("type", e.target.value as VehicleDocumentType | "")} className={inputClass("type")}>
+                      <option value="">Selecione o tipo</option>
+                      {typeOptions.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.type ? <p className="mt-1 text-xs text-red-600">{fieldErrors.type}</p> : null}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Nome do documento</label>
+                    <input value={form.name} onChange={(e) => handleChange("name", e.target.value)} className={inputClass("name")} placeholder="Ex: CRLV 2026" />
+                    {fieldErrors.name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p> : null}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Número</label>
+                    <input value={form.number} onChange={(e) => handleChange("number", e.target.value)} className={inputClass()} placeholder="Opcional" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Órgão emissor</label>
+                    <input value={form.issuer} onChange={(e) => handleChange("issuer", e.target.value)} className={inputClass()} placeholder="Detran, IBAMA, transportadora..." />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Status</label>
+                    <select value={form.status} onChange={(e) => handleChange("status", e.target.value as VehicleDocumentStatus | "")} className={inputClass("status")}>
+                      <option value="">Selecione o status</option>
+                      <option value="VALID">Válido</option>
+                      <option value="EXPIRING">Vencendo</option>
+                      <option value="EXPIRED">Vencido</option>
+                    </select>
+                    {fieldErrors.status ? <p className="mt-1 text-xs text-red-600">{fieldErrors.status}</p> : null}
+                  </div>
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Vigência</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="block text-sm font-medium text-slate-700">Data de emissão</label><input type="date" value={form.issueDate} onChange={(e) => handleChange("issueDate", e.target.value)} className={inputClass()} /></div>
-                  <div><label className="block text-sm font-medium text-slate-700">Data de vencimento</label><input type="date" value={form.expiryDate} onChange={(e) => handleChange("expiryDate", e.target.value)} className={inputClass()} /></div>
+                  {!isCpfDocument ? (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Data de emiss??o</label>
+                        <input type="date" value={form.issueDate} onChange={(e) => handleChange("issueDate", e.target.value)} className={inputClass()} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Data de vencimento</label>
+                        <input type="date" value={form.expiryDate} onChange={(e) => handleChange("expiryDate", e.target.value)} className={inputClass()} />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 md:col-span-2">
+                      CPF não exige controle de emissão ou vencimento.
+                    </div>
+                  )}
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-700">Anexo do documento</label>
-                    <input
-                      type="file"
-                      accept=".pdf,image/*"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                      className="mt-1 w-full cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-orange-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-orange-700 hover:file:bg-orange-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                    />
+                    <input type="file" accept=".pdf,image/*" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="mt-1 w-full cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-orange-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-orange-700 hover:file:bg-orange-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                      {selectedFile ? (
-                        <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-700">
-                          Novo arquivo: {selectedFile.name}
-                        </span>
-                      ) : null}
+                      {selectedFile ? <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-700">Novo arquivo: {selectedFile.name}</span> : null}
                       {!selectedFile && form.fileUrl ? (
                         <>
-                          <a
-                            href={resolveFileUrl(form.fileUrl)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-semibold text-blue-700 hover:underline"
-                          >
-                            Ver anexo atual
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => handleChange("fileUrl", "")}
-                            className="btn-ui btn-ui-danger"
-                          >
-                            Remover anexo
-                          </button>
+                          <a href={resolveFileUrl(form.fileUrl)} target="_blank" rel="noreferrer" className="font-semibold text-blue-700 hover:underline">Ver anexo atual</a>
+                          <button type="button" onClick={() => handleChange("fileUrl", "")} className="btn-ui btn-ui-danger">Remover anexo</button>
                         </>
                       ) : (
                         <span className="text-slate-500">Aceita PDF, PNG, JPG e WEBP (até 10MB).</span>
                       )}
                     </div>
                   </div>
-                  <div className="md:col-span-2"><label className="block text-sm font-medium text-slate-700">Observações</label><textarea value={form.notes} onChange={(e) => handleChange("notes", e.target.value)} rows={3} className={inputClass()} placeholder="Informações adicionais" /></div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-slate-700">Observações</label>
+                    <textarea value={form.notes} onChange={(e) => handleChange("notes", e.target.value)} rows={3} className={inputClass()} placeholder="Informações adicionais" />
+                  </div>
                 </div>
               </div>
+
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button type="button" onClick={closeModal} className="btn-ui btn-ui-neutral">Cancelar</button>
-                <button type="submit" disabled={saving} className="btn-ui btn-ui-primary disabled:cursor-not-allowed disabled:opacity-70">{saving ? "Salvando..." : editingDocument ? "Salvar alterações" : "Cadastrar documento"}</button>
+                <button type="submit" disabled={saving} className="btn-ui btn-ui-primary disabled:cursor-not-allowed disabled:opacity-70">
+                  {saving ? "Salvando..." : editingDocument ? "Salvar alterações" : "Cadastrar documento"}
+                </button>
               </div>
             </form>
           </div>
         </div>
       ) : null}
+
       <ConfirmDeleteModal
         isOpen={Boolean(documentToDelete)}
         title="Excluir documento"
-        description={
-          documentToDelete
-            ? `Deseja excluir o documento "${documentToDelete.name}"?`
-            : ""
-        }
+        description={documentToDelete ? `Deseja excluir o documento "${documentToDelete.name}"?` : ""}
         loading={deletingDocument}
         onCancel={() => setDocumentToDelete(null)}
         onConfirm={confirmDeleteDocument}
       />
+
       <ConfirmDeleteModal
         isOpen={bulkDeleteOpen}
         title="Excluir documentos selecionados"
@@ -660,4 +1249,3 @@ export function VehicleDocumentsPage() {
     </div>
   );
 }
-

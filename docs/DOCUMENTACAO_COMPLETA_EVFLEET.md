@@ -93,14 +93,14 @@ Regra administrativa:
 Estrutura em abas:
 - **Manutenções** (preventiva/corretiva/periódica)
 - **Planos de manutenção**
-- **Gestão de pneus**
+- **Gestão de Pneus**
 
 Recursos:
 - Modais padronizados de cadastro/edição.
 - Tabelas com ordenação.
 - Alertas e histórico por veículo.
 
-Gestão de pneus (versão atual):
+Gestão de Pneus (versão atual):
 - Cadastro técnico simplificado
 - Campo de **pressão recomendada**
 - Sem campos de sulco/pressão atual no CRUD principal

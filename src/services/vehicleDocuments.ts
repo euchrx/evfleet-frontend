@@ -3,7 +3,28 @@ import { api } from "./api";
 import type { VehicleDocument } from "../types/vehicle-document";
 
 export type CreateVehicleDocumentInput = {
-  type: "LICENSING" | "INSURANCE" | "IPVA" | "LEASING_CONTRACT" | "INSPECTION" | "OTHER";
+  type:
+    | "LICENSING"
+    | "INSURANCE"
+    | "IPVA"
+    | "LEASING_CONTRACT"
+    | "INSPECTION"
+    | "CNH"
+    | "EAR"
+    | "MOPP"
+    | "TOXICOLOGICAL_EXAM"
+    | "EMPLOYMENT_RECORD"
+    | "RG"
+    | "CPF_DOCUMENT"
+    | "DEFENSIVE_DRIVING"
+    | "TRUCAO_TRANSPORTE"
+    | "CRLV"
+    | "CIV"
+    | "CIPP"
+    | "ENVIRONMENTAL_AUTHORIZATION"
+    | "RNTRC"
+    | "OTHER";
+  ownerType?: "VEHICLE" | "DRIVER" | "GENERAL";
   name: string;
   number?: string;
   issueDate?: string;
@@ -12,7 +33,8 @@ export type CreateVehicleDocumentInput = {
   issuer?: string;
   notes?: string;
   fileUrl?: string;
-  vehicleId: string;
+  vehicleId?: string;
+  driverId?: string;
 };
 
 export type UpdateVehicleDocumentInput = Partial<CreateVehicleDocumentInput>;

@@ -1080,7 +1080,7 @@ export function DashboardPage() {
           className="cursor-pointer rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md"
         >
           <div className="flex items-center justify-between">
-            <p className="text-lg font-semibold text-slate-900">Custo com débitos e multas</p>
+            <p className="text-lg font-semibold text-slate-900">Custo com finanças</p>
             <div className="rounded-xl bg-red-100 p-2 text-red-700">
               <CircleAlert size={16} />
             </div>
@@ -1361,23 +1361,20 @@ export function DashboardPage() {
         </DashboardCard>
 
         <DashboardCard
-          title="Viagens"
+          title="Gestão de Finanças"
           icon={
-            <div className="rounded-xl bg-violet-100 p-2 text-violet-700">
-              <Route size={16} />
+            <div className="rounded-xl bg-red-100 p-2 text-red-700">
+              <CircleAlert size={16} />
             </div>
           }
         >
-          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.tripsTotal}</p>
-          <div className="mt-4 flex items-center gap-2 text-xs">
-            <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-700">
-              Abertas: {loading ? "..." : metrics.tripsOpen}
-            </span>
-            <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
-              Concluídas: {loading ? "..." : metrics.tripsCompleted}
+          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.debtsTotal}</p>
+          <div className="mt-3 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Registros totais</span>
+            <span className="rounded-full bg-red-100 px-2 py-1 font-semibold text-red-700">
+              Pendentes: {loading ? "..." : metrics.pendingDebts}
             </span>
           </div>
-          <p className="mt-3 text-xs text-slate-500">Total no escopo</p>
         </DashboardCard>
 
         <DashboardCard
@@ -1396,20 +1393,23 @@ export function DashboardPage() {
         </DashboardCard>
 
         <DashboardCard
-          title="Débitos e Multas"
+          title="Gestão de Viagens"
           icon={
-            <div className="rounded-xl bg-red-100 p-2 text-red-700">
-              <CircleAlert size={16} />
+            <div className="rounded-xl bg-violet-100 p-2 text-violet-700">
+              <Route size={16} />
             </div>
           }
         >
-          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.debtsTotal}</p>
-          <div className="mt-3 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Registros totais</span>
-            <span className="rounded-full bg-red-100 px-2 py-1 font-semibold text-red-700">
-              Pendentes: {loading ? "..." : metrics.pendingDebts}
+          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.tripsTotal}</p>
+          <div className="mt-4 flex items-center gap-2 text-xs">
+            <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-700">
+              Abertas: {loading ? "..." : metrics.tripsOpen}
+            </span>
+            <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
+              Concluídas: {loading ? "..." : metrics.tripsCompleted}
             </span>
           </div>
+          <p className="mt-3 text-xs text-slate-500">Total no escopo</p>
         </DashboardCard>
 
       </div>
@@ -1450,7 +1450,7 @@ export function DashboardPage() {
                 </p>
               </div>
               <div className="rounded-xl border border-red-200 bg-red-50 p-3">
-                <p className="text-xs font-semibold uppercase text-red-700">Débitos e multas</p>
+                <p className="text-xs font-semibold uppercase text-red-700">Finanças</p>
                 <p className="mt-1 text-xl font-bold text-red-800">
                   {toCurrency(vehicleCostModalData.debtsTotal)}
                 </p>
@@ -1594,7 +1594,7 @@ export function DashboardPage() {
                       ? "Detalhamento - Custo com pneus"
                     : costModal === "MAINTENANCE"
                       ? "Detalhamento - Custo com manutenção"
-                      : "Detalhamento - Custo com débitos e multas"}
+                      : "Detalhamento - Custo com finanças"}
                 </h3>
                 <p className="text-sm text-slate-500">
                   {periodLabel} • {costModal === "PRODUCTS" ? "Todas as categorias" : selectedVehicleLabel}
@@ -1759,10 +1759,10 @@ export function DashboardPage() {
                             <td className="px-4 py-3 text-sm text-slate-600">
                               <button
                                 type="button"
-                                title="Abrir gestão de pneus"
+                                title="Abrir gestão de Pneus"
                                 onClick={() => {
                                   setCostModal(null);
-                                  navigate(`/maintenance-records?tab=tires${item.plate ? `&plate=${encodeURIComponent(item.plate)}` : ""}`);
+                                  navigate("/tire-management");
                                 }}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-600 transition hover:border-orange-300 hover:text-orange-600"
                               >
@@ -1868,7 +1868,7 @@ export function DashboardPage() {
                             <td className="px-4 py-3 text-sm text-slate-600">
                               <button
                                 type="button"
-                                title="Abrir débitos e multas filtrado por placa"
+                                title="Abrir finanças filtrado por placa"
                                 onClick={() => {
                                   if (!item.plate) return;
                                   setCostModal(null);

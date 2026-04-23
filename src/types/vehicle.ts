@@ -1,5 +1,8 @@
 export type VehicleType = "LIGHT" | "HEAVY";
 export type VehicleCategory = "CAR" | "TRUCK" | "UTILITY" | "IMPLEMENT";
+
+export type AxleConfiguration = "SINGLE" | "DUAL";
+
 export type FuelType =
   | "GASOLINE"
   | "ETHANOL"
@@ -9,7 +12,44 @@ export type FuelType =
   | "ELECTRIC"
   | "HYBRID"
   | "CNG";
+
 export type VehicleStatus = "ACTIVE" | "MAINTENANCE" | "SOLD";
+
+export type VehicleLinkedImplementVehicle = {
+  id: string;
+  plate: string;
+  model: string;
+  brand: string;
+  year: number;
+  fipeValue?: number | null;
+  vehicleType: VehicleType;
+  category?: VehicleCategory;
+
+  axleCount?: number | null;
+  axleConfiguration?: AxleConfiguration | null;
+
+  chassis?: string | null;
+  renavam?: string | null;
+  acquisitionDate?: string | null;
+  fuelType?: FuelType | null;
+  tankCapacity?: number | null;
+  status?: VehicleStatus;
+  currentKm?: number | null;
+  profilePhotoUrl?: string | null;
+  photoUrls?: string[];
+  documentUrls?: string[];
+  companyId?: string;
+  branchId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type LinkedImplement = {
+  id: string;
+  position: number;
+  implementId: string;
+  implement: VehicleLinkedImplementVehicle;
+};
 
 export type Vehicle = {
   id: string;
@@ -17,22 +57,29 @@ export type Vehicle = {
   model: string;
   brand: string;
   year: number;
+  fipeValue?: number | null;
   vehicleType: VehicleType;
   category?: VehicleCategory;
-  chassis?: string;
-  renavam?: string;
-  acquisitionDate?: string;
-  fuelType?: FuelType;
-  tankCapacity?: number;
+
+  axleCount?: number | null;
+  axleConfiguration?: AxleConfiguration | null;
+
+  chassis?: string | null;
+  renavam?: string | null;
+  acquisitionDate?: string | null;
+  fuelType?: FuelType | null;
+  tankCapacity?: number | null;
   status?: VehicleStatus;
-  currentKm?: number;
-  profilePhotoUrl?: string;
+  currentKm?: number | null;
+  profilePhotoUrl?: string | null;
   photoUrls?: string[];
   documentUrls?: string[];
   companyId?: string;
-  branchId?: string;
+  branchId?: string | null;
   createdAt?: string;
   updatedAt?: string;
+
+  implements?: LinkedImplement[];
 };
 
 export type VehicleHistoryItem = {

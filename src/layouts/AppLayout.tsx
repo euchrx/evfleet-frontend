@@ -54,7 +54,7 @@ import {
 } from "../services/adminSettings";
 import { api } from "../services/api";
 import { getSupportRequests } from "../services/support";
-import type { SubscriptionStatus } from "../services/subscription";
+import type { BillingAccessStatus, SubscriptionStatus } from "../services/subscription";
 import { formatVehicleLabel } from "../utils/vehicleLabel";
 
 type AppNotification = {
@@ -66,7 +66,9 @@ type AppNotification = {
 };
 
 type HeaderSubscriptionInfo = {
-  status: SubscriptionStatus | null;
+  subscriptionStatus: SubscriptionStatus | null;
+  accessStatus: BillingAccessStatus | null;
+  isBlocked: boolean;
   planCode?: string | null;
   planName?: string | null;
 };
@@ -148,7 +150,7 @@ function formatSupportCategory(value?: string | null) {
   return "Pedido";
 }
 
-function getSubscriptionStatusMeta(status: SubscriptionStatus | null) {
+function getSubscriptionStatusMeta(status: BillingAccessStatus | null) {
   if (status === "ACTIVE") {
     return {
       label: "Assinatura ativa",
@@ -165,17 +167,33 @@ function getSubscriptionStatusMeta(status: SubscriptionStatus | null) {
     };
   }
 
-  if (status === "PAST_DUE") {
+  if (status === "GRACE_PERIOD") {
     return {
-      label: "Pagamento pendente",
+      label: "Em tolerância",
+      tone: "border-orange-200 bg-orange-50 text-orange-700",
+      dot: "bg-orange-500",
+    };
+  }
+
+  if (status === "BLOCKED") {
+    return {
+      label: "Acesso bloqueado",
       tone: "border-red-200 bg-red-50 text-red-700",
       dot: "bg-red-500",
     };
   }
 
-  if (status === "CANCELED") {
+  if (status === "SETUP_REQUIRED") {
     return {
-      label: "Assinatura cancelada",
+      label: "Configuração pendente",
+      tone: "border-blue-200 bg-blue-50 text-blue-700",
+      dot: "bg-blue-500",
+    };
+  }
+
+  if (status === "NO_PLAN") {
+    return {
+      label: "Sem plano",
       tone: "border-slate-200 bg-slate-100 text-slate-700",
       dot: "bg-slate-500",
     };
@@ -187,6 +205,30 @@ function getSubscriptionStatusMeta(status: SubscriptionStatus | null) {
     dot: "bg-slate-400",
   };
 }
+
+function buildFallbackAccessFromSubscription(subscription: {
+  status?: SubscriptionStatus;
+  plan?: { code?: string | null; name?: string | null } | null;
+} | null) {
+  const status = subscription?.status ?? null;
+  const accessStatus: BillingAccessStatus | null =
+    status === "ACTIVE"
+      ? "ACTIVE"
+      : status === "TRIALING"
+        ? "TRIALING"
+        : status === "PAST_DUE"
+          ? "BLOCKED"
+          : status === "DRAFT"
+            ? "SETUP_REQUIRED"
+            : "NO_PLAN";
+
+  return {
+    accessStatus,
+    subscriptionStatus: status,
+    isBlocked: accessStatus === "BLOCKED",
+  };
+}
+
 
 function isStarterSupportPlan(subscription: HeaderSubscriptionInfo | null) {
   const code = String(subscription?.planCode || "").trim().toUpperCase();
@@ -281,15 +323,21 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
-      name: "Débitos e Multas",
-      path: "/debts",
-      icon: BadgeAlert,
+      name: "Gestão de Pneus",
+      path: "/tire-management",
+      icon: Wrench,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
       name: "Gestão de Viagens",
       path: "/trips",
       icon: Route,
+      roles: ["ADMIN", "FLEET_MANAGER"],
+    },
+    {
+      name: "Gestão de Finanças",
+      path: "/debts",
+      icon: BadgeAlert,
       roles: ["ADMIN", "FLEET_MANAGER"],
     },
     {
@@ -399,8 +447,8 @@ export function AppLayout() {
     [systemLogs, systemVersion],
   );
   const subscriptionMeta = useMemo(
-    () => getSubscriptionStatusMeta(subscriptionInfo?.status || null),
-    [subscriptionInfo?.status],
+    () => getSubscriptionStatusMeta(subscriptionInfo?.accessStatus || null),
+    [subscriptionInfo?.accessStatus],
   );
   const initial = user?.name?.charAt(0).toUpperCase() || "U";
 
@@ -520,12 +568,12 @@ export function AppLayout() {
     const anomalyNotifications: AppNotification[] =
       fuelRecords.length > 0 && vehicles.length > 0
         ? detectFuelAnomalies(fuelRecords, vehicles).map((item) => ({
-            id: `fuel-anomaly-${item.id}`,
-            title: `Anomalia de consumo - ${item.vehicle}`,
-            description: `${item.reason} Motorista: ${item.driver}.`,
-            date: item.date,
-            link: "/fuel-records",
-          }))
+          id: `fuel-anomaly-${item.id}`,
+          title: `Anomalia de consumo - ${item.vehicle}`,
+          description: `${item.reason} Motorista: ${item.driver}.`,
+          date: item.date,
+          link: "/fuel-records",
+        }))
         : [];
 
     const maintenanceNotifications: AppNotification[] = maintenanceRecords
@@ -723,38 +771,38 @@ export function AppLayout() {
       });
 
     const supportNotifications: AppNotification[] = supportRequests.flatMap((request) => {
-          if (request.status === "COMPLETED" && request.completedAt) {
-            return [
-              {
-                id: `support-completed-${request.id}`,
-                title: `Suporte concluído - ${request.title}`,
-                description:
-                  request.completionMessage ||
-                  "O pedido foi marcado como concluído pela equipe.",
-                date: request.completedAt,
-                link: "/support",
-              },
-            ];
-          }
+      if (request.status === "COMPLETED" && request.completedAt) {
+        return [
+          {
+            id: `support-completed-${request.id}`,
+            title: `Suporte concluído - ${request.title}`,
+            description:
+              request.completionMessage ||
+              "O pedido foi marcado como concluído pela equipe.",
+            date: request.completedAt,
+            link: "/support",
+          },
+        ];
+      }
 
-          if (request.status === "IN_PROGRESS" && request.respondedAt) {
-            const etaText = request.estimatedCompletionAt
-              ? ` Prazo estimado: ${formatDateOnly(request.estimatedCompletionAt)}.`
-              : "";
+      if (request.status === "IN_PROGRESS" && request.respondedAt) {
+        const etaText = request.estimatedCompletionAt
+          ? ` Prazo estimado: ${formatDateOnly(request.estimatedCompletionAt)}.`
+          : "";
 
-            return [
-              {
-                id: `support-responded-${request.id}`,
-                title: `Suporte respondeu - ${request.title}`,
-                description: `${request.responseMessage || "Seu pedido já está em atendimento."}${etaText}`,
-                date: request.respondedAt,
-                link: "/support",
-              },
-            ];
-          }
+        return [
+          {
+            id: `support-responded-${request.id}`,
+            title: `Suporte respondeu - ${request.title}`,
+            description: `${request.responseMessage || "Seu pedido já está em atendimento."}${etaText}`,
+            date: request.respondedAt,
+            link: "/support",
+          },
+        ];
+      }
 
-          return [];
-        });
+      return [];
+    });
 
     setNotifications(
       [
@@ -815,22 +863,29 @@ export function AppLayout() {
           return;
         }
 
-        const endpoint =
+        const subscriptionEndpoint =
           isAdmin && selectedCompanyId
             ? `/billing/companies/${selectedCompanyId}/subscription`
             : "/billing/me/subscription";
 
-        const { data } = await api.get<{
+        const subscriptionResponse = await api.get<{
           status?: SubscriptionStatus;
           plan?: { code?: string | null; name?: string | null } | null;
-        } | null>(
-          endpoint,
-        );
+        } | null>(subscriptionEndpoint);
+
+        const accessData = buildFallbackAccessFromSubscription(subscriptionResponse.data);
+
         if (!active) return;
+
+        const subscriptionData = subscriptionResponse.data;
+
         setSubscriptionInfo({
-          status: data?.status || null,
-          planCode: data?.plan?.code || null,
-          planName: data?.plan?.name || null,
+          subscriptionStatus:
+            accessData?.subscriptionStatus || subscriptionData?.status || null,
+          accessStatus: accessData?.accessStatus || null,
+          isBlocked: Boolean(accessData?.isBlocked),
+          planCode: subscriptionData?.plan?.code || null,
+          planName: subscriptionData?.plan?.name || null,
         });
       } catch {
         if (!active) return;
@@ -969,9 +1024,8 @@ export function AppLayout() {
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-slate-900 text-white shadow-xl transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-slate-900 text-white shadow-xl transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="border-b border-slate-800 px-6 py-6">
           <div className="flex items-center justify-between">
@@ -998,11 +1052,10 @@ export function AppLayout() {
                 key={item.path}
                 to={item.path}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                  active
-                    ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
-                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                }`}
+                className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${active
+                  ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  }`}
               >
                 <Icon size={18} />
                 <span>{item.name}</span>
@@ -1106,11 +1159,10 @@ export function AppLayout() {
                       <button
                         type="button"
                         onClick={() => handleCompanyScopeChange("")}
-                        className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold ${
-                          !selectedCompanyId
-                            ? "border-orange-600 bg-orange-500 text-white"
-                            : "border-orange-200 bg-white text-slate-700 hover:bg-orange-100"
-                        }`}
+                        className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold ${!selectedCompanyId
+                          ? "border-orange-600 bg-orange-500 text-white"
+                          : "border-orange-200 bg-white text-slate-700 hover:bg-orange-100"
+                          }`}
                       >
                         {!selectedCompanyId ? (
                           <Check size={15} />
@@ -1128,11 +1180,10 @@ export function AppLayout() {
                             key={company.id}
                             type="button"
                             onClick={() => handleCompanyScopeChange(company.id)}
-                            className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold ${
-                              active
-                                ? "border-orange-600 bg-orange-500 text-white"
-                                : "border-orange-200 bg-white text-slate-700 hover:bg-orange-100"
-                            }`}
+                            className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold ${active
+                              ? "border-orange-600 bg-orange-500 text-white"
+                              : "border-orange-200 bg-white text-slate-700 hover:bg-orange-100"
+                              }`}
                           >
                             {active ? (
                               <Check size={15} />
@@ -1153,7 +1204,7 @@ export function AppLayout() {
               ref={profileMenuRef}
               className="relative flex w-full items-center justify-end gap-3 lg:col-start-3 lg:justify-self-end"
             >
-              {subscriptionInfo?.status ? (
+              {subscriptionInfo ? (
                 <button
                   type="button"
                   onClick={() => navigate("/subscription")}
@@ -1188,9 +1239,19 @@ export function AppLayout() {
                     <span className="mt-2 inline-flex rounded-full border border-orange-300 bg-white px-2.5 py-0.5 text-xs font-semibold text-orange-700">
                       {String(formatRole(user?.role)).toUpperCase()}
                     </span>
-                    {subscriptionInfo?.status === "TRIALING" ? (
+                    {subscriptionInfo?.accessStatus === "TRIALING" ? (
                       <span className="mt-2 ml-2 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
                         Período de teste
+                      </span>
+                    ) : null}
+                    {subscriptionInfo?.accessStatus === "GRACE_PERIOD" ? (
+                      <span className="mt-2 ml-2 inline-flex rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-700">
+                        Em tolerância
+                      </span>
+                    ) : null}
+                    {subscriptionInfo?.accessStatus === "BLOCKED" ? (
+                      <span className="mt-2 ml-2 inline-flex rounded-full border border-red-300 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                        Acesso bloqueado
                       </span>
                     ) : null}
                   </div>
@@ -1466,11 +1527,10 @@ export function AppLayout() {
                     key={notification.id}
                     type="button"
                     onClick={() => handleOpenNotification(notification)}
-                    className={`w-full rounded-xl border px-4 py-3 text-left ${
-                      notification.link
-                        ? "cursor-pointer border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/40"
-                        : "cursor-default border-slate-200 bg-slate-50"
-                    }`}
+                    className={`w-full rounded-xl border px-4 py-3 text-left ${notification.link
+                      ? "cursor-pointer border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/40"
+                      : "cursor-default border-slate-200 bg-slate-50"
+                      }`}
                   >
                     <p className="text-sm font-semibold text-slate-900">
                       {notification.title}

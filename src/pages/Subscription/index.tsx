@@ -9,10 +9,16 @@ import {
   deleteBillingPlan,
   generateSubscriptionPayment,
   getSubscriptionPageData,
+  resetCompanySubscriptionOperationalState,
   selectCompanyPlan,
+  setCompanySubscriptionActive,
+  setCompanySubscriptionSetup,
+  setCompanySubscriptionTrial,
   updateBillingPlan,
+  type BillingAccessStatus,
   type PlanInterval,
   type PaymentStatus,
+  type SelectCompanyPlanInput,
   type SubscriptionInvoice,
   type SubscriptionPageData,
   type SubscriptionPlan,
@@ -24,10 +30,21 @@ import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 
 function subscriptionStatusLabel(status: SubscriptionStatus) {
+  if (status === "DRAFT") return "Em configuração";
   if (status === "ACTIVE") return "Ativa";
   if (status === "TRIALING") return "Período de teste";
-  if (status === "PAST_DUE") return "Pagamento pendente";
+  if (status === "PAST_DUE") return "Inadimplente";
   return "Cancelada";
+}
+
+function accessStatusLabel(status?: BillingAccessStatus | null) {
+  if (status === "NO_PLAN") return "Sem plano";
+  if (status === "SETUP_REQUIRED") return "Configuração pendente";
+  if (status === "TRIALING") return "Período de teste";
+  if (status === "ACTIVE") return "Assinatura ativa";
+  if (status === "GRACE_PERIOD") return "Em tolerância";
+  if (status === "BLOCKED") return "Bloqueado";
+  return "Sem status";
 }
 
 function invoiceStatusLabel(status: PaymentStatus) {
@@ -46,33 +63,62 @@ function invoiceStatusClass(status: PaymentStatus) {
   return "status-inactive";
 }
 
-function getStatusAlert(status?: SubscriptionStatus) {
+function getAccessStatusAlert(status?: BillingAccessStatus | null, message?: string) {
   if (!status) return null;
+
+  if (status === "NO_PLAN") {
+    return {
+      className: "border-slate-300 bg-slate-50 text-slate-700",
+      message: message || "Nenhum plano vinculado a esta empresa.",
+    };
+  }
+
+  if (status === "SETUP_REQUIRED") {
+    return {
+      className: "border-blue-200 bg-blue-50 text-blue-800",
+      message: message || "A assinatura foi criada, mas ainda depende de configuração final.",
+    };
+  }
+
   if (status === "TRIALING") {
     return {
       className: "border-amber-200 bg-amber-50 text-amber-800",
-      message: "Período de teste ativo.",
+      message: message || "Período de teste ativo.",
     };
   }
-  if (status === "PAST_DUE") {
-    return {
-      className: "border-red-200 bg-red-50 text-red-700",
-      message: "Pagamento pendente. Regularize para manter acesso completo.",
-    };
-  }
-  if (status === "CANCELED") {
-    return {
-      className: "border-slate-300 bg-slate-50 text-slate-700",
-      message: "Assinatura cancelada. Entre em contato com o administrador para reativação.",
-    };
-  }
+
   if (status === "ACTIVE") {
     return {
       className: "border-emerald-200 bg-emerald-50 text-emerald-800",
-      message: "Assinatura ativa e operação liberada.",
+      message: message || "Assinatura ativa.",
     };
   }
+
+  if (status === "GRACE_PERIOD") {
+    return {
+      className: "border-orange-200 bg-orange-50 text-orange-800",
+      message:
+        message || "Pagamento pendente, mas a empresa ainda está dentro do período de tolerância.",
+    };
+  }
+
+  if (status === "BLOCKED") {
+    return {
+      className: "border-red-200 bg-red-50 text-red-700",
+      message: message || "Acesso operacional bloqueado por inadimplência.",
+    };
+  }
+
   return null;
+}
+
+function getAccessStatusTextClass(status?: BillingAccessStatus | null) {
+  if (status === "ACTIVE") return "text-emerald-700";
+  if (status === "TRIALING") return "text-amber-700";
+  if (status === "GRACE_PERIOD") return "text-orange-700";
+  if (status === "BLOCKED") return "text-red-700";
+  if (status === "SETUP_REQUIRED") return "text-blue-700";
+  return "text-slate-700";
 }
 
 function parseDateSafe(value?: string) {
@@ -86,6 +132,110 @@ function isStarterPlan(plan?: Pick<SubscriptionPlan, "code" | "name"> | null) {
   const code = String(plan?.code || "").trim().toUpperCase();
   const name = String(plan?.name || "").trim().toUpperCase();
   return code === "STA" || code === "STARTER" || name.includes("STARTER");
+}
+
+function getRequestErrorMessage(error: unknown, fallback: string) {
+  const axiosError = error as {
+    response?: {
+      data?: {
+        message?: string | string[];
+      };
+    };
+    message?: string;
+  };
+
+  const apiMessage = axiosError?.response?.data?.message;
+  if (Array.isArray(apiMessage) && apiMessage.length > 0) {
+    return apiMessage.join(", ");
+  }
+  if (typeof apiMessage === "string" && apiMessage.trim()) {
+    return apiMessage;
+  }
+  if (typeof axiosError?.message === "string" && axiosError.message.trim()) {
+    return axiosError.message;
+  }
+  return fallback;
+}
+
+
+type PlanSelectionConfig = {
+  trialDays: string;
+  graceDays: string;
+  customPriceCents: string;
+  customVehicleLimit: string;
+  useSnapshot: boolean;
+};
+
+function buildPlanSelectionDefaults(plan?: SubscriptionPlan | null): PlanSelectionConfig {
+  return {
+    trialDays:
+      typeof plan?.defaultTrialDays === "number" && plan.defaultTrialDays >= 0
+        ? String(plan.defaultTrialDays)
+        : "",
+    graceDays:
+      typeof plan?.defaultGraceDays === "number" && plan.defaultGraceDays >= 0
+        ? String(plan.defaultGraceDays)
+        : "",
+    customPriceCents: "",
+    customVehicleLimit: "",
+    useSnapshot: true,
+  };
+}
+
+function parseOptionalNonNegativeInt(value: string) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return undefined;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) {
+    throw new Error("Informe apenas números válidos.");
+  }
+  return Math.max(0, Math.floor(parsed));
+}
+
+function parseOptionalPositiveInt(value: string) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return undefined;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error("Informe apenas valores maiores que zero.");
+  }
+  return Math.floor(parsed);
+}
+
+type PlanFormState = {
+  code: string;
+  name: string;
+  description: string;
+  priceCents: string;
+  vehicleLimit: string;
+  interval: PlanInterval;
+  isPublic: boolean;
+  isEnterprise: boolean;
+  companyId: string;
+  defaultTrialDays: string;
+  defaultGraceDays: string;
+  allowsCustomPrice: boolean;
+  allowsCustomVehicleLimit: boolean;
+  sortOrder: string;
+};
+
+function buildEmptyPlanForm(companyId = ""): PlanFormState {
+  return {
+    code: "",
+    name: "",
+    description: "",
+    priceCents: "",
+    vehicleLimit: "",
+    interval: "MONTHLY",
+    isPublic: true,
+    isEnterprise: false,
+    companyId,
+    defaultTrialDays: "",
+    defaultGraceDays: "",
+    allowsCustomPrice: false,
+    allowsCustomVehicleLimit: false,
+    sortOrder: "0",
+  };
 }
 
 export function SubscriptionPage() {
@@ -107,18 +257,16 @@ export function SubscriptionPage() {
   const [activatingSubscription, setActivatingSubscription] = useState(false);
   const [isClearPaymentsOpen, setIsClearPaymentsOpen] = useState(false);
   const [clearingPayments, setClearingPayments] = useState(false);
+  const [isResetOperationalStateOpen, setIsResetOperationalStateOpen] = useState(false);
+  const [resettingOperationalState, setResettingOperationalState] = useState(false);
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<SubscriptionPlan | null>(null);
   const [selectedPlanActivationStatus, setSelectedPlanActivationStatus] =
     useState<Extract<SubscriptionStatus, "ACTIVE" | "TRIALING">>("TRIALING");
   const [redirectingToCheckout, setRedirectingToCheckout] = useState(false);
-  const [newPlan, setNewPlan] = useState({
-    code: "",
-    name: "",
-    description: "",
-    priceCents: "",
-    vehicleLimit: "",
-    interval: "MONTHLY" as PlanInterval,
-  });
+  const [planSelectionConfig, setPlanSelectionConfig] = useState<PlanSelectionConfig>(
+    buildPlanSelectionDefaults(),
+  );
+  const [newPlan, setNewPlan] = useState<PlanFormState>(buildEmptyPlanForm(selectedCompanyId || ""));
 
   async function loadData() {
     try {
@@ -139,12 +287,25 @@ export function SubscriptionPage() {
     loadData();
   }, [selectedCompanyId, location.key]);
 
+  useEffect(() => {
+    setPlanSelectionConfig(buildPlanSelectionDefaults(selectedPlanForCheckout));
+  }, [selectedPlanForCheckout?.id]);
+  useEffect(() => {
+    setNewPlan((current) => {
+      const scopedCompanyId = selectedCompanyId || data?.companyId || "";
+      if (!current.isEnterprise) return current;
+      if (current.companyId === scopedCompanyId) return current;
+      return { ...current, companyId: scopedCompanyId };
+    });
+  }, [selectedCompanyId, data?.companyId]);
+
   const overview = data?.overview || null;
+  const access = data?.access || null;
   const plans = data?.plans || [];
   const invoices = data?.invoices || [];
   const canManagePlans = user?.role === "ADMIN";
   const hasCompanyScope = Boolean(data?.companyId);
-  const statusAlert = getStatusAlert(overview?.status);
+  const statusAlert = getAccessStatusAlert(access?.accessStatus, access?.message);
   const paymentUnlockDaysBeforeDue = 5;
   const now = new Date();
   const nextBillingDate = parseDateSafe(overview?.nextBillingDate);
@@ -166,7 +327,8 @@ export function SubscriptionPage() {
   const isInsideUnlockWindow = paymentUnlockDate ? now >= paymentUnlockDate : true;
   const paymentWindowBlocked = Boolean(
     overview &&
-      overview.status !== "PAST_DUE" &&
+      access?.accessStatus !== "GRACE_PERIOD" &&
+      access?.accessStatus !== "BLOCKED" &&
       overview.status !== "CANCELED" &&
       hasPaidCurrentCycle &&
       !isInsideUnlockWindow,
@@ -178,12 +340,19 @@ export function SubscriptionPage() {
         )}.`
       : "Pagamento deste ciclo ja confirmado. Aguarde a proxima janela de cobranca."
     : "";
-  const trialEnded = overview?.status === "PAST_DUE";
+  const trialEnded =
+    access?.accessStatus === "GRACE_PERIOD" || access?.accessStatus === "BLOCKED";
 
   function canStartTrialForPlan(plan?: SubscriptionPlan | null) {
     if (!plan) return false;
     if (!isStarterPlan(plan)) return false;
-    return !overview || overview.status === "TRIALING";
+
+    return (
+      !access ||
+      access.accessStatus === "NO_PLAN" ||
+      access.accessStatus === "SETUP_REQUIRED" ||
+      access.accessStatus === "TRIALING"
+    );
   }
 
   function getSuggestedActivationStatus(plan?: SubscriptionPlan | null) {
@@ -192,9 +361,11 @@ export function SubscriptionPage() {
 
   function requiresCheckoutOnSelection(plan?: SubscriptionPlan | null) {
     if (!plan) return false;
+
     if (plan.isCurrent) {
-      return overview?.status === "CANCELED";
+      return access?.accessStatus === "BLOCKED" || overview?.status === "CANCELED";
     }
+
     return getSuggestedActivationStatus(plan) === "ACTIVE";
   }
 
@@ -209,14 +380,7 @@ export function SubscriptionPage() {
 
   function openCreatePlanModal() {
     setEditingPlan(null);
-    setNewPlan({
-      code: "",
-      name: "",
-      description: "",
-      priceCents: "",
-      vehicleLimit: "",
-      interval: "MONTHLY",
-    });
+    setNewPlan(buildEmptyPlanForm(selectedCompanyId || data?.companyId || ""));
     setIsPlanModalOpen(true);
   }
 
@@ -232,13 +396,43 @@ export function SubscriptionPage() {
           ? String(plan.vehicleLimit)
           : "",
       interval: plan.billingCycle,
+      isPublic: Boolean(plan.isPublic),
+      isEnterprise: Boolean(plan.isEnterprise),
+      companyId: plan.companyId || selectedCompanyId || data?.companyId || "",
+      defaultTrialDays:
+        typeof plan.defaultTrialDays === "number" && plan.defaultTrialDays >= 0
+          ? String(plan.defaultTrialDays)
+          : "",
+      defaultGraceDays:
+        typeof plan.defaultGraceDays === "number" && plan.defaultGraceDays >= 0
+          ? String(plan.defaultGraceDays)
+          : "",
+      allowsCustomPrice: Boolean(plan.allowsCustomPrice),
+      allowsCustomVehicleLimit: Boolean(plan.allowsCustomVehicleLimit),
+      sortOrder:
+        typeof plan.sortOrder === "number" && Number.isFinite(plan.sortOrder)
+          ? String(plan.sortOrder)
+          : "0",
     });
     setIsPlanModalOpen(true);
   }
 
   async function handleSelectPlan(
     planId: string,
-    initialStatus: Extract<SubscriptionStatus, "ACTIVE" | "TRIALING"> = "TRIALING",
+    initialStatus: Extract<SubscriptionStatus, "ACTIVE" | "TRIALING" | "DRAFT"> = "TRIALING",
+    overrides?: {
+      trialDays?: number;
+      graceDays?: number;
+      customPriceCents?: number;
+      customVehicleLimit?: number;
+      isCustomConfiguration?: boolean;
+      planNameSnapshot?: string;
+      planCodeSnapshot?: string;
+      priceCentsSnapshot?: number;
+      vehicleLimitSnapshot?: number;
+      currencySnapshot?: string;
+      intervalSnapshot?: PlanInterval;
+    },
   ) {
     if (!data?.companyId) {
       setErrorMessage("Selecione uma empresa no escopo para continuar.");
@@ -248,11 +442,131 @@ export function SubscriptionPage() {
     try {
       setSubmittingPlanId(planId);
       setErrorMessage("");
-      await selectCompanyPlan(data.companyId, planId, initialStatus);
+      await selectCompanyPlan(data.companyId, planId, {
+        initialStatus,
+        ...overrides,
+      });
       await loadData();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Não foi possível selecionar o plano.",
+      );
+    } finally {
+      setSubmittingPlanId(null);
+    }
+  }
+
+  function buildSelectedPlanOverrides(plan?: SubscriptionPlan | null) {
+    if (!plan) return undefined;
+
+    const trialDays = parseOptionalNonNegativeInt(planSelectionConfig.trialDays);
+    const graceDays = parseOptionalNonNegativeInt(planSelectionConfig.graceDays);
+    const customPriceCents = plan.allowsCustomPrice
+      ? parseOptionalPositiveInt(planSelectionConfig.customPriceCents)
+      : undefined;
+    const customVehicleLimit = plan.allowsCustomVehicleLimit
+      ? parseOptionalPositiveInt(planSelectionConfig.customVehicleLimit)
+      : undefined;
+
+    const hasCustomConfiguration =
+      trialDays !== undefined ||
+      graceDays !== undefined ||
+      customPriceCents !== undefined ||
+      customVehicleLimit !== undefined;
+
+    return {
+      ...(trialDays !== undefined ? { trialDays } : {}),
+      ...(graceDays !== undefined ? { graceDays } : {}),
+      ...(customPriceCents !== undefined ? { customPriceCents } : {}),
+      ...(customVehicleLimit !== undefined ? { customVehicleLimit } : {}),
+      ...(hasCustomConfiguration ? { isCustomConfiguration: true } : {}),
+      ...(planSelectionConfig.useSnapshot
+        ? {
+            planNameSnapshot: plan.name,
+            planCodeSnapshot: plan.code,
+            priceCentsSnapshot: customPriceCents ?? plan.priceCents,
+            vehicleLimitSnapshot: customVehicleLimit ?? plan.vehicleLimit ?? undefined,
+            currencySnapshot: plan.currency,
+            intervalSnapshot: plan.billingCycle,
+          }
+        : {}),
+    };
+  }
+
+  function buildPlanCommandPayload(plan?: SubscriptionPlan | null): Omit<
+    SelectCompanyPlanInput,
+    "initialStatus"
+  > | undefined {
+    if (!plan) return undefined;
+    return buildSelectedPlanOverrides(plan);
+  }
+
+  async function handleSetPlanSetup(plan: SubscriptionPlan) {
+    if (!data?.companyId) {
+      setErrorMessage("Selecione uma empresa no escopo para continuar.");
+      return;
+    }
+
+    try {
+      setSubmittingPlanId(plan.id);
+      setErrorMessage("");
+      await setCompanySubscriptionSetup(
+        data.companyId,
+        plan.id,
+        buildPlanCommandPayload(plan),
+      );
+      await loadData();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Não foi possível colocar a assinatura em setup.",
+      );
+    } finally {
+      setSubmittingPlanId(null);
+    }
+  }
+
+  async function handleSetPlanTrial(plan: SubscriptionPlan) {
+    if (!data?.companyId) {
+      setErrorMessage("Selecione uma empresa no escopo para continuar.");
+      return;
+    }
+
+    try {
+      setSubmittingPlanId(plan.id);
+      setErrorMessage("");
+      await setCompanySubscriptionTrial(
+        data.companyId,
+        plan.id,
+        buildPlanCommandPayload(plan),
+      );
+      await loadData();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Não foi possível iniciar o período de teste.",
+      );
+    } finally {
+      setSubmittingPlanId(null);
+    }
+  }
+
+  async function handleSetPlanActive(plan: SubscriptionPlan) {
+    if (!data?.companyId) {
+      setErrorMessage("Selecione uma empresa no escopo para continuar.");
+      return;
+    }
+
+    try {
+      setSubmittingPlanId(plan.id);
+      setErrorMessage("");
+      await setCompanySubscriptionActive(
+        data.companyId,
+        plan.id,
+        buildPlanCommandPayload(plan),
+      );
+      await loadData();
+    } catch (error) {
+      setErrorMessage(
+        getRequestErrorMessage(error, "Não foi possível ativar a assinatura."),
       );
     } finally {
       setSubmittingPlanId(null);
@@ -295,7 +609,19 @@ export function SubscriptionPage() {
     try {
       setRedirectingToCheckout(true);
       setErrorMessage("");
-      const subscriptionId = data.overview?.subscriptionId;
+      let subscriptionId = data.overview?.subscriptionId;
+      if (!subscriptionId) {
+        const initialStatus = canStartTrialForPlan(selectedPlanForCheckout) ? "TRIALING" : "ACTIVE";
+        await handleSelectPlan(
+          selectedPlanForCheckout.id,
+          initialStatus,
+          buildSelectedPlanOverrides(selectedPlanForCheckout),
+        );
+        const refreshed = await getSubscriptionPageData();
+        setData(refreshed);
+        subscriptionId = refreshed.overview?.subscriptionId;
+      }
+
       if (!subscriptionId) {
         throw new Error("Assinatura não encontrada para gerar o checkout.");
       }
@@ -318,6 +644,7 @@ export function SubscriptionPage() {
 
   function getPlanActionLabel(plan: SubscriptionPlan) {
     if (canManagePlans && !hasCompanyScope) return "Selecione empresa";
+    if (plan.isCurrent && access?.accessStatus === "BLOCKED") return "Regularizar e pagar";
     if (plan.isCurrent && overview?.status === "CANCELED") return "Reativar e pagar";
     if (plan.isCurrent && overview) return "Ver assinatura";
     return requiresCheckoutOnSelection(plan) ? "Selecionar e pagar" : "Selecionar plano";
@@ -333,7 +660,8 @@ export function SubscriptionPage() {
   );
   const selectedPlanIsStarter = isStarterPlan(selectedPlanForCheckout);
   const selectedPlanIsCanceledCurrent =
-    Boolean(selectedPlanForCheckout?.isCurrent) && overview?.status === "CANCELED";
+    Boolean(selectedPlanForCheckout?.isCurrent) &&
+    (overview?.status === "CANCELED" || access?.accessStatus === "BLOCKED");
 
   async function handlePayNow() {
     if (!overview?.subscriptionId) return;
@@ -371,6 +699,11 @@ export function SubscriptionPage() {
         interval: newPlan.interval,
         currency: "BRL",
         active: true,
+        isPublic: newPlan.isPublic,
+        isEnterprise: newPlan.isEnterprise,
+        ...(newPlan.isEnterprise && newPlan.companyId.trim()
+          ? { companyId: newPlan.companyId.trim() }
+          : {}),
       };
       if (editingPlan?.id) {
         await updateBillingPlan(editingPlan.id, payload);
@@ -379,33 +712,37 @@ export function SubscriptionPage() {
       }
       setIsPlanModalOpen(false);
       setEditingPlan(null);
-      setNewPlan({
-        code: "",
-        name: "",
-        description: "",
-        priceCents: "",
-        vehicleLimit: "",
-        interval: "MONTHLY",
-      });
+      setNewPlan(buildEmptyPlanForm(selectedCompanyId || data?.companyId || ""));
       await loadData();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : editingPlan
+        getRequestErrorMessage(
+          error,
+          editingPlan
             ? "Não foi possível atualizar o plano."
             : "Não foi possível adicionar o plano.",
+        ),
       );
     } finally {
       setSavingPlan(false);
     }
   }
 
-  async function handleAdminSetPlanStatus(
-    planId: string,
-    status: Extract<SubscriptionStatus, "ACTIVE" | "TRIALING">,
-  ) {
-    await handleSelectPlan(planId, status);
+  async function handleResetOperationalState() {
+    if (!data?.companyId) return;
+    try {
+      setResettingOperationalState(true);
+      setErrorMessage("");
+      await resetCompanySubscriptionOperationalState(data.companyId);
+      setIsResetOperationalStateOpen(false);
+      await loadData();
+    } catch (error) {
+      setErrorMessage(
+        getRequestErrorMessage(error, "Não foi possível resetar o estado operacional."),
+      );
+    } finally {
+      setResettingOperationalState(false);
+    }
   }
 
   async function handleDeletePlan() {
@@ -417,7 +754,7 @@ export function SubscriptionPage() {
       setPlanToDelete(null);
       await loadData();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Não foi possível remover o plano.");
+      setErrorMessage(getRequestErrorMessage(error, "Não foi possível remover o plano."));
     } finally {
       setDeletingPlan(false);
     }
@@ -434,7 +771,7 @@ export function SubscriptionPage() {
       window.location.reload();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Não foi possível desabilitar a assinatura.",
+        getRequestErrorMessage(error, "Não foi possível desabilitar a assinatura."),
       );
     } finally {
       setCancelingSubscription(false);
@@ -452,7 +789,7 @@ export function SubscriptionPage() {
       window.location.reload();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Não foi possível ativar a assinatura.",
+        getRequestErrorMessage(error, "Não foi possível ativar a assinatura."),
       );
     } finally {
       setActivatingSubscription(false);
@@ -493,7 +830,7 @@ export function SubscriptionPage() {
               Adicionar plano
             </button>
           ) : null}
-          {overview && data?.canPayNow && overview.status !== "CANCELED" ? (
+          {overview && data?.canPayNow && access?.accessStatus !== "NO_PLAN" ? (
             <button
               type="button"
               onClick={handlePayNow}
@@ -539,54 +876,54 @@ export function SubscriptionPage() {
           <p className="text-sm text-slate-600">
             {canManagePlans && !hasCompanyScope
               ? "Selecione uma empresa no escopo para consultar a assinatura."
-              : "Nenhuma assinatura encontrada para esta empresa."}
+              : access?.accessStatus === "NO_PLAN"
+                ? "Esta empresa ainda não possui plano vinculado."
+                : "Nenhuma assinatura encontrada para esta empresa."}
           </p>
         ) : (
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
-                  {canManagePlans && hasCompanyScope ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsCancelSubscriptionOpen(true)}
-                      title={
-                        overview.status === "CANCELED"
-                          ? "Ativar assinatura da empresa"
-                          : "Desabilitar assinatura da empresa"
-                      }
-                      className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition ${
-                        overview.status === "CANCELED"
-                          ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                          : "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
-                      }`}
-                    >
-                      <Power size={15} />
-                    </button>
-                  ) : null}
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Status operacional
+                  </p>
+
                 </div>
-                <p
-                  className={`mt-2 text-lg font-bold ${
-                    overview.status === "ACTIVE"
-                      ? "text-emerald-700"
-                      : overview.status === "TRIALING"
-                        ? "text-amber-700"
-                        : overview.status === "PAST_DUE"
-                          ? "text-orange-700"
-                          : "text-slate-700"
-                  }`}
-                >
-                  {subscriptionStatusLabel(overview.status)}
+                <p className={`mt-2 text-lg font-bold ${getAccessStatusTextClass(access?.accessStatus)}`}>
+                  {accessStatusLabel(access?.accessStatus)}
                 </p>
+                {overview ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Assinatura: {subscriptionStatusLabel(overview.status)}
+                  </p>
+                ) : null}
               </div>
               <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Plano atual</p>
                 <p className="mt-1 text-lg font-bold text-blue-900">{overview.planName}</p>
               </div>
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Próxima cobrança</p>
-                <p className="mt-1 text-lg font-bold text-amber-900">{formatDate(overview.nextBillingDate)}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                  {access?.accessStatus === "TRIALING"
+                    ? "Fim do trial"
+                    : access?.accessStatus === "GRACE_PERIOD"
+                      ? "Fim da tolerância"
+                      : access?.accessStatus === "BLOCKED"
+                        ? "Bloqueado em"
+                        : "Próxima cobrança"}
+                </p>
+                <p className="mt-1 text-lg font-bold text-amber-900">
+                  {formatDate(
+                    access?.accessStatus === "TRIALING"
+                      ? access?.trialEndsAt
+                      : access?.accessStatus === "GRACE_PERIOD"
+                        ? access?.graceEndsAt
+                        : access?.accessStatus === "BLOCKED"
+                          ? access?.accessBlockedAt
+                          : overview.nextBillingDate,
+                  )}
+                </p>
               </div>
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Valor</p>
@@ -623,6 +960,25 @@ export function SubscriptionPage() {
                     {plan.isCurrent ? <span className="status-pill status-pending">Plano atual</span> : null}
                     {canManagePlans ? (
                       <>
+                        {plan.isCurrent && hasCompanyScope && overview ? (
+                          <button
+                            type="button"
+                            onClick={() => setIsCancelSubscriptionOpen(true)}
+                            disabled={isSubmitting}
+                            title={
+                              overview.status === "CANCELED"
+                                ? "Ativar assinatura da empresa"
+                                : "Desabilitar assinatura da empresa"
+                            }
+                            className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                              overview.status === "CANCELED"
+                                ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                : "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                            }`}
+                          >
+                            <Power size={15} />
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => openEditPlanModal(plan)}
@@ -663,10 +1019,12 @@ export function SubscriptionPage() {
                   onClick={() => {
                     setSelectedPlanForCheckout(plan);
                     setSelectedPlanActivationStatus(getSuggestedActivationStatus(plan));
+                    setPlanSelectionConfig(buildPlanSelectionDefaults(plan));
                   }}
-                  disabled={(canManagePlans && !hasCompanyScope) || isSubmitting || redirectingToCheckout}
+                  disabled={(canManagePlans && !hasCompanyScope) || isSubmitting || redirectingToCheckout || plan.active === false}
+                  title={plan.active === false ? "Plano inativo não pode ser usado." : undefined}
                   className={`mt-4 w-full rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                    (canManagePlans && !hasCompanyScope)
+                    (canManagePlans && !hasCompanyScope) || plan.active === false
                       ? "cursor-not-allowed border border-slate-300 bg-slate-100 text-slate-500"
                       : "cursor-pointer bg-orange-500 text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                   }`}
@@ -675,22 +1033,33 @@ export function SubscriptionPage() {
                 </button>
 
                 {canManagePlans && hasCompanyScope ? (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
                     <button
                       type="button"
-                      onClick={() => handleAdminSetPlanStatus(plan.id, "TRIALING")}
-                      disabled={isSubmitting || redirectingToCheckout || !isStarterPlan(plan)}
+                      onClick={() => handleSetPlanTrial(plan)}
+                      disabled={isSubmitting || redirectingToCheckout || plan.active === false}
+                      title={plan.active === false ? "Plano inativo não pode ser usado." : undefined}
                       className="cursor-pointer rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Setar teste
+                      Forçar trial
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleAdminSetPlanStatus(plan.id, "ACTIVE")}
-                      disabled={isSubmitting || redirectingToCheckout}
+                      onClick={() => handleSetPlanActive(plan)}
+                      disabled={isSubmitting || redirectingToCheckout || plan.active === false}
+                      title={plan.active === false ? "Plano inativo não pode ser usado." : undefined}
                       className="cursor-pointer rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Setar pago
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetPlanSetup(plan)}
+                      disabled={isSubmitting || redirectingToCheckout || plan.active === false}
+                      title={plan.active === false ? "Plano inativo não pode ser usado." : undefined}
+                      className="cursor-pointer rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Voltar setup
                     </button>
                   </div>
                 ) : null}
@@ -713,6 +1082,7 @@ export function SubscriptionPage() {
                 onClick={() => {
                   setSelectedPlanForCheckout(null);
                   setSelectedPlanActivationStatus("ACTIVE");
+                  setPlanSelectionConfig(buildPlanSelectionDefaults());
                 }}
                 className="cursor-pointer rounded-lg px-3 py-2 text-slate-500 transition hover:bg-slate-100"
               >
@@ -754,7 +1124,9 @@ export function SubscriptionPage() {
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">Disponível</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {selectedPlanForCheckout.active === false ? "Inativo" : "Disponível"}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Limite de veículos</p>
@@ -772,7 +1144,7 @@ export function SubscriptionPage() {
                   <p className="text-sm font-semibold text-slate-800">
                     Tipo de ativação ao vincular o plano
                   </p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
                     <button
                       type="button"
                       onClick={() => setSelectedPlanActivationStatus("TRIALING")}
@@ -809,6 +1181,94 @@ export function SubscriptionPage() {
                 </div>
               ) : null}
 
+              {canManagePlans ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">Configuração da assinatura</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Use estes campos para setup, trial customizado ou assinatura enterprise com snapshot comercial.
+                      </p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${selectedPlanForCheckout.isEnterprise ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-700"}`}>
+                      {selectedPlanForCheckout.isEnterprise ? "Enterprise" : "Plano público"}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label className="space-y-1">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trial (dias)</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={planSelectionConfig.trialDays}
+                        onChange={(event) =>
+                          setPlanSelectionConfig((current) => ({ ...current, trialDays: event.target.value }))
+                        }
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-400"
+                        placeholder={selectedPlanForCheckout.defaultTrialDays != null ? String(selectedPlanForCheckout.defaultTrialDays) : "0"}
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Grace (dias)</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={planSelectionConfig.graceDays}
+                        onChange={(event) =>
+                          setPlanSelectionConfig((current) => ({ ...current, graceDays: event.target.value }))
+                        }
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-400"
+                        placeholder={selectedPlanForCheckout.defaultGraceDays != null ? String(selectedPlanForCheckout.defaultGraceDays) : "5"}
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Preço customizado (centavos)</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={planSelectionConfig.customPriceCents}
+                        onChange={(event) =>
+                          setPlanSelectionConfig((current) => ({ ...current, customPriceCents: event.target.value }))
+                        }
+                        disabled={!selectedPlanForCheckout.allowsCustomPrice}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        placeholder={selectedPlanForCheckout.allowsCustomPrice ? String(selectedPlanForCheckout.priceCents) : "Plano não permite"}
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Limite customizado de veículos</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={planSelectionConfig.customVehicleLimit}
+                        onChange={(event) =>
+                          setPlanSelectionConfig((current) => ({ ...current, customVehicleLimit: event.target.value }))
+                        }
+                        disabled={!selectedPlanForCheckout.allowsCustomVehicleLimit}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-orange-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        placeholder={selectedPlanForCheckout.allowsCustomVehicleLimit ? String(selectedPlanForCheckout.vehicleLimit || "") : "Plano não permite"}
+                      />
+                    </label>
+                  </div>
+
+                  <label className="mt-4 flex items-center gap-3 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={planSelectionConfig.useSnapshot}
+                      onChange={(event) =>
+                        setPlanSelectionConfig((current) => ({ ...current, useSnapshot: event.target.checked }))
+                      }
+                      className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-400"
+                    />
+                    Salvar snapshot comercial da configuração aplicada nesta assinatura.
+                  </label>
+                </div>
+              ) : null}
+
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-sm font-semibold text-slate-800">O que este plano oferece</p>
                 <ul className="mt-3 space-y-2">
@@ -830,9 +1290,11 @@ export function SubscriptionPage() {
                     await handleSelectPlan(
                       selectedPlanForCheckout.id,
                       selectedPlanActivationStatus,
+                      buildSelectedPlanOverrides(selectedPlanForCheckout),
                     );
                     setSelectedPlanForCheckout(null);
                     setSelectedPlanActivationStatus("ACTIVE");
+                    setPlanSelectionConfig(buildPlanSelectionDefaults());
                   }}
                   disabled={redirectingToCheckout}
                   className="cursor-pointer rounded-xl border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -845,6 +1307,7 @@ export function SubscriptionPage() {
                   onClick={() => {
                     setSelectedPlanForCheckout(null);
                     setSelectedPlanActivationStatus("ACTIVE");
+                    setPlanSelectionConfig(buildPlanSelectionDefaults());
                   }}
                 disabled={redirectingToCheckout}
                 className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -875,8 +1338,8 @@ export function SubscriptionPage() {
                     ? "Redirecionando..."
                     : paymentWindowBlocked
                       ? "Pago no ciclo atual"
-                      : overview?.status === "CANCELED"
-                        ? "Reativar e pagar"
+                      : access?.accessStatus === "BLOCKED" || overview?.status === "CANCELED"
+                        ? "Regularizar e pagar"
                         : "Pagar agora"}
                 </button>
               ) : (
@@ -890,9 +1353,11 @@ export function SubscriptionPage() {
                           await handleSelectPlan(
                             selectedPlanForCheckout.id,
                             getSelfServicePlanStatus(),
+                            buildSelectedPlanOverrides(selectedPlanForCheckout),
                           );
                           setSelectedPlanForCheckout(null);
                           setSelectedPlanActivationStatus("ACTIVE");
+                          setPlanSelectionConfig(buildPlanSelectionDefaults());
                         }
                   }
                   className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
@@ -910,7 +1375,15 @@ export function SubscriptionPage() {
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-bold text-slate-900">Histórico de pagamentos</h2>
         {canManagePlans ? (
-          <div className="mt-3 flex justify-end">
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsResetOperationalStateOpen(true)}
+              className="inline-flex items-center rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+              title="Resetar state operacional da assinatura"
+            >
+              Reset operacional
+            </button>
             <button
               type="button"
               onClick={() => setIsClearPaymentsOpen(true)}
@@ -1023,7 +1496,8 @@ export function SubscriptionPage() {
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">Descrição</label>
-                  <input
+                  <textarea
+                    rows={3}
                     value={newPlan.description}
                     onChange={(event) =>
                       setNewPlan((prev) => ({ ...prev, description: event.target.value }))
@@ -1037,7 +1511,7 @@ export function SubscriptionPage() {
                   <input
                     required
                     type="number"
-                    min={100}
+                    min={1}
                     value={newPlan.priceCents}
                     onChange={(event) =>
                       setNewPlan((prev) => ({ ...prev, priceCents: event.target.value }))
@@ -1047,7 +1521,7 @@ export function SubscriptionPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">Limite de veículos permitidos</label>
+                  <label className="block text-sm font-medium text-slate-700">Limite de veículos</label>
                   <input
                     type="number"
                     min={1}
@@ -1055,7 +1529,7 @@ export function SubscriptionPage() {
                     onChange={(event) =>
                       setNewPlan((prev) => ({ ...prev, vehicleLimit: event.target.value }))
                     }
-                    placeholder="Ex: 20 (deixe vazio para ilimitado)"
+                    placeholder="Ex: 20 (vazio = ilimitado)"
                     className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                   />
                 </div>
@@ -1075,8 +1549,120 @@ export function SubscriptionPage() {
                     <option value="YEARLY">Anual</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Ordem</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={newPlan.sortOrder}
+                    onChange={(event) =>
+                      setNewPlan((prev) => ({ ...prev, sortOrder: event.target.value }))
+                    }
+                    placeholder="0"
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Trial padrão (dias)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={newPlan.defaultTrialDays}
+                    onChange={(event) =>
+                      setNewPlan((prev) => ({ ...prev, defaultTrialDays: event.target.value }))
+                    }
+                    placeholder="Ex: 7"
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Grace padrão (dias)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={newPlan.defaultGraceDays}
+                    onChange={(event) =>
+                      setNewPlan((prev) => ({ ...prev, defaultGraceDays: event.target.value }))
+                    }
+                    placeholder="Ex: 5"
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2">
+                  <p className="text-sm font-semibold text-slate-800">Classificação do plano</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={newPlan.isPublic}
+                        onChange={(event) =>
+                          setNewPlan((prev) => ({ ...prev, isPublic: event.target.checked }))
+                        }
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                      />
+                      <span>
+                        <span className="block font-medium text-slate-800">Plano público</span>
+                        <span className="block text-xs text-slate-500">
+                          Aparece como opção padrão para seleção comum.
+                        </span>
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={newPlan.isEnterprise}
+                        onChange={(event) =>
+                          setNewPlan((prev) => ({ ...prev, isEnterprise: event.target.checked }))
+                        }
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                      />
+                      <span>
+                        <span className="block font-medium text-slate-800">Plano enterprise</span>
+                        <span className="block text-xs text-slate-500">
+                          Pode servir como base para contratos customizados.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2">
+                  <p className="text-sm font-semibold text-slate-800">Capacidade de customização</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={newPlan.allowsCustomPrice}
+                        onChange={(event) =>
+                          setNewPlan((prev) => ({ ...prev, allowsCustomPrice: event.target.checked }))
+                        }
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                      />
+                      <span>
+                        <span className="block font-medium text-slate-800">Permite preço customizado</span>
+                        <span className="block text-xs text-slate-500">
+                          Autoriza sobrescrever o valor na assinatura.
+                        </span>
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={newPlan.allowsCustomVehicleLimit}
+                        onChange={(event) =>
+                          setNewPlan((prev) => ({ ...prev, allowsCustomVehicleLimit: event.target.checked }))
+                        }
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                      />
+                      <span>
+                        <span className="block font-medium text-slate-800">Permite limite customizado</span>
+                        <span className="block text-xs text-slate-500">
+                          Autoriza sobrescrever o limite de veículos na assinatura.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
               </div>
-
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
                 <button
                   type="button"
@@ -1126,6 +1712,15 @@ export function SubscriptionPage() {
         loading={clearingPayments}
         onCancel={() => setIsClearPaymentsOpen(false)}
         onConfirm={handleClearPayments}
+      />
+      <ConfirmDeleteModal
+        isOpen={isResetOperationalStateOpen}
+        title="Resetar estado operacional"
+        description="Deseja limpar bloqueios e datas operacionais da assinatura atual? Isso não apaga pagamentos nem remove o histórico comercial."
+        confirmText="Resetar"
+        loading={resettingOperationalState}
+        onCancel={() => setIsResetOperationalStateOpen(false)}
+        onConfirm={handleResetOperationalState}
       />
     </div>
   );

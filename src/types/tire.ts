@@ -11,21 +11,44 @@ export type Tire = {
   brand: string;
   model: string;
   size: string;
+  rim?: number | null;
+
   purchaseDate?: string | null;
   purchaseCost?: number | null;
+
   status: TireStatus;
   axlePosition?: string | null;
   wheelPosition?: string | null;
+
   currentKm: number;
+
   currentTreadDepthMm?: number | null;
   currentPressurePsi?: number | null;
   targetPressurePsi?: number | null;
   minTreadDepthMm: number;
+  originalTreadDepthMm?: number | null;
+
   installedAt?: string | null;
+  lastInspectionDate?: string | null;
+
+  loadIndex?: string | null;
+  speedIndex?: string | null;
+
+  numberOfLives?: number | null;
+  currentLifeKm?: number | null;
+  totalCasingKm?: number | null;
+
+  reformCost?: number | null;
+
+  warrantyStatus?: string | null;
+  warrantyUntil?: string | null;
+
   notes?: string | null;
+
   vehicleId?: string | null;
   createdAt: string;
   updatedAt: string;
+
   vehicle?: {
     id: string;
     plate: string;
@@ -37,6 +60,7 @@ export type Tire = {
       name: string;
     };
   };
+
   readings?: TireReading[];
 };
 

@@ -1,4 +1,4 @@
-import { api } from "./api";
+﻿import { api } from "./api";
 
 export type MenuVisibilityMap = Record<string, boolean>;
 
@@ -17,9 +17,9 @@ export const MENU_VISIBILITY_ITEMS: MenuVisibilityItem[] = [
   { label: "Manutenções", path: "/maintenance-records" },
   { label: "Manutenções - Registros", path: "/maintenance-records::records" },
   { label: "Manutenções - Planos", path: "/maintenance-records::plans" },
-  { label: "Manutenções - Pneus", path: "/maintenance-records::tires" },
-  { label: "Débitos e Multas", path: "/debts" },
+  { label: "Gestão de Pneus", path: "/tire-management" },
   { label: "Gestão de Viagens", path: "/trips" },
+  { label: "Gestão de Finanças", path: "/debts" },
   { label: "Gestão de Documentos", path: "/vehicle-documents" },
   { label: "Filiais", path: "/branches" },
   { label: "Como usar", path: "/how-to-use" },

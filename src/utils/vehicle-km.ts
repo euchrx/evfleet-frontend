@@ -1,6 +1,6 @@
 type VehicleLike = {
   id: string;
-  currentKm?: number;
+  currentKm?: number | null;
   createdAt?: string;
   updatedAt?: string;
 };

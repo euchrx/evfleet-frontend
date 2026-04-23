@@ -455,10 +455,10 @@ export function ReportsPage() {
     { id: "FUEL", label: "Abastecimentos" },
     { id: "PRODUCTS", label: "Produtos" },
     { id: "MAINTENANCE", label: "Manutenções" },
-    { id: "TIRES", label: "Gestão de pneus" },
+    { id: "TIRES", label: "Gestão de Pneus" },
     { id: "TRIPS", label: "Gestão de viagens" },
     { id: "DOCUMENTS", label: "Gestão de documentos" },
-    { id: "DEBTS", label: "Débitos e multas" },
+    { id: "DEBTS", label: "Gestão de Finanças" },
   ];
 
   const vehicleStatusOptions: SelectOption[] = [
@@ -534,7 +534,7 @@ export function ReportsPage() {
     });
 
     const documentsFiltered = documents.filter((item) => {
-      if (!vehicleSet.has(item.vehicleId)) return false;
+      if (!item.vehicleId || !vehicleSet.has(item.vehicleId)) return false;
       return inRange(item.expiryDate || item.issueDate || item.createdAt);
     });
 
@@ -672,7 +672,7 @@ export function ReportsPage() {
       {
         enabled: showTires,
         count: filteredData.tires.length,
-        html: `<h2>Gestão de pneus (${filteredData.tires.length})</h2>
+        html: `<h2>Gestão de Pneus (${filteredData.tires.length})</h2>
           <table><thead><tr><th>Data</th><th>Veículo</th><th>Pneu</th><th>Posição</th><th>Status</th><th>Custo</th></tr></thead>
           <tbody>${filteredData.tires
             .map(
@@ -680,7 +680,7 @@ export function ReportsPage() {
                 `<tr><td>${escapeHtml(formatDate(item.purchaseDate || item.installedAt || item.createdAt))}</td><td>${escapeHtml(formatVehicleDisplay(item.vehicle, item.vehicleId || "-"))}</td><td>${escapeHtml(`${item.brand} ${item.model}`)}</td><td>${escapeHtml(`${item.axlePosition || "-"}${item.wheelPosition ? ` | ${item.wheelPosition}` : ""}`)}</td><td>${escapeHtml(labelTireStatus(item.status))}</td><td>${toCurrency(item.purchaseCost || 0)}</td></tr>`,
             )
             .join("")}</tbody></table>
-          <div class="module-total">Total do módulo Gestão de pneus: ${toCurrency(tiresModuleTotal)}</div>`,
+          <div class="module-total">Total do módulo Gestão de Pneus: ${toCurrency(tiresModuleTotal)}</div>`,
       },
       {
         enabled: showTrips,
@@ -703,7 +703,7 @@ export function ReportsPage() {
           <tbody>${filteredData.documents
             .map(
               (item) =>
-                `<tr><td>${escapeHtml(formatDate(item.expiryDate || item.issueDate || item.createdAt))}</td><td>${escapeHtml(formatVehicleDisplay(item.vehicle, item.vehicleId))}</td><td>${escapeHtml(item.name || "-")}</td><td>${escapeHtml(labelDocumentType(item.type))}</td><td>${escapeHtml(labelDocumentStatus(item.status))}</td><td>${escapeHtml(item.issuer || "-")}</td></tr>`,
+                `<tr><td>${escapeHtml(formatDate(item.expiryDate || item.issueDate || item.createdAt))}</td><td>${escapeHtml(formatVehicleDisplay(item.vehicle, item.vehicleId || undefined))}</td><td>${escapeHtml(item.name || "-")}</td><td>${escapeHtml(labelDocumentType(item.type))}</td><td>${escapeHtml(labelDocumentStatus(item.status))}</td><td>${escapeHtml(item.issuer || "-")}</td></tr>`,
             )
             .join("")}</tbody></table>
           <div class="module-total">Total do módulo Gestão de documentos: ${filteredData.documents.length} documento(s)</div>`,
@@ -711,7 +711,7 @@ export function ReportsPage() {
       {
         enabled: showDebts,
         count: filteredData.debts.length,
-        html: `<h2>Débitos e multas (${filteredData.debts.length})</h2>
+        html: `<h2>Gestão de Finanças (${filteredData.debts.length})</h2>
           <table><thead><tr><th>Data</th><th>Veículo</th><th>Categoria</th><th>Descrição</th><th>Status</th><th>Valor</th></tr></thead>
           <tbody>${filteredData.debts
             .map(
@@ -719,7 +719,7 @@ export function ReportsPage() {
                 `<tr><td>${escapeHtml(formatDate(item.dueDate || item.debtDate))}</td><td>${escapeHtml(`${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`.trim())}</td><td>${escapeHtml(labelDebtCategory(item.category))}</td><td>${escapeHtml(item.description || "-")}</td><td>${escapeHtml(labelDebtStatus(item.status))}</td><td>${toCurrency(item.amount || 0)}</td></tr>`,
             )
             .join("")}</tbody></table>
-          <div class="module-total">Total do módulo Débitos e multas: ${toCurrency(debtsModuleTotal)}</div>`,
+          <div class="module-total">Total do módulo Gestão de Finanças: ${toCurrency(debtsModuleTotal)}</div>`,
       },
     ];
 

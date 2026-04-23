@@ -73,15 +73,20 @@ export function UsersPage() {
   }, [selectedCompanyId]);
 
   function openCreateModal() {
+    if (!canSelectCompanyScope && !selectedCompanyId) {
+      setPageErrorMessage("Nenhuma empresa vinculada foi encontrada para cadastrar usuário.");
+      return;
+    }
+
     if (canSelectCompanyScope && !selectedCompanyId && options.length === 0) {
-      setPageErrorMessage("Selecione uma empresa no escopo para cadastrar usuário.");
+      setPageErrorMessage("Cadastre ou selecione uma empresa no escopo para cadastrar usuário.");
       return;
     }
 
     setEditingUser(null);
     setForm({
       ...initialForm,
-      companyId: "",
+      companyId: selectedCompanyId || "",
     });
     setFieldErrors({});
     setIsModalOpen(true);
@@ -183,7 +188,9 @@ export function UsersPage() {
           : typeof apiMessage === "string" && apiMessage.trim()
             ? apiMessage
             : "Não foi possível salvar. Revise os campos.";
-      if (/email/i.test(apiText)) {
+      if (/empresa|company/i.test(apiText)) {
+        setFieldErrors((prev) => ({ ...prev, companyId: apiText }));
+      } else if (/email/i.test(apiText)) {
         setFieldErrors((prev) => ({ ...prev, email: apiText }));
       } else if (/senha|password/i.test(apiText)) {
         setFieldErrors((prev) => ({ ...prev, password: apiText }));
@@ -640,8 +647,8 @@ export function UsersPage() {
                   {saving
                     ? "Salvando..."
                     : editingUser
-                    ? "Salvar alterações"
-                    : "Cadastrar usuário"}
+                      ? "Salvar alterações"
+                      : "Cadastrar usuário"}
                 </button>
               </div>
             </form>

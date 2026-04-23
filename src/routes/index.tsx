@@ -12,6 +12,8 @@ import { VehiclesPage } from "../pages/Vehicles";
 import { DriversPage } from "../pages/Drivers";
 import { MaintenanceRecordsPage } from "../pages/MaintenanceRecords";
 import { MaintenanceRegisterPage } from "../pages/MaintenanceRegister";
+import { TireManagementPage } from "../pages/TireManagement";
+import { TireLinkPage } from "../pages/TireManagement/TireLinkPage";
 import { DebtsPage } from "../pages/Debts";
 import { ReportsPage } from "../pages/Reports";
 import { FuelRecordsPage } from "../pages/FuelRecords";
@@ -43,6 +45,8 @@ export function AppRoutes() {
             <Route path="/drivers" element={<DriversPage />} />
             <Route path="/maintenance-records" element={<MaintenanceRecordsPage />} />
             <Route path="/maintenance-records/register" element={<MaintenanceRegisterPage />} />
+            <Route path="/tire-management" element={<TireManagementPage />} />
+            <Route path="/tire-management/link" element={<TireLinkPage />} />
             <Route path="/fuel-records" element={<FuelRecordsPage />} />
             <Route path="/products" element={<RetailProductsPage />} />
             <Route path="/support" element={<SupportPage />} />
@@ -54,6 +58,7 @@ export function AppRoutes() {
             <Route path="/subscription" element={<SubscriptionPage />} />
             <Route path="/billing/success" element={<BillingSuccessPage />} />
             <Route path="/how-to-use" element={<HowToPage />} />
+
             <Route element={<RoleRoute allowedRoles={["ADMIN", "FLEET_MANAGER"]} />}>
               <Route path="/branches" element={<BranchesPage />} />
             </Route>
