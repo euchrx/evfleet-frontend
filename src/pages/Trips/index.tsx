@@ -560,13 +560,6 @@ export function TripsPage() {
   const allTripsOnPageSelected =
     paginatedTrips.length > 0 && paginatedTrips.every((item) => selectedTripIds.includes(item.id));
 
-  const selectedVehicleIds = useMemo(() => splitCsv(draftFilters.vehicleId), [draftFilters.vehicleId]);
-  const selectedDriverIds = useMemo(() => splitCsv(draftFilters.driverId), [draftFilters.driverId]);
-  const selectedStatusIds = useMemo(
-    () => (draftFilters.status === "ALL" ? [] : splitCsv(draftFilters.status)),
-    [draftFilters.status],
-  );
-
   useEffect(() => {
     if (!pageErrorMessage) return;
 

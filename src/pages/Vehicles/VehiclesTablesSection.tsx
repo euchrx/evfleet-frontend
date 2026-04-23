@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Link2, Pencil, Trash2 } from "lucide-react";
+import { Clock3, Link2 } from "lucide-react";
 import { TablePagination } from "../../components/TablePagination";
 import type { Branch } from "../../types/branch";
 import type { Vehicle } from "../../types/vehicle";

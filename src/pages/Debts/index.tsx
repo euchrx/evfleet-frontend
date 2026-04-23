@@ -688,16 +688,6 @@ export function DebtsPage() {
   const allDebtsOnPageSelected =
     paginatedDebts.length > 0 && paginatedDebts.every((item) => selectedDebtIds.includes(item.id));
 
-  const selectedVehicleIds = useMemo(() => splitCsv(draftFilters.vehicleId), [draftFilters.vehicleId]);
-  const selectedCategoryIds = useMemo(
-    () => (draftFilters.category === "ALL" ? [] : splitCsv(draftFilters.category)),
-    [draftFilters.category],
-  );
-  const selectedStatusIds = useMemo(
-    () => (draftFilters.status === "ALL" ? [] : splitCsv(draftFilters.status)),
-    [draftFilters.status],
-  );
-
   return (
     <div className="min-w-0 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

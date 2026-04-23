@@ -226,7 +226,7 @@ export function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [documents, setDocuments] = useState<VehicleDocument[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const [, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [consulting, setConsulting] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -547,15 +547,6 @@ export function DriversPage() {
       setDeletingSelectedDrivers(false);
     }
   }
-
-  const branchOptions = useMemo<SelectOption[]>(
-    () =>
-      branches.map((branch) => ({
-        id: branch.id,
-        label: branch.name,
-      })),
-    [branches],
-  );
 
   const statusOptions: SelectOption[] = [
     { id: "ACTIVE", label: "Ativo" },
