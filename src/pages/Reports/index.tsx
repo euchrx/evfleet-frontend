@@ -22,10 +22,10 @@ import type { Tire } from "../../types/tire";
 import type { Trip } from "../../types/trip";
 import type { VehicleDocument } from "../../types/vehicle-document";
 import type { Vehicle } from "../../types/vehicle";
-import { formatVehicleLabel } from "../../utils/vehicleLabel";
 
 type ReportModule =
   | "VEHICLES"
+  | "DRIVERS"
   | "FUEL"
   | "PRODUCTS"
   | "MAINTENANCE"
@@ -34,6 +34,7 @@ type ReportModule =
   | "DOCUMENTS"
   | "DEBTS";
 
+type VehicleCategoryFilter = "VEHICLES" | "IMPLEMENTS";
 type VehicleTypeFilter = "LIGHT" | "HEAVY";
 type VehicleStatusFilter = "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "SOLD";
 type SelectOption = { id: string; label: string };
@@ -44,25 +45,31 @@ function toCurrency(value: number) {
 
 function parseDateSafe(dateValue?: string | null) {
   if (!dateValue) return new Date("");
+
   const normalized = String(dateValue).trim();
   const calendarDate = normalized.slice(0, 10);
+
   if (/^\d{4}-\d{2}-\d{2}$/.test(calendarDate)) {
     const [year, month, day] = calendarDate.split("-").map(Number);
     return new Date(year, month - 1, day);
   }
+
   return new Date(normalized);
 }
 
 function toInputDate(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-    date.getDate(),
-  ).padStart(2, "0")}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    "0",
+  )}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function formatDate(dateValue?: string | null) {
   if (!dateValue) return "-";
+
   const date = parseDateSafe(dateValue);
   if (Number.isNaN(date.getTime())) return "-";
+
   return date.toLocaleDateString("pt-BR");
 }
 
@@ -123,28 +130,10 @@ function labelVehicleCategory(value?: string) {
   return value || "-";
 }
 
-function labelVehicleStatus(value?: string) {
-  if (value === "ACTIVE") return "Ativo";
-  if (value === "INACTIVE") return "Inativo";
-  if (value === "MAINTENANCE") return "Em manutenção";
-  if (value === "SOLD") return "Vendido";
-  return value || "-";
-}
-
 function labelTripStatus(value?: string) {
   if (value === "OPEN") return "Aberta";
   if (value === "COMPLETED") return "Concluída";
   if (value === "CANCELLED") return "Cancelada";
-  return value || "-";
-}
-
-function labelDocumentType(value?: string) {
-  if (value === "LICENSING") return "Licenciamento";
-  if (value === "INSURANCE") return "Seguro";
-  if (value === "IPVA") return "IPVA";
-  if (value === "LEASING_CONTRACT") return "Contrato";
-  if (value === "INSPECTION") return "Inspeção";
-  if (value === "OTHER") return "Outro";
   return value || "-";
 }
 
@@ -184,10 +173,208 @@ function formatVehicleDisplay(
   fallback?: string,
 ) {
   if (!vehicle) return fallback || "-";
-  const parts = [vehicle.plate, vehicle.brand, vehicle.model]
+
+  const plate = String(vehicle.plate || "").trim();
+  const name = [vehicle.brand, vehicle.model]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return [plate, name].filter(Boolean).join(" - ") || fallback || "-";
+}
+
+function formatDateTime(dateValue?: string | null) {
+  if (!dateValue) return "-";
+
+  const date = parseDateSafe(dateValue);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatYear(value?: string | number | null) {
+  if (!value) return "-";
+  return String(value);
+}
+
+function formatTankCapacity(value?: string | number | null) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return "-";
+
+  return `${number.toLocaleString("pt-BR", {
+    maximumFractionDigits: 2,
+  })} L`;
+}
+
+function formatFuelType(value?: string | null) {
+  if (value === "GASOLINE") return "Gasolina";
+  if (value === "ETHANOL") return "Etanol";
+  if (value === "DIESEL") return "Diesel";
+  if (value === "ARLA32") return "ARLA 32";
+  if (value === "FLEX") return "Flex";
+  if (value === "ELECTRIC") return "Elétrico";
+  if (value === "HYBRID") return "Híbrido";
+  if (value === "CNG") return "GNV";
+  return value || "-";
+}
+
+function formatLinkedImplements(vehicle: Vehicle) {
+  const implementsList = vehicle.implements || [];
+
+  if (!Array.isArray(implementsList) || implementsList.length === 0) {
+    return "-";
+  }
+
+  return implementsList
+    .slice()
+    .sort((a, b) => Number(a.position || 0) - Number(b.position || 0))
+    .map((item) => formatVehicleDisplay(item.implement))
+    .filter((item) => item && item !== "-")
+    .join(", ") || "-";
+}
+
+function formatLinkedVehicle(vehicle: Vehicle) {
+  const source = vehicle as Vehicle & Record<string, any>;
+
+  const linkedVehicle =
+    source.linkedVehicle ||
+    source.vehicle ||
+    source.parentVehicle ||
+    source.compositionVehicle ||
+    null;
+
+  return formatVehicleDisplay(linkedVehicle, "-");
+}
+
+function formatBranchName(item: Record<string, any>) {
+  return item.branch?.name || item.branchName || "-";
+}
+
+function formatAverageConsumption(item: FuelRecord) {
+  const source = item as FuelRecord & Record<string, any>;
+
+  const consumption =
+    Number(source.averageConsumption || 0) ||
+    Number(source.consumptionAverage || 0) ||
+    Number(source.kmPerLiter || 0);
+
+  if (!Number.isFinite(consumption) || consumption <= 0) return "-";
+
+  return `${consumption.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} km/L`;
+}
+
+function formatTireMeasure(item: Tire) {
+  const source = item as Tire & Record<string, any>;
+  return source.measure || source.size || source.tireSize || "-";
+}
+
+function formatTireRim(item: Tire) {
+  const source = item as Tire & Record<string, any>;
+  return source.rim || source.rimSize || source.wheelRim || "-";
+}
+
+function formatTireCondition(item: Tire) {
+  const source = item as Tire & Record<string, any>;
+  const condition = source.condition || source.state;
+
+  if (condition === "NEW") return "Novo";
+  if (condition === "USED") return "Usado";
+  if (condition === "RETREADED") return "Recapado";
+  if (condition === "SCRAP") return "Sucata";
+  if (condition === "GOOD") return "Bom";
+  if (condition === "WARNING") return "Atenção";
+  if (condition === "CRITICAL") return "Crítico";
+
+  return condition || "-";
+}
+
+function formatTireAlerts(item: Tire) {
+  const source = item as Tire & Record<string, any>;
+
+  const alerts = [
+    source.alert,
+    source.alerts,
+    source.warning,
+    source.warnings,
+    source.observation,
+  ]
+    .flat()
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  return alerts.length > 0 ? alerts.join(", ") : "-";
+}
+
+function formatTripRoute(item: Trip) {
+  const origin = String(item.origin || "").trim();
+  const destination = String(item.destination || "").trim();
+
+  if (!origin && !destination) return "-";
+  if (!origin) return destination;
+  if (!destination) return origin;
+
+  return `${origin} → ${destination}`;
+}
+
+function formatTripDistance(item: Trip) {
+  const source = item as Trip & Record<string, any>;
+
+  if (
+    typeof source.returnKm === "number" &&
+    typeof source.departureKm === "number" &&
+    source.returnKm >= source.departureKm
+  ) {
+    return (source.returnKm - source.departureKm).toLocaleString("pt-BR");
+  }
+
+  const distance = Number(source.distanceKm || source.km || 0);
+  if (!Number.isFinite(distance) || distance <= 0) return "-";
+
+  return distance.toLocaleString("pt-BR");
+}
+
+function formatDriverDocuments(driver: Driver) {
+  const source = driver as Driver & Record<string, any>;
+
+  const documents = [
+    source.document,
+    source.licenseNumber || source.cnh,
+  ]
     .map((item) => String(item || "").trim())
     .filter(Boolean);
-  return parts.join(" • ") || fallback || "-";
+
+  return documents.length > 0 ? documents.join(" / ") : "-";
+}
+
+function formatDriverVehicles(driver: Driver, vehicles: Vehicle[]) {
+  const source = driver as Driver & Record<string, any>;
+
+  if (Array.isArray(source.vehicles) && source.vehicles.length > 0) {
+    return source.vehicles
+      .map((vehicle: Vehicle) => formatVehicleDisplay(vehicle))
+      .join(", ");
+  }
+
+  if (Array.isArray(source.vehicleIds) && source.vehicleIds.length > 0) {
+    const vehicleMap = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+
+    return source.vehicleIds
+      .map((vehicleId: string) =>
+        formatVehicleDisplay(vehicleMap.get(vehicleId), vehicleId),
+      )
+      .join(", ");
+  }
+
+  return "-";
 }
 
 function MultiSelectField({
@@ -198,6 +385,8 @@ function MultiSelectField({
   placeholder,
   error,
   disabled = false,
+  openOnClick = false,
+  keepOpenOnSelect = false,
 }: {
   label: string;
   options: SelectOption[];
@@ -206,10 +395,13 @@ function MultiSelectField({
   placeholder: string;
   error?: string;
   disabled?: boolean;
+  openOnClick?: boolean;
+  keepOpenOnSelect?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedOptions = useMemo(
     () => options.filter((item) => selectedIds.includes(item.id)),
@@ -218,23 +410,36 @@ function MultiSelectField({
 
   const filteredOptions = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return options.filter((item) => {
-      if (selectedIds.includes(item.id)) return false;
-      if (!normalized) return true;
-      return item.label.toLowerCase().includes(normalized);
-    });
-  }, [options, selectedIds, query]);
+
+    return options
+      .filter((item) => {
+        if (selectedIds.includes(item.id)) return false;
+        if (!normalized && !openOnClick) return false;
+        if (!normalized) return true;
+        return item.label.toLowerCase().includes(normalized);
+      })
+      .slice(0, 10);
+  }, [options, selectedIds, query, openOnClick]);
 
   function addItem(id: string) {
     if (disabled || selectedIds.includes(id)) return;
+
     onChange([...selectedIds, id]);
     setQuery("");
+
+    if (keepOpenOnSelect) {
+      setOpen(true);
+      requestAnimationFrame(() => inputRef.current?.focus());
+      return;
+    }
+
     setOpen(false);
   }
 
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
       if (!containerRef.current) return;
+
       const target = event.target as Node;
       if (!containerRef.current.contains(target)) setOpen(false);
     }
@@ -245,6 +450,7 @@ function MultiSelectField({
 
     window.addEventListener("mousedown", handleOutsideClick);
     window.addEventListener("keydown", handleEscape);
+
     return () => {
       window.removeEventListener("mousedown", handleOutsideClick);
       window.removeEventListener("keydown", handleEscape);
@@ -254,48 +460,64 @@ function MultiSelectField({
   return (
     <div className="space-y-1">
       <label className="block text-sm font-semibold text-slate-700">{label}</label>
+
       <div ref={containerRef} className="relative">
         <div
-          className={`min-h-[44px] w-full rounded-xl border bg-white px-2.5 py-2 text-sm focus-within:ring-2 ${
-            error
+          className={`min-h-[44px] w-full rounded-xl border bg-white px-2.5 py-2 text-sm focus-within:ring-2 ${error
               ? "border-red-300 focus-within:border-red-500 focus-within:ring-red-200"
               : "border-slate-300 focus-within:border-orange-500 focus-within:ring-orange-200"
-          }`}
-          onClick={() => setOpen(true)}
+            }`}
+          onClick={() => {
+            if (disabled) return;
+            inputRef.current?.focus();
+            if (openOnClick) setOpen(true);
+          }}
         >
           <div className="flex flex-wrap items-center gap-2">
             {selectedOptions.map((item) => (
               <span
                 key={item.id}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700"
+                className="inline-flex cursor-default items-center gap-1 rounded-md border border-slate-300 bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700"
+                onClick={(event) => event.stopPropagation()}
               >
                 {item.label}
+
                 <button
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    if (!disabled) onChange(selectedIds.filter((id) => id !== item.id));
+                    if (!disabled) {
+                      onChange(selectedIds.filter((id) => id !== item.id));
+                      requestAnimationFrame(() => inputRef.current?.focus());
+                    }
                   }}
-                  className={`text-slate-500 ${
-                    disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:text-red-600"
-                  }`}
+                  className={`text-slate-500 ${disabled
+                      ? "cursor-not-allowed opacity-50"
+                      : "cursor-pointer hover:text-red-600"
+                    }`}
                 >
                   ×
                 </button>
               </span>
             ))}
+
             <input
+              ref={inputRef}
               value={query}
               onChange={(event) => {
                 if (disabled) return;
-                setQuery(event.target.value);
-                setOpen(true);
+
+                const nextQuery = event.target.value;
+                setQuery(nextQuery);
+                setOpen(Boolean(nextQuery.trim()) || openOnClick);
               }}
               onFocus={() => {
-                if (!disabled) setOpen(true);
+                if (disabled) return;
+                if (openOnClick || query.trim()) setOpen(true);
               }}
-              onBlur={() => setTimeout(() => setOpen(false), 120)}
-              placeholder={selectedOptions.length === 0 ? placeholder : "Digite para buscar..."}
+              placeholder={
+                selectedOptions.length === 0 ? placeholder : "Digite para buscar..."
+              }
               disabled={disabled}
               className="min-w-[180px] flex-1 bg-transparent px-1 py-1 text-sm outline-none disabled:cursor-not-allowed"
             />
@@ -320,6 +542,7 @@ function MultiSelectField({
           </div>
         ) : null}
       </div>
+
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </div>
   );
@@ -342,26 +565,19 @@ export function ReportsPage() {
 
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
+  const [selectedImplementIds, setSelectedImplementIds] = useState<string[]>([]);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
-  const [selectedVehicleTypes, setSelectedVehicleTypes] = useState<VehicleTypeFilter[]>([]);
-  const [selectedVehicleStatuses, setSelectedVehicleStatuses] = useState<VehicleStatusFilter[]>([
-    "ACTIVE",
-    "INACTIVE",
-    "MAINTENANCE",
-    "SOLD",
-  ]);
-  const [selectedModules, setSelectedModules] = useState<ReportModule[]>([
-    "VEHICLES",
-    "FUEL",
-    "PRODUCTS",
-    "MAINTENANCE",
-    "TIRES",
-    "TRIPS",
-    "DOCUMENTS",
-    "DEBTS",
-  ]);
+  const [selectedVehicleCategories, setSelectedVehicleCategories] = useState<
+    VehicleCategoryFilter[]
+  >(["VEHICLES"]);
+  const [selectedVehicleTypes, setSelectedVehicleTypes] = useState<VehicleTypeFilter[]>(
+    [],
+  );
+  const [selectedVehicleStatuses, setSelectedVehicleStatuses] = useState<
+    VehicleStatusFilter[]
+  >([]);
+  const [selectedModules, setSelectedModules] = useState<ReportModule[]>([]);
   const [fieldErrors, setFieldErrors] = useState<{
-    modules?: string;
     vehicleTypes?: string;
   }>({});
   const [format, setFormat] = useState("PDF");
@@ -374,6 +590,7 @@ export function ReportsPage() {
   async function loadData() {
     try {
       setErrorMessage("");
+
       const [
         vehiclesData,
         driversData,
@@ -412,11 +629,12 @@ export function ReportsPage() {
   }
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   useEffect(() => {
     if (!selectedBranchId) return;
+
     setSelectedBranchIds((current) =>
       current.includes(selectedBranchId) ? current : [...current, selectedBranchId],
     );
@@ -426,24 +644,58 @@ export function ReportsPage() {
     const scoped = selectedBranchId
       ? vehicles.filter((item) => !item.branchId || item.branchId === selectedBranchId)
       : vehicles;
+
     return [...scoped].sort((a, b) =>
-      `${a.brand} ${a.model}`.localeCompare(`${b.brand} ${b.model}`, "pt-BR"),
+      formatVehicleDisplay(a).localeCompare(formatVehicleDisplay(b), "pt-BR"),
     );
   }, [vehicles, selectedBranchId]);
 
-  const vehicleOptions = useMemo<SelectOption[]>(
-    () =>
-      availableVehicles.map((item) => ({
-        id: item.id,
-        label: formatVehicleLabel(item),
-      })),
+  const availableMainVehicles = useMemo(
+    () => availableVehicles.filter((item) => item.category !== "IMPLEMENT"),
     [availableVehicles],
   );
 
+  const availableImplements = useMemo(
+    () => availableVehicles.filter((item) => item.category === "IMPLEMENT"),
+    [availableVehicles],
+  );
+
+  const vehicleOptions = useMemo<SelectOption[]>(
+    () =>
+      availableMainVehicles
+        .filter((item) =>
+          selectedVehicleTypes.length > 0
+            ? selectedVehicleTypes.includes(item.vehicleType as VehicleTypeFilter)
+            : true,
+        )
+        .map((item) => ({
+          id: item.id,
+          label: formatVehicleDisplay(item),
+        })),
+    [availableMainVehicles, selectedVehicleTypes],
+  );
+
+  const implementOptions = useMemo<SelectOption[]>(
+    () =>
+      availableImplements.map((item) => ({
+        id: item.id,
+        label: formatVehicleDisplay(item),
+      })),
+    [availableImplements],
+  );
+
   const driverOptions = useMemo<SelectOption[]>(
-    () => drivers.map((item) => ({ id: item.id, label: item.name })),
+    () =>
+      drivers
+        .map((item) => ({ id: item.id, label: item.name }))
+        .sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
     [drivers],
   );
+
+  const vehicleCategoryOptions: SelectOption[] = [
+    { id: "VEHICLES", label: "Veículos" },
+    { id: "IMPLEMENTS", label: "Implementos" },
+  ];
 
   const vehicleTypeOptions: SelectOption[] = [
     { id: "LIGHT", label: "Leve" },
@@ -452,6 +704,7 @@ export function ReportsPage() {
 
   const moduleOptions: SelectOption[] = [
     { id: "VEHICLES", label: "Veículos" },
+    { id: "DRIVERS", label: "Motoristas" },
     { id: "FUEL", label: "Abastecimentos" },
     { id: "PRODUCTS", label: "Produtos" },
     { id: "MAINTENANCE", label: "Manutenções" },
@@ -468,9 +721,20 @@ export function ReportsPage() {
     { id: "SOLD", label: "Vendidos" },
   ];
 
+  useEffect(() => {
+    if (!selectedVehicleCategories.includes("VEHICLES")) {
+      setSelectedVehicleIds([]);
+    }
+
+    if (!selectedVehicleCategories.includes("IMPLEMENTS")) {
+      setSelectedImplementIds([]);
+    }
+  }, [selectedVehicleCategories]);
+
   const filteredData = useMemo(() => {
     const start = parseDateSafe(startDate);
     const end = parseDateSafe(endDate);
+
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
 
@@ -485,7 +749,19 @@ export function ReportsPage() {
       return selectedBranchIds.includes(vehicle.branchId);
     });
 
-    const byType = baseVehicles.filter((vehicle) =>
+    const categoryFilteredVehicles = baseVehicles.filter((vehicle) => {
+      if (selectedVehicleCategories.length === 0) return true;
+
+      const isImplement = vehicle.category === "IMPLEMENT";
+
+      if (isImplement) {
+        return selectedVehicleCategories.includes("IMPLEMENTS");
+      }
+
+      return selectedVehicleCategories.includes("VEHICLES");
+    });
+
+    const byType = categoryFilteredVehicles.filter((vehicle) =>
       selectedVehicleTypes.length > 0
         ? selectedVehicleTypes.includes(vehicle.vehicleType as VehicleTypeFilter)
         : true,
@@ -497,12 +773,21 @@ export function ReportsPage() {
         : true,
     );
 
+    const selectedAssetIds = [...selectedVehicleIds, ...selectedImplementIds];
+
     const vehiclesFinal = byStatus.filter((vehicle) =>
-      selectedVehicleIds.length > 0 ? selectedVehicleIds.includes(vehicle.id) : true,
+      selectedAssetIds.length > 0 ? selectedAssetIds.includes(vehicle.id) : true,
     );
 
     const vehicleSet = new Set(vehiclesFinal.map((item) => item.id));
     const driverSet = new Set(selectedDriverIds);
+
+    const driversFinal = drivers
+      .filter((driver) => {
+        if (selectedDriverIds.length === 0) return true;
+        return selectedDriverIds.includes(driver.id);
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
     const fuel = fuelRecords.filter((item) => {
       if (!vehicleSet.has(item.vehicleId) || !inRange(item.fuelDate)) return false;
@@ -540,6 +825,7 @@ export function ReportsPage() {
 
     return {
       vehicles: vehiclesFinal,
+      drivers: driversFinal,
       fuel,
       maintenance,
       debts: debtsFiltered,
@@ -550,10 +836,13 @@ export function ReportsPage() {
     };
   }, [
     availableVehicles,
+    drivers,
     selectedBranchIds,
+    selectedVehicleCategories,
     selectedVehicleTypes,
     selectedVehicleStatuses,
     selectedVehicleIds,
+    selectedImplementIds,
     selectedDriverIds,
     startDate,
     endDate,
@@ -567,35 +856,65 @@ export function ReportsPage() {
   ]);
 
   function exportReport() {
-    const nextErrors: { modules?: string; vehicleTypes?: string } = {};
-    if (selectedModules.length === 0) nextErrors.modules = "Selecione ao menos um módulo.";
-    if (selectedVehicleTypes.length === 0) {
-      nextErrors.vehicleTypes = "Selecione ao menos uma categoria de veículo.";
-    }
+    const nextErrors: { vehicleTypes?: string } = {};
+
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    const showVehicles = selectedModules.includes("VEHICLES");
-    const showFuel = selectedModules.includes("FUEL");
-    const showProducts = selectedModules.includes("PRODUCTS");
-    const showMaintenance = selectedModules.includes("MAINTENANCE");
-    const showTires = selectedModules.includes("TIRES");
-    const showTrips = selectedModules.includes("TRIPS");
-    const showDocuments = selectedModules.includes("DOCUMENTS");
-    const showDebts = selectedModules.includes("DEBTS");
+    const shouldShowAllModules = selectedModules.length === 0;
+
+    const showVehicles = shouldShowAllModules || selectedModules.includes("VEHICLES");
+    const showDrivers = shouldShowAllModules || selectedModules.includes("DRIVERS");
+    const showFuel = shouldShowAllModules || selectedModules.includes("FUEL");
+    const showProducts = shouldShowAllModules || selectedModules.includes("PRODUCTS");
+    const showMaintenance =
+      shouldShowAllModules || selectedModules.includes("MAINTENANCE");
+    const showTires = shouldShowAllModules || selectedModules.includes("TIRES");
+    const showTrips = shouldShowAllModules || selectedModules.includes("TRIPS");
+    const showDocuments =
+      shouldShowAllModules || selectedModules.includes("DOCUMENTS");
+    const showDebts = shouldShowAllModules || selectedModules.includes("DEBTS");
+
+    const vehiclesOnly = filteredData.vehicles
+      .filter((item) => item.category !== "IMPLEMENT")
+      .sort((a, b) =>
+        formatVehicleDisplay(a).localeCompare(formatVehicleDisplay(b), "pt-BR"),
+      );
+
+    const implementsOnly = filteredData.vehicles
+      .filter((item) => item.category === "IMPLEMENT")
+      .sort((a, b) =>
+        formatVehicleDisplay(a).localeCompare(formatVehicleDisplay(b), "pt-BR"),
+      );
 
     const vehiclesModuleTotal = 0;
-    const fuelModuleTotal = filteredData.fuel.reduce((sum, item) => sum + Number(item.totalValue || 0), 0);
-    const productsModuleTotal = filteredData.products.reduce((sum, item) => sum + toNumber(item.totalValue), 0);
-    const maintenanceModuleTotal = filteredData.maintenance.reduce((sum, item) => sum + Number(item.cost || 0), 0);
-    const tiresModuleTotal = filteredData.tires.reduce((sum, item) => sum + Number(item.purchaseCost || 0), 0);
+    const fuelModuleTotal = filteredData.fuel.reduce(
+      (sum, item) => sum + Number(item.totalValue || 0),
+      0,
+    );
+    const productsModuleTotal = filteredData.products.reduce(
+      (sum, item) => sum + toNumber(item.totalValue),
+      0,
+    );
+    const maintenanceModuleTotal = filteredData.maintenance.reduce(
+      (sum, item) => sum + Number(item.cost || 0),
+      0,
+    );
+    const tiresModuleTotal = filteredData.tires.reduce(
+      (sum, item) => sum + Number(item.purchaseCost || 0),
+      0,
+    );
     const tripsDistanceTotal = filteredData.trips.reduce((sum, item) => {
       if (typeof item.returnKm === "number" && item.returnKm >= item.departureKm) {
         return sum + (item.returnKm - item.departureKm);
       }
+
       return sum;
     }, 0);
-    const debtsModuleTotal = filteredData.debts.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const debtsModuleTotal = filteredData.debts.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0,
+    );
 
     const totalGeral =
       (showVehicles ? vehiclesModuleTotal : 0) +
@@ -605,131 +924,379 @@ export function ReportsPage() {
       (showTires ? tiresModuleTotal : 0) +
       (showDebts ? debtsModuleTotal : 0);
 
-    const selectedVehicleStatusesLabel =
-      selectedVehicleStatuses.length > 0
-        ? selectedVehicleStatuses.map((status) => labelVehicleStatus(status)).join(", ")
-        : "Todos os status";
-
     const sections = [
       {
         enabled: showVehicles,
-        count: filteredData.vehicles.length,
-        html: `<h2>Veículos (${filteredData.vehicles.length})</h2>
-          <table><thead><tr><th>Placa</th><th>Veículo</th><th>Categoria</th><th>Tipo</th><th>Status</th></tr></thead>
-          <tbody>${filteredData.vehicles
+        order: 1,
+        title: "Veículos",
+        count: vehiclesOnly.length,
+        html: `<h2>Veículos (${vehiclesOnly.length})</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Placa</th>
+                <th>Marca/Modelo</th>
+                <th>Ano modelo</th>
+                <th>Fipe</th>
+                <th>Categoria</th>
+                <th>Tipo de veículo</th>
+                <th>Capacidade do Tanque</th>
+                <th>Implementos vinculados</th>
+              </tr>
+            </thead>
+            <tbody>${vehiclesOnly
+            .map((item) => {
+              const source = item as Vehicle & Record<string, any>;
+
+              return `<tr>
+      <td>${escapeHtml(item.plate || "-")}</td>
+      <td>${escapeHtml(`${item.brand || ""} ${item.model || ""}`.trim() || "-")}</td>
+      <td>${escapeHtml(formatYear(source.modelYear || item.year))}</td>
+      <td>${escapeHtml(source.fipeCode || source.fipe || "-")}</td>
+      <td>${escapeHtml(labelVehicleCategory(item.category))}</td>
+      <td>${escapeHtml(labelVehicleType(item.vehicleType))}</td>
+      <td>${escapeHtml(formatTankCapacity(source.tankCapacity))}</td>
+      <td>${escapeHtml(formatLinkedImplements(item))}</td>
+    </tr>`;
+            })
+            .join("")}</tbody>
+          </table>
+          <div class="module-total">Total do módulo Veículos: ${toCurrency(
+              vehiclesModuleTotal,
+            )}</div>`,
+      },
+      {
+        enabled: showVehicles,
+        order: 2,
+        title: "Implementos",
+        count: implementsOnly.length,
+        html: `<h2>Implementos (${implementsOnly.length})</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Placa</th>
+                <th>Marca/Modelo</th>
+                <th>Categoria</th>
+                <th>Tipo</th>
+                <th>Veículo vinculado</th>
+              </tr>
+            </thead>
+            <tbody>${implementsOnly
             .map(
               (item) =>
-                `<tr><td>${escapeHtml(item.plate || "-")}</td><td>${escapeHtml(
-                  `${item.brand || ""} ${item.model || ""}`.trim() || "-"
-                )}</td><td>${escapeHtml(labelVehicleCategory(item.category))}</td><td>${escapeHtml(
-                  labelVehicleType(item.vehicleType),
-                )}</td><td>${escapeHtml(labelVehicleStatus(item.status))}</td></tr>`,
+                `<tr>
+                    <td>${escapeHtml(item.plate || "-")}</td>
+                    <td>${escapeHtml(`${item.brand || ""} ${item.model || ""}`.trim() || "-")}</td>
+                    <td>${escapeHtml(labelVehicleCategory(item.category))}</td>
+                    <td>${escapeHtml(labelVehicleType(item.vehicleType))}</td>
+                    <td>${escapeHtml(formatLinkedVehicle(item))}</td>
+                  </tr>`,
             )
-            .join("")}</tbody></table>
-          <div class="module-total">Total do módulo Veículos: ${toCurrency(vehiclesModuleTotal)}</div>`,
+            .join("")}</tbody>
+          </table>`,
       },
       {
         enabled: showFuel,
+        title: "Abastecimentos",
         count: filteredData.fuel.length,
         html: `<h2>Abastecimentos (${filteredData.fuel.length})</h2>
-          <table><thead><tr><th>Data</th><th>Veículo</th><th>Motorista</th><th>Litros</th><th>Valor</th><th>KM</th></tr></thead>
-          <tbody>${filteredData.fuel
+          <table>
+            <thead>
+              <tr>
+                <th>Filial</th>
+                <th>Veículo</th>
+                <th>Motorista</th>
+                <th>Data e Hora</th>
+                <th>Combustível</th>
+                <th>Litros</th>
+                <th>Valor total</th>
+                <th>KM</th>
+                <th>Consumo médio</th>
+              </tr>
+            </thead>
+            <tbody>${filteredData.fuel
             .map(
               (item) =>
-                `<tr><td>${escapeHtml(formatDate(item.fuelDate))}</td><td>${escapeHtml(
-                  `${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`.trim(),
-                )}</td><td>${escapeHtml(item.driver?.name || "-")}</td><td>${toNumber(item.liters).toFixed(2)}</td><td>${toCurrency(item.totalValue || 0)}</td><td>${toNumber(item.km).toLocaleString("pt-BR")}</td></tr>`,
+                `<tr>
+                    <td>${escapeHtml(formatBranchName(item))}</td>
+                    <td>${escapeHtml(formatVehicleDisplay(item.vehicle, item.vehicleId))}</td>
+                    <td>${escapeHtml(item.driver?.name || "-")}</td>
+                    <td>${escapeHtml(formatDateTime(item.fuelDate))}</td>
+                    <td>${escapeHtml(formatFuelType(item.fuelType))}</td>
+                    <td>${toNumber(item.liters).toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}</td>
+                    <td>${toCurrency(item.totalValue || 0)}</td>
+                    <td>${toNumber(item.km).toLocaleString("pt-BR")}</td>
+                    <td>${escapeHtml(formatAverageConsumption(item))}</td>
+                  </tr>`,
             )
-            .join("")}</tbody></table>
-          <div class="module-total">Total do módulo Abastecimentos: ${toCurrency(fuelModuleTotal)}</div>`,
+            .join("")}</tbody>
+          </table>
+          <div class="module-total">Total do módulo Abastecimentos: ${toCurrency(
+              fuelModuleTotal,
+            )}</div>`,
+      },
+      {
+        enabled: showDebts,
+        title: "Gestão de Finanças",
+        count: filteredData.debts.length,
+        html: `<h2>Gestão de Finanças (${filteredData.debts.length})</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Veículo</th>
+                <th>Descrição</th>
+                <th>Categoria</th>
+                <th>Status</th>
+                <th>Valor</th>
+                <th>Data de lançamento</th>
+                <th>Data de Vencimento</th>
+              </tr>
+            </thead>
+            <tbody>${filteredData.debts
+            .map(
+              (item) =>
+                `<tr>
+                    <td>${escapeHtml(formatVehicleDisplay(item.vehicle, item.vehicleId))}</td>
+                    <td>${escapeHtml(item.description || "-")}</td>
+                    <td>${escapeHtml(labelDebtCategory(item.category))}</td>
+                    <td>${escapeHtml(labelDebtStatus(item.status))}</td>
+                    <td>${toCurrency(item.amount || 0)}</td>
+                    <td>${escapeHtml(formatDate(item.debtDate || item.createdAt))}</td>
+                    <td>${escapeHtml(formatDate(item.dueDate))}</td>
+                  </tr>`,
+            )
+            .join("")}</tbody>
+          </table>
+          <div class="module-total">Total do módulo Gestão de Finanças: ${toCurrency(
+              debtsModuleTotal,
+            )}</div>`,
+      },
+      {
+        enabled: showDocuments,
+        title: "Gestão de documentos",
+        count: filteredData.documents.length,
+        html: `<h2>Gestão de documentos (${filteredData.documents.length})</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Veículo</th>
+                <th>Documento</th>
+                <th>Status</th>
+                <th>Data de lançamento</th>
+                <th>Data de Vencimento</th>
+              </tr>
+            </thead>
+            <tbody>${filteredData.documents
+            .map(
+              (item) =>
+                `<tr>
+                    <td>${escapeHtml(formatVehicleDisplay(item.vehicle, item.vehicleId || undefined))}</td>
+                    <td>${escapeHtml(item.name || "-")}</td>
+                    <td>${escapeHtml(labelDocumentStatus(item.status))}</td>
+                    <td>${escapeHtml(formatDate(item.issueDate || item.createdAt))}</td>
+                    <td>${escapeHtml(formatDate(item.expiryDate))}</td>
+                  </tr>`,
+            )
+            .join("")}</tbody>
+          </table>
+          <div class="module-total">Total do módulo Gestão de documentos: ${filteredData.documents.length
+          } documento(s)</div>`,
+      },
+      {
+        enabled: showTires,
+        title: "Gestão de Pneus",
+        count: filteredData.tires.length,
+        html: `<h2>Gestão de Pneus (${filteredData.tires.length})</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Número de série</th>
+                <th>Marca/Modelo</th>
+                <th>Medida</th>
+                <th>Aro</th>
+                <th>Posição</th>
+                <th>Status</th>
+                <th>Estado</th>
+                <th>Veículo vinculado</th>
+                <th>KM</th>
+                <th>Alertas</th>
+              </tr>
+            </thead>
+            <tbody>${filteredData.tires
+            .map((item) => {
+              const source = item as Tire & Record<string, any>;
+
+              return `<tr>
+      <td>${escapeHtml(source.serialNumber || source.number || source.code || "-")}</td>
+      <td>${escapeHtml(`${source.brand || ""} ${source.model || ""}`.trim() || "-")}</td>
+      <td>${escapeHtml(formatTireMeasure(item))}</td>
+      <td>${escapeHtml(formatTireRim(item))}</td>
+      <td>${escapeHtml(
+                `${source.axlePosition || "-"}${source.wheelPosition ? ` | ${source.wheelPosition}` : ""
+                }`,
+              )}</td>
+      <td>${escapeHtml(labelTireStatus(source.status))}</td>
+      <td>${escapeHtml(formatTireCondition(item))}</td>
+      <td>${escapeHtml(formatVehicleDisplay(source.vehicle, source.vehicleId || "-"))}</td>
+      <td>${toNumber(source.currentKm || source.km || source.installedKm).toLocaleString("pt-BR")}</td>
+      <td>${escapeHtml(formatTireAlerts(item))}</td>
+    </tr>`;
+            })
+            .join("")}</tbody>
+          </table>
+          <div class="module-total">Total do módulo Gestão de Pneus: ${toCurrency(
+              tiresModuleTotal,
+            )}</div>`,
+      },
+      {
+        enabled: showTrips,
+        title: "Gestão de viagens",
+        count: filteredData.trips.length,
+        html: `<h2>Gestão de viagens (${filteredData.trips.length})</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Veículo</th>
+                <th>Motorista</th>
+                <th>Rota</th>
+                <th>Data de saída</th>
+                <th>Data de retorno</th>
+                <th>KM Rodados</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${filteredData.trips
+            .map(
+              (item) =>
+                `<tr>
+                    <td>${escapeHtml(formatVehicleDisplay(item.vehicle, item.vehicleId))}</td>
+                    <td>${escapeHtml(item.driver?.name || "-")}</td>
+                    <td>${escapeHtml(formatTripRoute(item))}</td>
+                    <td>${escapeHtml(formatDateTime(item.departureAt))}</td>
+                    <td>${escapeHtml(formatDateTime((item as Trip & Record<string, any>).returnAt || (item as Trip & Record<string, any>).arrivalAt))}</td>
+                    <td>${escapeHtml(formatTripDistance(item))}</td>
+                    <td>${escapeHtml(labelTripStatus(item.status))}</td>
+                  </tr>`,
+            )
+            .join("")}</tbody>
+          </table>
+          <div class="module-total">Total de km em Gestão de viagens: ${tripsDistanceTotal.toLocaleString(
+              "pt-BR",
+            )} km</div>`,
+      },
+      {
+        enabled: showMaintenance,
+        title: "Manutenções",
+        count: filteredData.maintenance.length,
+        html: `<h2>Manutenções (${filteredData.maintenance.length})</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Veículo</th>
+                <th>Tipo</th>
+                <th>Descrição</th>
+                <th>KM</th>
+                <th>Custo</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${filteredData.maintenance
+            .map(
+              (item) =>
+                `<tr>
+                    <td>${escapeHtml(formatDate(item.maintenanceDate))}</td>
+                    <td>${escapeHtml(formatVehicleDisplay(item.vehicle, item.vehicleId))}</td>
+                    <td>${escapeHtml(labelMaintenanceType(item.type))}</td>
+                    <td>${escapeHtml(item.description || "-")}</td>
+                    <td>${toNumber(item.km).toLocaleString("pt-BR")}</td>
+                    <td>${toCurrency(item.cost || 0)}</td>
+                    <td>${escapeHtml(labelMaintenanceStatus(item.status))}</td>
+                  </tr>`,
+            )
+            .join("")}</tbody>
+          </table>
+          <div class="module-total">Total do módulo Manutenções: ${toCurrency(
+              maintenanceModuleTotal,
+            )}</div>`,
+      },
+      {
+        enabled: showDrivers,
+        title: "Motoristas",
+        count: filteredData.drivers.length,
+        html: `<h2>Motoristas (${filteredData.drivers.length})</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>CPF</th>
+                <th>Documentos</th>
+                <th>Veículos</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${filteredData.drivers
+            .map((item) => {
+              const driver = item as Driver & {
+                cpf?: string | null;
+                document?: string | null;
+                status?: string | null;
+              };
+
+              return `<tr>
+                  <td>${escapeHtml(driver.name || "-")}</td>
+                  <td>${escapeHtml(driver.cpf || "-")}</td>
+                  <td>${escapeHtml(formatDriverDocuments(driver))}</td>
+                  <td>${escapeHtml(formatDriverVehicles(driver, availableVehicles))}</td>
+                  <td>${escapeHtml(driver.status || "-")}</td>
+                </tr>`;
+            })
+            .join("")}</tbody>
+          </table>
+          <div class="module-total">Total do módulo Motoristas: ${filteredData.drivers.length
+          } motorista(s)</div>`,
       },
       {
         enabled: showProducts,
+        title: "Produtos",
         count: filteredData.products.length,
         html: `<h2>Produtos (${filteredData.products.length})</h2>
           <table><thead><tr><th>Data</th><th>Produto</th><th>Categoria</th><th>Fornecedor</th><th>NF-e</th><th>Quantidade</th><th>Valor total</th></tr></thead>
           <tbody>${filteredData.products
             .map(
               (item) =>
-                `<tr><td>${escapeHtml(formatDate(item.retailProductImport?.issuedAt || item.createdAt))}</td><td>${escapeHtml(item.description || "-")}</td><td>${escapeHtml(labelProductCategory(item.category))}</td><td>${escapeHtml(item.retailProductImport?.supplierName || "-")}</td><td>${escapeHtml(item.retailProductImport?.invoiceNumber || "-")}</td><td>${toNumber(item.quantity).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td>${toCurrency(toNumber(item.totalValue))}</td></tr>`,
+                `<tr><td>${escapeHtml(
+                  formatDate(item.retailProductImport?.issuedAt || item.createdAt),
+                )}</td><td>${escapeHtml(item.description || "-")}</td><td>${escapeHtml(
+                  labelProductCategory(item.category),
+                )}</td><td>${escapeHtml(
+                  item.retailProductImport?.supplierName || "-",
+                )}</td><td>${escapeHtml(
+                  item.retailProductImport?.invoiceNumber || "-",
+                )}</td><td>${toNumber(item.quantity).toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}</td><td>${toCurrency(toNumber(item.totalValue))}</td></tr>`,
             )
             .join("")}</tbody></table>
-          <div class="module-total">Total do módulo Produtos: ${toCurrency(productsModuleTotal)}</div>`,
-      },
-      {
-        enabled: showMaintenance,
-        count: filteredData.maintenance.length,
-        html: `<h2>Manutenções (${filteredData.maintenance.length})</h2>
-          <table><thead><tr><th>Data</th><th>Veículo</th><th>Tipo</th><th>Status</th><th>Custo</th><th>KM</th></tr></thead>
-          <tbody>${filteredData.maintenance
-            .map(
-              (item) =>
-                `<tr><td>${escapeHtml(formatDate(item.maintenanceDate))}</td><td>${escapeHtml(`${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`.trim())}</td><td>${escapeHtml(labelMaintenanceType(item.type))}</td><td>${escapeHtml(labelMaintenanceStatus(item.status))}</td><td>${toCurrency(item.cost || 0)}</td><td>${toNumber(item.km).toLocaleString("pt-BR")}</td></tr>`,
-            )
-            .join("")}</tbody></table>
-          <div class="module-total">Total do módulo Manutenções: ${toCurrency(maintenanceModuleTotal)}</div>`,
-      },
-      {
-        enabled: showTires,
-        count: filteredData.tires.length,
-        html: `<h2>Gestão de Pneus (${filteredData.tires.length})</h2>
-          <table><thead><tr><th>Data</th><th>Veículo</th><th>Pneu</th><th>Posição</th><th>Status</th><th>Custo</th></tr></thead>
-          <tbody>${filteredData.tires
-            .map(
-              (item) =>
-                `<tr><td>${escapeHtml(formatDate(item.purchaseDate || item.installedAt || item.createdAt))}</td><td>${escapeHtml(formatVehicleDisplay(item.vehicle, item.vehicleId || "-"))}</td><td>${escapeHtml(`${item.brand} ${item.model}`)}</td><td>${escapeHtml(`${item.axlePosition || "-"}${item.wheelPosition ? ` | ${item.wheelPosition}` : ""}`)}</td><td>${escapeHtml(labelTireStatus(item.status))}</td><td>${toCurrency(item.purchaseCost || 0)}</td></tr>`,
-            )
-            .join("")}</tbody></table>
-          <div class="module-total">Total do módulo Gestão de Pneus: ${toCurrency(tiresModuleTotal)}</div>`,
-      },
-      {
-        enabled: showTrips,
-        count: filteredData.trips.length,
-        html: `<h2>Gestão de viagens (${filteredData.trips.length})</h2>
-          <table><thead><tr><th>Saída</th><th>Veículo</th><th>Motorista</th><th>Rota</th><th>Status</th><th>KM rodados</th></tr></thead>
-          <tbody>${filteredData.trips
-            .map((item) => {
-              const kmRodados = typeof item.returnKm === "number" && item.returnKm >= item.departureKm ? item.returnKm - item.departureKm : 0;
-              return `<tr><td>${escapeHtml(formatDate(item.departureAt))}</td><td>${escapeHtml(formatVehicleDisplay(item.vehicle, item.vehicleId))}</td><td>${escapeHtml(item.driver?.name || "-")}</td><td>${escapeHtml(`${item.origin} → ${item.destination}`)}</td><td>${escapeHtml(labelTripStatus(item.status))}</td><td>${kmRodados.toLocaleString("pt-BR")}</td></tr>`;
-            })
-            .join("")}</tbody></table>
-          <div class="module-total">Total de km em Gestão de viagens: ${tripsDistanceTotal.toLocaleString("pt-BR")} km</div>`,
-      },
-      {
-        enabled: showDocuments,
-        count: filteredData.documents.length,
-        html: `<h2>Gestão de documentos (${filteredData.documents.length})</h2>
-          <table><thead><tr><th>Data</th><th>Veículo</th><th>Documento</th><th>Tipo</th><th>Status</th><th>Emissor</th></tr></thead>
-          <tbody>${filteredData.documents
-            .map(
-              (item) =>
-                `<tr><td>${escapeHtml(formatDate(item.expiryDate || item.issueDate || item.createdAt))}</td><td>${escapeHtml(formatVehicleDisplay(item.vehicle, item.vehicleId || undefined))}</td><td>${escapeHtml(item.name || "-")}</td><td>${escapeHtml(labelDocumentType(item.type))}</td><td>${escapeHtml(labelDocumentStatus(item.status))}</td><td>${escapeHtml(item.issuer || "-")}</td></tr>`,
-            )
-            .join("")}</tbody></table>
-          <div class="module-total">Total do módulo Gestão de documentos: ${filteredData.documents.length} documento(s)</div>`,
-      },
-      {
-        enabled: showDebts,
-        count: filteredData.debts.length,
-        html: `<h2>Gestão de Finanças (${filteredData.debts.length})</h2>
-          <table><thead><tr><th>Data</th><th>Veículo</th><th>Categoria</th><th>Descrição</th><th>Status</th><th>Valor</th></tr></thead>
-          <tbody>${filteredData.debts
-            .map(
-              (item) =>
-                `<tr><td>${escapeHtml(formatDate(item.dueDate || item.debtDate))}</td><td>${escapeHtml(`${item.vehicle?.plate || item.vehicleId} - ${item.vehicle?.brand || ""} ${item.vehicle?.model || ""}`.trim())}</td><td>${escapeHtml(labelDebtCategory(item.category))}</td><td>${escapeHtml(item.description || "-")}</td><td>${escapeHtml(labelDebtStatus(item.status))}</td><td>${toCurrency(item.amount || 0)}</td></tr>`,
-            )
-            .join("")}</tbody></table>
-          <div class="module-total">Total do módulo Gestão de Finanças: ${toCurrency(debtsModuleTotal)}</div>`,
+          <div class="module-total">Total do módulo Produtos: ${toCurrency(
+              productsModuleTotal,
+            )}</div>`,
       },
     ];
 
     const moduleSections = sections
       .filter((section) => section.enabled)
       .sort((a, b) => {
-        const aZero = a.count === 0 ? 1 : 0;
-        const bZero = b.count === 0 ? 1 : 0;
-        if (aZero !== bZero) return aZero - bZero;
-        return b.count - a.count;
+        const orderA = typeof a.order === "number" ? a.order : Number.POSITIVE_INFINITY;
+        const orderB = typeof b.order === "number" ? b.order : Number.POSITIVE_INFINITY;
+
+        if (orderA !== orderB) return orderA - orderB;
+
+        return String(a.title || "").localeCompare(String(b.title || ""), "pt-BR");
       })
       .map((section) => section.html)
       .join("");
@@ -752,8 +1319,9 @@ export function ReportsPage() {
         </head>
         <body>
           <h1>Relatório operacional</h1>
-          <div class="meta">Período: ${escapeHtml(formatDate(startDate))} até ${escapeHtml(formatDate(endDate))}</div>
-          ${showVehicles ? `<div class="meta">Status de veículos: ${escapeHtml(selectedVehicleStatusesLabel)}</div>` : ""}
+          <div class="meta">Período: ${escapeHtml(formatDate(startDate))} até ${escapeHtml(
+      formatDate(endDate),
+    )}</div>
           ${moduleSections}
           <div class="grand-total">Valor total geral: ${toCurrency(totalGeral)}</div>
         </body>
@@ -762,8 +1330,10 @@ export function ReportsPage() {
 
     const printWindow = window.open("", "_blank", "width=1280,height=900");
     if (!printWindow) return;
+
     printWindow.document.write(html);
     printWindow.document.close();
+
     setTimeout(() => {
       printWindow.focus();
       printWindow.print();
@@ -797,8 +1367,94 @@ export function ReportsPage() {
             />
           </div>
 
+          <div className="lg:col-span-3">
+            <MultiSelectField
+              label="Módulos"
+              options={moduleOptions}
+              selectedIds={selectedModules}
+              onChange={(value) => setSelectedModules(value as ReportModule[])}
+              placeholder="Selecione os módulos, ou deixe limpo para visualizar todos"
+              openOnClick
+              keepOpenOnSelect
+            />
+          </div>
+
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700">Data inicial *</label>
+            <MultiSelectField
+              label="Categoria"
+              options={vehicleCategoryOptions}
+              selectedIds={selectedVehicleCategories}
+              onChange={(value) =>
+                setSelectedVehicleCategories(value as VehicleCategoryFilter[])
+              }
+              placeholder="Selecione Veículos/Implementos"
+              openOnClick
+              keepOpenOnSelect
+            />
+          </div>
+
+          {selectedVehicleCategories.length > 0 ? (
+            <div>
+              <MultiSelectField
+                label="Tipo de veículo"
+                options={vehicleTypeOptions}
+                selectedIds={selectedVehicleTypes}
+                onChange={(value) => {
+                  setSelectedVehicleTypes(value as VehicleTypeFilter[]);
+                  setFieldErrors((prev) => ({ ...prev, vehicleTypes: undefined }));
+                }}
+                placeholder="Selecione Leve/Pesado"
+                error={fieldErrors.vehicleTypes}
+                openOnClick
+                keepOpenOnSelect
+              />
+            </div>
+          ) : null}
+
+          {selectedVehicleCategories.includes("VEHICLES") ? (
+            <div>
+              <MultiSelectField
+                label="Veículos"
+                options={vehicleOptions}
+                selectedIds={selectedVehicleIds}
+                onChange={setSelectedVehicleIds}
+                placeholder="Buscar por placa, marca ou modelo"
+                openOnClick
+                keepOpenOnSelect
+              />
+            </div>
+          ) : null}
+
+          {selectedVehicleCategories.includes("IMPLEMENTS") ? (
+            <div>
+              <MultiSelectField
+                label="Implementos"
+                options={implementOptions}
+                selectedIds={selectedImplementIds}
+                onChange={setSelectedImplementIds}
+                placeholder="Buscar por placa, marca ou modelo"
+                openOnClick
+                keepOpenOnSelect
+              />
+            </div>
+          ) : null}
+
+          <div>
+            <MultiSelectField
+              label="Motoristas"
+              options={driverOptions}
+              selectedIds={selectedDriverIds}
+              onChange={setSelectedDriverIds}
+              placeholder="Digite para buscar motorista"
+              openOnClick
+              keepOpenOnSelect
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-700">
+              Data inicial *
+            </label>
             <input
               type="date"
               value={startDate}
@@ -808,60 +1464,14 @@ export function ReportsPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700">Data final *</label>
+            <label className="mb-1 block text-sm font-semibold text-slate-700">
+              Data final *
+            </label>
             <input
               type="date"
               value={endDate}
               onChange={(event) => setEndDate(event.target.value)}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-            />
-          </div>
-
-          <div>
-            <MultiSelectField
-              label="Veículos"
-              options={vehicleOptions}
-              selectedIds={selectedVehicleIds}
-              onChange={setSelectedVehicleIds}
-              placeholder="Buscar por placa, marca ou modelo"
-            />
-          </div>
-
-          <div>
-            <MultiSelectField
-              label="Motoristas"
-              options={driverOptions}
-              selectedIds={selectedDriverIds}
-              onChange={setSelectedDriverIds}
-              placeholder="Digite para buscar motorista"
-            />
-          </div>
-
-          <div>
-            <MultiSelectField
-              label="Categoria de veículo"
-              options={vehicleTypeOptions}
-              selectedIds={selectedVehicleTypes}
-              onChange={(value) => {
-                setSelectedVehicleTypes(value as VehicleTypeFilter[]);
-                setFieldErrors((prev) => ({ ...prev, vehicleTypes: undefined }));
-              }}
-              placeholder="Selecione Leve/Pesado"
-              error={fieldErrors.vehicleTypes}
-            />
-          </div>
-
-          <div className="lg:col-span-3">
-            <MultiSelectField
-              label="Módulos"
-              options={moduleOptions}
-              selectedIds={selectedModules}
-              onChange={(value) => {
-                setSelectedModules(value as ReportModule[]);
-                setFieldErrors((prev) => ({ ...prev, modules: undefined }));
-              }}
-              placeholder="Selecione os módulos"
-              error={fieldErrors.modules}
             />
           </div>
 
@@ -871,8 +1481,12 @@ export function ReportsPage() {
                 label="Status dos veículos"
                 options={vehicleStatusOptions}
                 selectedIds={selectedVehicleStatuses}
-                onChange={(value) => setSelectedVehicleStatuses(value as VehicleStatusFilter[])}
+                onChange={(value) =>
+                  setSelectedVehicleStatuses(value as VehicleStatusFilter[])
+                }
                 placeholder="Selecione os status"
+                openOnClick
+                keepOpenOnSelect
               />
             </div>
           ) : null}
@@ -891,6 +1505,7 @@ export function ReportsPage() {
 
         <div className="mt-5 flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={exportReport}
             className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
           >

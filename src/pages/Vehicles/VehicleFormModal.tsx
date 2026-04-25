@@ -47,8 +47,6 @@ export function VehicleFormModal({
   isOpen,
   editingVehicleId,
   currentCompanyName,
-  branchFieldsEnabled,
-  branches,
   form,
   setForm,
   fieldErrors,
@@ -148,33 +146,6 @@ export function VehicleFormModal({
                   <p className="text-xs text-red-600">{fieldErrors.brand}</p>
                 ) : null}
               </label>
-
-              {branchFieldsEnabled ? (
-                <label className="space-y-1">
-                  <span className="text-sm font-medium text-slate-700">Filial</span>
-                  <select
-                    value={form.branchId}
-                    onChange={(e) => {
-                      setForm((prev) => ({ ...prev, branchId: e.target.value }));
-                      clearFieldError("branchId");
-                    }}
-                    className={getFieldClass("branchId")}
-                  >
-                    <option value="">Sem filial vinculada</option>
-                    {branches.map((branch) => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-slate-500">
-                    Opcional. Use apenas se quiser organizar os veículos por filial.
-                  </p>
-                  {fieldErrors.branchId ? (
-                    <p className="text-xs text-red-600">{fieldErrors.branchId}</p>
-                  ) : null}
-                </label>
-              ) : null}
 
               <label className="space-y-1">
                 <span className="text-sm font-medium text-slate-700">Modelo</span>

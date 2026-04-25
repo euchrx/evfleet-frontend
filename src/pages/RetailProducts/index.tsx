@@ -2,8 +2,6 @@
 import { RefreshCw } from "lucide-react";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { ProductXmlImportButton } from "../../components/ProductXmlImportButton";
-import { TablePagination } from "../../components/TablePagination";
-import { formatVehicleLabel } from "../../utils/vehicleLabel";
 import {
   deleteRetailProducts,
   getRetailProducts,
@@ -12,6 +10,11 @@ import {
   type RetailProductItem,
 } from "../../services/retailProducts";
 import { useCompanyScope } from "../../contexts/CompanyScopeContext";
+import {
+  ProductsTablesSection,
+  type ProductPageFilters,
+  type SelectOption,
+} from "./ProductsTablesSection";
 
 const PAGE_SIZE = 10;
 
@@ -24,16 +27,6 @@ const categoryOptions: Array<{ value: RetailProductCategory; label: string }> = 
   { value: "OUTROS", label: "Outros" },
 ];
 
-type ProductPageFilters = {
-  dateFrom: string;
-  dateTo: string;
-  category: RetailProductFilters["category"];
-  description: string;
-  productCode: string;
-  supplierName: string;
-  invoiceNumber: string;
-};
-
 const initialPageFilters: ProductPageFilters = {
   dateFrom: "",
   dateTo: "",
@@ -43,6 +36,19 @@ const initialPageFilters: ProductPageFilters = {
   supplierName: "",
   invoiceNumber: "",
 };
+
+function splitCsv(value: string) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function includesInCsv(csv: string, value: string | null | undefined) {
+  const values = splitCsv(csv);
+  if (values.length === 0) return true;
+  return values.includes(String(value || ""));
+}
 
 function toNumber(value: string | number | null | undefined) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -63,22 +69,22 @@ function formatMoney(value: string | number | null | undefined) {
   });
 }
 
-function formatQuantity(value: string | number | null | undefined) {
-  return toNumber(value).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+function normalizeText(value: string | null | undefined) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function uniqueOptions(values: Array<string | null | undefined>): SelectOption[] {
+  const map = new Map<string, string>();
+
+  values.forEach((value) => {
+    const label = String(value || "").trim();
+    if (!label) return;
+    if (!map.has(label)) map.set(label, label);
   });
-}
 
-function formatDate(value?: string | null) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("pt-BR");
-}
-
-function categoryLabel(category: RetailProductCategory) {
-  return categoryOptions.find((item) => item.value === category)?.label || "Outros";
+  return Array.from(map.entries())
+    .map(([id, label]) => ({ id, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }));
 }
 
 export function RetailProductsPage() {
@@ -100,8 +106,10 @@ export function RetailProductsPage() {
     category: "",
   });
 
-  const [draftFilters, setDraftFilters] = useState<ProductPageFilters>(initialPageFilters);
-  const [appliedFilters, setAppliedFilters] = useState<ProductPageFilters>(initialPageFilters);
+  const [draftFilters, setDraftFilters] =
+    useState<ProductPageFilters>(initialPageFilters);
+  const [appliedFilters, setAppliedFilters] =
+    useState<ProductPageFilters>(initialPageFilters);
 
   async function loadData(nextFilters = serviceFilters, manualRefresh = false) {
     try {
@@ -135,10 +143,14 @@ export function RetailProductsPage() {
   }
 
   async function handleSearch() {
+    const selectedCategories = splitCsv(draftFilters.category);
     const nextServiceFilters: RetailProductFilters = {
       dateFrom: draftFilters.dateFrom,
       dateTo: draftFilters.dateTo,
-      category: draftFilters.category,
+      category:
+        selectedCategories.length === 1
+          ? (selectedCategories[0] as RetailProductFilters["category"])
+          : "",
     };
 
     setServiceFilters(nextServiceFilters);
@@ -174,45 +186,76 @@ export function RetailProductsPage() {
     };
   }, [items]);
 
+  const productOptions = useMemo(
+    () => uniqueOptions(items.map((item) => item.description)),
+    [items],
+  );
+
+  const productCodeOptions = useMemo(
+    () => uniqueOptions(items.map((item) => item.productCode)),
+    [items],
+  );
+
+  const supplierOptions = useMemo(
+    () => uniqueOptions(items.map((item) => item.retailProductImport.supplierName)),
+    [items],
+  );
+
+  const invoiceOptions = useMemo(
+    () => uniqueOptions(items.map((item) => item.retailProductImport.invoiceNumber)),
+    [items],
+  );
+
+  const categorySelectOptions: SelectOption[] = useMemo(
+    () =>
+      categoryOptions.map((option) => ({
+        id: option.value,
+        label: option.label,
+      })),
+    [],
+  );
+
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      const description = String(item.description || "").toLowerCase();
-      const productCode = String(item.productCode || "").toLowerCase();
-      const supplierName = String(item.retailProductImport.supplierName || "").toLowerCase();
-      const invoiceNumber = String(item.retailProductImport.invoiceNumber || "").toLowerCase();
+      const description = normalizeText(item.description);
+      const productCode = normalizeText(item.productCode);
+      const supplierName = normalizeText(item.retailProductImport.supplierName);
+      const invoiceNumber = normalizeText(item.retailProductImport.invoiceNumber);
+
+      const selectedDescriptions = splitCsv(appliedFilters.description).map(normalizeText);
+      const selectedProductCodes = splitCsv(appliedFilters.productCode).map(normalizeText);
+      const selectedSuppliers = splitCsv(appliedFilters.supplierName).map(normalizeText);
+      const selectedInvoices = splitCsv(appliedFilters.invoiceNumber).map(normalizeText);
 
       if (
-        appliedFilters.description &&
-        !description.includes(appliedFilters.description.trim().toLowerCase())
+        selectedDescriptions.length > 0 &&
+        !selectedDescriptions.includes(description)
       ) {
         return false;
       }
 
       if (
-        appliedFilters.productCode &&
-        !productCode.includes(appliedFilters.productCode.trim().toLowerCase())
+        selectedProductCodes.length > 0 &&
+        !selectedProductCodes.includes(productCode)
       ) {
         return false;
       }
 
-      if (
-        appliedFilters.supplierName &&
-        !supplierName.includes(appliedFilters.supplierName.trim().toLowerCase())
-      ) {
+      if (selectedSuppliers.length > 0 && !selectedSuppliers.includes(supplierName)) {
         return false;
       }
 
-      if (
-        appliedFilters.invoiceNumber &&
-        !invoiceNumber.includes(appliedFilters.invoiceNumber.trim().toLowerCase())
-      ) {
+      if (selectedInvoices.length > 0 && !selectedInvoices.includes(invoiceNumber)) {
+        return false;
+      }
+
+      if (!includesInCsv(appliedFilters.category, item.category)) {
         return false;
       }
 
       return true;
     });
   }, [items, appliedFilters]);
-
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE)),
     [filteredItems.length],
@@ -243,7 +286,9 @@ export function RetailProductsPage() {
 
   function toggleItemSelection(itemId: string) {
     setSelectedItemIds((prev) =>
-      prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId],
+      prev.includes(itemId)
+        ? prev.filter((id) => id !== itemId)
+        : [...prev, itemId],
     );
   }
 
@@ -295,6 +340,7 @@ export function RetailProductsPage() {
 
         <div className="flex flex-col gap-3 sm:flex-row">
           <ProductXmlImportButton onImported={() => loadData(serviceFilters, true)} />
+
           <button
             type="button"
             onClick={() => loadData(serviceFilters, true)}
@@ -309,23 +355,20 @@ export function RetailProductsPage() {
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Itens</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{summary.totalItems}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Itens
+          </p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">
+            {summary.totalItems}
+          </p>
         </div>
+
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
             Valor total
           </p>
           <p className="mt-1 text-2xl font-bold text-emerald-800">
             {formatMoney(summary.totalValue)}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-            Quantidade
-          </p>
-          <p className="mt-1 text-2xl font-bold text-blue-800">
-            {formatQuantity(summary.totalQuantity)}
           </p>
         </div>
       </div>
@@ -336,267 +379,32 @@ export function RetailProductsPage() {
         </div>
       ) : null}
 
-      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="p-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <label className="space-y-1.5 xl:col-span-2">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">Empresa</span>
-              <input
-                value={currentCompany?.name || ""}
-                disabled
-                className="w-full cursor-not-allowed rounded-xl border border-slate-300 bg-slate-200 px-3 py-2 text-sm text-slate-600 outline-none"
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">Data inicial</span>
-              <input
-                type="date"
-                value={draftFilters.dateFrom}
-                onChange={(event) => handleDraftFilterChange("dateFrom", event.target.value)}
-                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">Data final</span>
-              <input
-                type="date"
-                value={draftFilters.dateTo}
-                onChange={(event) => handleDraftFilterChange("dateTo", event.target.value)}
-                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">Produto</span>
-              <input
-                value={draftFilters.description}
-                onChange={(event) => handleDraftFilterChange("description", event.target.value)}
-                placeholder="Descrição do produto"
-                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">
-                Código do produto
-              </span>
-              <input
-                value={draftFilters.productCode}
-                onChange={(event) => handleDraftFilterChange("productCode", event.target.value)}
-                placeholder="Código"
-                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">Fornecedor</span>
-              <input
-                value={draftFilters.supplierName}
-                onChange={(event) => handleDraftFilterChange("supplierName", event.target.value)}
-                placeholder="Nome do fornecedor"
-                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">NF-e</span>
-              <input
-                value={draftFilters.invoiceNumber}
-                onChange={(event) => handleDraftFilterChange("invoiceNumber", event.target.value)}
-                placeholder="Número da nota"
-                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">Categoria</span>
-              <select
-                value={draftFilters.category || ""}
-                onChange={(event) =>
-                  handleDraftFilterChange(
-                    "category",
-                    (event.target.value || "") as ProductPageFilters["category"],
-                  )
-                }
-                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-              >
-                <option value="">Todas as categorias</option>
-                {categoryOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleClear}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            >
-              Limpar filtros
-            </button>
-            <button
-              type="button"
-              onClick={handleSearch}
-              className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
-            >
-              Consultar
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-500">
-              {selectedItemIds.length > 0
-                ? `${selectedItemIds.length} item(ns) selecionado(s)`
-                : `${filteredItems.length} item(ns) encontrado(s)`}
-            </p>
-
-            {selectedItemIds.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setBulkDeleteOpen(true)}
-                disabled={selectedItemIds.length === 0}
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Excluir selecionados
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="w-12 px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={allItemsOnPageSelected}
-                    onChange={toggleSelectAllPage}
-                    className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
-                    aria-label="Selecionar itens da página"
-                  />
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Produto
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Veículo
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Categoria
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Qtd
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Valor
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Valor total
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  NF-e
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Fornecedor
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  Data
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-sm text-slate-500">
-                    Carregando produtos...
-                  </td>
-                </tr>
-              ) : paginatedItems.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-sm text-slate-500">
-                    Nenhum produto encontrado.
-                  </td>
-                </tr>
-              ) : (
-                paginatedItems.map((item) => (
-                  <tr key={item.id} className="border-t border-slate-200">
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={selectedItemIds.includes(item.id)}
-                        onChange={() => toggleItemSelection(item.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-200"
-                        aria-label={`Selecionar produto ${item.description}`}
-                      />
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      <p className="font-medium text-slate-900">{item.description}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Código: {item.productCode || "-"}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      {item.retailProductImport.vehicle ? (
-                        <span>{formatVehicleLabel(item.retailProductImport.vehicle)}</span>
-                      ) : item.retailProductImport.sourcePlate ? (
-                        <span>{item.retailProductImport.sourcePlate}</span>
-                      ) : (
-                        <span className="text-slate-500">Sem veículo detectado</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                        {categoryLabel(item.category)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      {formatQuantity(item.quantity)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      {formatMoney(item.unitValue)}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">
-                      {formatMoney(item.totalValue)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      {item.retailProductImport.invoiceNumber || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      {item.retailProductImport.supplierName || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      {formatDate(item.retailProductImport.issuedAt)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {!loading && items.length > 0 ? (
-          <TablePagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={filteredItems.length}
-            pageSize={PAGE_SIZE}
-            itemLabel="produtos"
-            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-          />
-        ) : null}
-      </section>
+      <ProductsTablesSection
+        currentCompanyName={currentCompany?.name}
+        loading={loading}
+        refreshing={refreshing}
+        draftFilters={draftFilters}
+        filteredItems={filteredItems}
+        paginatedItems={paginatedItems}
+        selectedItemIds={selectedItemIds}
+        allItemsOnPageSelected={allItemsOnPageSelected}
+        productOptions={productOptions}
+        productCodeOptions={productCodeOptions}
+        supplierOptions={supplierOptions}
+        invoiceOptions={invoiceOptions}
+        categoryOptions={categorySelectOptions}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={PAGE_SIZE}
+        onFilterChange={handleDraftFilterChange}
+        onSearch={handleSearch}
+        onClear={handleClear}
+        onToggleItemSelection={toggleItemSelection}
+        onToggleSelectAllPage={toggleSelectAllPage}
+        onOpenBulkDelete={() => setBulkDeleteOpen(true)}
+        onPreviousPage={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+        onNextPage={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+      />
 
       <ConfirmDeleteModal
         isOpen={bulkDeleteOpen}

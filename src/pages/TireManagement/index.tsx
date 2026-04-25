@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ComponentProps, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createTire,
@@ -8,7 +8,7 @@ import {
   getTires,
   updateTire,
 } from "../../services/tires";
-import type { Tire, TireAlert, TireStatus } from "../../types/tire";
+import type { Tire, TireAlert } from "../../types/tire";
 import {
   BulkEditTiresModal,
   type BulkEditTiresForm,
@@ -21,7 +21,7 @@ import {
   TireInspectionModal,
   type TireInspectionForm,
 } from "./components/TireInspectionModal";
-import { TireTable } from "./components/TireTable";
+import { TireTable, type TireSearchFilters } from "./components/TireTable";
 import { TireVehicleCards } from "./components/TireVehicleCards";
 import {
   compareValues,
@@ -37,21 +37,6 @@ import {
 } from "./helpers";
 
 export type LinkFilter = "ALL" | "LINKED" | "UNLINKED";
-
-export type TireSearchFilters = {
-  serialNumber: string;
-  brand: string;
-  model: string;
-  size: string;
-  status: "" | TireStatus;
-  condition: string;
-  vehicle: string;
-  branch: string;
-  purchaseDateStart: string;
-  purchaseDateEnd: string;
-  linkFilter: LinkFilter;
-  alertFilter: "ALL" | "ONLY_ALERTS" | "WITHOUT_ALERTS";
-};
 
 const emptyBulkForm: BulkEditTiresForm = {
   brand: "",
@@ -88,6 +73,8 @@ const initialSearchFilters: TireSearchFilters = {
   linkFilter: "ALL",
   alertFilter: "ALL",
 };
+
+type TireTableProps = ComponentProps<typeof TireTable>;
 
 function normalizeText(value?: string | null) {
   return String(value || "")
@@ -401,12 +388,15 @@ export function TireManagementPage() {
     return sortedTires.slice(start, start + pageSize);
   }, [sortedTires, currentPage, pageSize]);
 
-  function updateDraftFilter<K extends keyof TireSearchFilters>(
-    field: K,
-    value: TireSearchFilters[K],
-  ) {
-    setDraftFilters((current) => ({ ...current, [field]: value }));
-  }
+  const updateDraftFilter: TireTableProps["onDraftFilterChange"] = (
+    field,
+    value,
+  ) => {
+    setDraftFilters({
+      ...draftFilters,
+      [field]: value,
+    } as TireSearchFilters);
+  };
 
   function handleSearch() {
     setAppliedFilters(draftFilters);
@@ -600,10 +590,10 @@ export function TireManagementPage() {
               : {}),
             ...(bulkForm.targetPressurePsi.trim()
               ? {
-                  targetPressurePsi: parseOptionalNumber(
-                    bulkForm.targetPressurePsi,
-                  ),
-                }
+                targetPressurePsi: parseOptionalNumber(
+                  bulkForm.targetPressurePsi,
+                ),
+              }
               : {}),
             ...(bulkForm.status ? { status: bulkForm.status } : {}),
           }),
@@ -726,7 +716,7 @@ export function TireManagementPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Gestão de Pneus</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Gestão de Pneus</h1>
           <p className="text-sm text-slate-500">
             Cadastre, visualize, edite e organize os pneus da frota.
           </p>

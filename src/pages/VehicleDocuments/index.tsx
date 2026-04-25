@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
-import { QuickStatusAction } from "../../components/QuickStatusAction";
-import { TablePagination } from "../../components/TablePagination";
 import { useBranch } from "../../contexts/BranchContext";
-import { getDrivers } from "../../services/drivers";
 import { api } from "../../services/api";
 import { normalizeApiBaseUrl } from "../../services/url";
 import {
@@ -14,6 +11,7 @@ import {
   updateVehicleDocument,
   uploadVehicleDocumentFile,
 } from "../../services/vehicleDocuments";
+import { getDrivers } from "../../services/drivers";
 import { getVehicles } from "../../services/vehicles";
 import type { Driver } from "../../types/driver";
 import type { Vehicle } from "../../types/vehicle";
@@ -24,8 +22,12 @@ import type {
   VehicleDocumentType,
 } from "../../types/vehicle-document";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
-
-type DocumentTab = "VEHICLE" | "DRIVER" | "GENERAL";
+import {
+  DocumentsTablesSection,
+  type DocumentFilters,
+  type DocumentSortBy,
+  type DocumentTab,
+} from "./DocumentsTablesSection";
 
 type DocumentFormData = {
   ownerType: VehicleDocumentOwnerType;
@@ -42,20 +44,9 @@ type DocumentFormData = {
   driverId: string;
 };
 
-type DocumentSortBy = "type" | "name" | "reference" | "expiryDate" | "status";
 type DocumentFieldErrors = Partial<
   Record<"vehicleId" | "driverId" | "type" | "status" | "name", string>
 >;
-
-type DocumentFilters = {
-  vehicleId: string;
-  driverId: string;
-  type: VehicleDocumentType | "";
-  status: VehicleDocumentStatus | "";
-  issuer: string;
-  startDate: string;
-  endDate: string;
-};
 
 const TABLE_PAGE_SIZE = 10;
 
@@ -117,34 +108,59 @@ const initialFilters: DocumentFilters = {
   endDate: "",
 };
 
+function parseFilterIds(value?: string) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function parseLocalDate(value?: string | null) {
   if (!value) return null;
+
   const raw = String(value).slice(0, 10);
   const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
   if (!match) {
     const fallback = new Date(value);
     return Number.isNaN(fallback.getTime()) ? null : fallback;
   }
-  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 0, 0, 0, 0);
-}
 
-function toDateText(value?: string | null) {
-  const date = parseLocalDate(value);
-  return date ? date.toLocaleDateString("pt-BR") : "-";
+  return new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    0,
+    0,
+    0,
+    0,
+  );
 }
 
 function getDaysUntil(value?: string | null) {
   const target = parseLocalDate(value);
   if (!target) return null;
+
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    0,
+    0,
+    0,
+    0,
+  );
+
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 function getEffectiveStatus(item: VehicleDocument): VehicleDocumentStatus {
   const days = getDaysUntil(item.expiryDate);
+
   if (days !== null && days < 0) return "EXPIRED";
   if (days !== null && days <= 30) return "EXPIRING";
+
   return item.status || "VALID";
 }
 
@@ -162,12 +178,19 @@ function statusClass(status: VehicleDocumentStatus) {
 
 function documentTypeLabel(value?: VehicleDocumentType | null) {
   const allOptions = [...vehicleTypeOptions, ...driverTypeOptions, ...generalTypeOptions];
+
   return allOptions.find((item) => item.value === value)?.label || "Outro";
 }
 
 function getReferenceLabel(item: VehicleDocument) {
-  if (item.ownerType === "DRIVER") return item.driver?.name || "Motorista não vinculado";
-  if (item.ownerType === "GENERAL") return item.company?.name || "Documento geral";
+  if (item.ownerType === "DRIVER") {
+    return item.driver?.name || "Motorista não vinculado";
+  }
+
+  if (item.ownerType === "GENERAL") {
+    return item.company?.name || "Documento geral";
+  }
+
   return item.vehicle ? formatVehicleLabel(item.vehicle) : "Veículo não vinculado";
 }
 
@@ -212,17 +235,20 @@ export function VehicleDocumentsPage() {
   const [focusedDriverId, setFocusedDriverId] = useState<string | null>(null);
   const [form, setForm] = useState<DocumentFormData>(initialForm);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
   const isCpfDocument = form.type === "CPF_DOCUMENT";
 
   async function loadData() {
     try {
       setLoading(true);
       setPageErrorMessage("");
+
       const [documentsData, vehiclesData, driversData] = await Promise.all([
         getVehicleDocuments(),
         getVehicles(),
         getDrivers(),
       ]);
+
       setDocuments(Array.isArray(documentsData) ? documentsData : []);
       setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
       setDrivers(Array.isArray(driversData) ? driversData : []);
@@ -235,7 +261,7 @@ export function VehicleDocumentsPage() {
   }
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   useEffect(() => {
@@ -270,8 +296,11 @@ export function VehicleDocumentsPage() {
     query.delete("tab");
     query.delete("highlight");
     query.delete("driverId");
+
     const next = query.toString();
-    const nextUrl = `${window.location.pathname}${next ? `?${next}` : ""}${window.location.hash || ""}`;
+    const nextUrl = `${window.location.pathname}${next ? `?${next}` : ""}${window.location.hash || ""
+      }`;
+
     window.history.replaceState({}, "", nextUrl);
 
     return () => window.clearTimeout(timer);
@@ -279,9 +308,12 @@ export function VehicleDocumentsPage() {
 
   useEffect(() => {
     if (!highlightedDocumentId) return;
+
     const clear = () => setHighlightedDocumentId(null);
+
     document.addEventListener("pointerdown", clear, { passive: true });
     document.addEventListener("keydown", clear);
+
     return () => {
       document.removeEventListener("pointerdown", clear);
       document.removeEventListener("keydown", clear);
@@ -290,9 +322,11 @@ export function VehicleDocumentsPage() {
 
   const availableVehicles = useMemo(() => {
     let filtered = vehicles;
+
     if (selectedBranchId) {
       filtered = filtered.filter((item) => item.branchId === selectedBranchId);
     }
+
     return [...filtered].sort((a, b) =>
       a.plate.localeCompare(b.plate, "pt-BR", { sensitivity: "base" }),
     );
@@ -300,9 +334,11 @@ export function VehicleDocumentsPage() {
 
   const availableDrivers = useMemo(() => {
     let filtered = drivers;
+
     if (selectedBranchId) {
       filtered = filtered.filter((item) => item.vehicle?.branchId === selectedBranchId);
     }
+
     return [...filtered].sort((a, b) =>
       a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }),
     );
@@ -311,10 +347,14 @@ export function VehicleDocumentsPage() {
   const scopedDocuments = useMemo(() => {
     return documents.filter((item) => {
       if (item.ownerType !== activeTab) return false;
-      if (activeTab === "DRIVER" && focusedDriverId && item.driverId !== focusedDriverId) return false;
+      if (activeTab === "DRIVER" && focusedDriverId && item.driverId !== focusedDriverId) {
+        return false;
+      }
+
       if (!selectedBranchId) return true;
       if (activeTab === "GENERAL") return true;
       if (activeTab === "DRIVER") return item.driver?.vehicle?.branchId === selectedBranchId;
+
       return item.vehicle?.branchId === selectedBranchId;
     });
   }, [documents, activeTab, focusedDriverId, selectedBranchId]);
@@ -324,12 +364,19 @@ export function VehicleDocumentsPage() {
 
     let filtered = scopedDocuments;
 
-    if (activeTab === "VEHICLE" && appliedFilters.vehicleId) {
-      filtered = filtered.filter((item) => item.vehicleId === appliedFilters.vehicleId);
+    const selectedVehicleIds = parseFilterIds(appliedFilters.vehicleId);
+    const selectedDriverIds = parseFilterIds(appliedFilters.driverId);
+
+    if (activeTab === "VEHICLE" && selectedVehicleIds.length > 0) {
+      filtered = filtered.filter((item) =>
+        item.vehicleId ? selectedVehicleIds.includes(item.vehicleId) : false,
+      );
     }
 
-    if (activeTab === "DRIVER" && appliedFilters.driverId) {
-      filtered = filtered.filter((item) => item.driverId === appliedFilters.driverId);
+    if (activeTab === "DRIVER" && selectedDriverIds.length > 0) {
+      filtered = filtered.filter((item) =>
+        item.driverId ? selectedDriverIds.includes(item.driverId) : false,
+      );
     }
 
     if (appliedFilters.type) {
@@ -337,19 +384,26 @@ export function VehicleDocumentsPage() {
     }
 
     if (appliedFilters.status) {
-      filtered = filtered.filter((item) => getEffectiveStatus(item) === appliedFilters.status);
+      filtered = filtered.filter(
+        (item) => getEffectiveStatus(item) === appliedFilters.status,
+      );
     }
 
     if (appliedFilters.issuer.trim()) {
       const issuerTerm = appliedFilters.issuer.trim().toLowerCase();
-      filtered = filtered.filter((item) => String(item.issuer || "").toLowerCase().includes(issuerTerm));
+
+      filtered = filtered.filter((item) =>
+        String(item.issuer || "").toLowerCase().includes(issuerTerm),
+      );
     }
 
     if (appliedFilters.startDate) {
       const startDate = parseLocalDate(appliedFilters.startDate)?.getTime() || 0;
+
       filtered = filtered.filter((item) => {
         const issueDate = parseLocalDate(item.issueDate)?.getTime() || 0;
         const expiryDate = parseLocalDate(item.expiryDate)?.getTime() || 0;
+
         return issueDate >= startDate || expiryDate >= startDate;
       });
     }
@@ -357,16 +411,27 @@ export function VehicleDocumentsPage() {
     if (appliedFilters.endDate) {
       const endDateBase = parseLocalDate(appliedFilters.endDate);
       const endDate = endDateBase
-        ? new Date(endDateBase.getFullYear(), endDateBase.getMonth(), endDateBase.getDate(), 23, 59, 59, 999).getTime()
+        ? new Date(
+          endDateBase.getFullYear(),
+          endDateBase.getMonth(),
+          endDateBase.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ).getTime()
         : 0;
+
       filtered = filtered.filter((item) => {
         const issueDate = parseLocalDate(item.issueDate)?.getTime() || 0;
         const expiryDate = parseLocalDate(item.expiryDate)?.getTime() || 0;
+
         return issueDate <= endDate || expiryDate <= endDate;
       });
     }
 
     const direction = sortDirection === "asc" ? 1 : -1;
+
     return [...filtered].sort((a, b) => {
       if (sortBy === "type") {
         return (
@@ -375,9 +440,11 @@ export function VehicleDocumentsPage() {
           }) * direction
         );
       }
+
       if (sortBy === "name") {
         return a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }) * direction;
       }
+
       if (sortBy === "reference") {
         return (
           getReferenceLabel(a).localeCompare(getReferenceLabel(b), "pt-BR", {
@@ -385,6 +452,7 @@ export function VehicleDocumentsPage() {
           }) * direction
         );
       }
+
       if (sortBy === "expiryDate") {
         return (
           ((parseLocalDate(a.expiryDate)?.getTime() || 0) -
@@ -392,6 +460,7 @@ export function VehicleDocumentsPage() {
           direction
         );
       }
+
       return (
         statusLabel(getEffectiveStatus(a)).localeCompare(
           statusLabel(getEffectiveStatus(b)),
@@ -409,13 +478,22 @@ export function VehicleDocumentsPage() {
 
   const paginatedDocuments = useMemo(() => {
     const start = (currentPage - 1) * TABLE_PAGE_SIZE;
+
     return filteredDocuments.slice(start, start + TABLE_PAGE_SIZE);
   }, [filteredDocuments, currentPage]);
 
   useEffect(() => {
     setCurrentPage(1);
     setSelectedDocumentIds([]);
-  }, [activeTab, appliedFilters, hasSearched, sortBy, sortDirection, selectedBranchId, focusedDriverId]);
+  }, [
+    activeTab,
+    appliedFilters,
+    hasSearched,
+    sortBy,
+    sortDirection,
+    selectedBranchId,
+    focusedDriverId,
+  ]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -431,16 +509,19 @@ export function VehicleDocumentsPage() {
     setCurrentPage(1);
   }, [activeTab, focusedDriverId, selectedBranchId]);
 
-
   const summary = useMemo(() => {
     if (!hasSearched) {
       return { total: 0, valid: 0, expiring: 0, expired: 0 };
     }
-    const total = filteredDocuments.length;
-    const valid = filteredDocuments.filter((item) => getEffectiveStatus(item) === "VALID").length;
-    const expiring = filteredDocuments.filter((item) => getEffectiveStatus(item) === "EXPIRING").length;
-    const expired = filteredDocuments.filter((item) => getEffectiveStatus(item) === "EXPIRED").length;
-    return { total, valid, expiring, expired };
+
+    return {
+      total: filteredDocuments.length,
+      valid: filteredDocuments.filter((item) => getEffectiveStatus(item) === "VALID").length,
+      expiring: filteredDocuments.filter((item) => getEffectiveStatus(item) === "EXPIRING")
+        .length,
+      expired: filteredDocuments.filter((item) => getEffectiveStatus(item) === "EXPIRED")
+        .length,
+    };
   }, [filteredDocuments, hasSearched]);
 
   function handleFilterChange<K extends keyof DocumentFilters>(
@@ -467,6 +548,7 @@ export function VehicleDocumentsPage() {
 
   function getSortArrow(column: DocumentSortBy) {
     if (sortBy !== column) return "↕";
+
     return sortDirection === "asc" ? "↑" : "↓";
   }
 
@@ -475,10 +557,10 @@ export function VehicleDocumentsPage() {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
       return;
     }
+
     setSortBy(column);
     setSortDirection("asc");
   }
-
   function openCreateModal(tab = activeTab) {
     setEditingDocument(null);
     setForm({
@@ -533,6 +615,7 @@ export function VehicleDocumentsPage() {
 
       return next;
     });
+
     if (
       field === "vehicleId" ||
       field === "driverId" ||
@@ -548,21 +631,26 @@ export function VehicleDocumentsPage() {
     if (field && fieldErrors[field]) {
       return "mt-1 w-full rounded-xl border border-red-400 bg-red-50 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200";
     }
+
     return "mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200";
   }
 
   function resolveFileUrl(fileUrl?: string | null) {
     if (!fileUrl) return "";
     if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+
     const base = normalizeApiBaseUrl(String(api.defaults.baseURL || "").trim());
+
     return `${base}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
   }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+
     try {
       setSaving(true);
       setFieldErrors({});
+
       let nextFileUrl = form.fileUrl.trim() || undefined;
 
       if (selectedFile) {
@@ -586,15 +674,19 @@ export function VehicleDocumentsPage() {
       };
 
       const nextErrors: DocumentFieldErrors = {};
+
       if (!payload.type) nextErrors.type = "Selecione o tipo.";
       if (!payload.status) nextErrors.status = "Selecione o status.";
       if (!payload.name) nextErrors.name = "Informe o nome do documento.";
+
       if (payload.ownerType === "VEHICLE" && !payload.vehicleId) {
         nextErrors.vehicleId = "Selecione o veículo.";
       }
+
       if (payload.ownerType === "DRIVER" && !payload.driverId) {
         nextErrors.driverId = "Selecione o motorista.";
       }
+
       if (Object.keys(nextErrors).length > 0) {
         setFieldErrors(nextErrors);
         return;
@@ -615,9 +707,11 @@ export function VehicleDocumentsPage() {
         error?.response?.data?.error ||
         error?.message ||
         "";
+
       const apiText = Array.isArray(apiMessage)
         ? apiMessage.join(", ")
         : String(apiMessage || "Não foi possível salvar o documento.");
+
       setFieldErrors((prev) => ({ ...prev, name: apiText }));
     } finally {
       setSaving(false);
@@ -630,8 +724,12 @@ export function VehicleDocumentsPage() {
   ) {
     try {
       setQuickStatusDocumentId(item.id);
+
       const updated = await updateVehicleDocument(item.id, { status: nextStatus });
-      setDocuments((prev) => prev.map((entry) => (entry.id === item.id ? updated : entry)));
+
+      setDocuments((prev) =>
+        prev.map((entry) => (entry.id === item.id ? updated : entry)),
+      );
       setPageErrorMessage("");
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
     } catch (error) {
@@ -648,9 +746,12 @@ export function VehicleDocumentsPage() {
 
   async function confirmDeleteDocument() {
     if (!documentToDelete) return;
+
     try {
       setDeletingDocument(true);
+
       await deleteVehicleDocument(documentToDelete.id);
+
       setDocumentToDelete(null);
       await loadData();
       window.dispatchEvent(new CustomEvent("evfleet-notifications-updated"));
@@ -671,21 +772,25 @@ export function VehicleDocumentsPage() {
   function handleToggleAllDocuments() {
     const pageIds = paginatedDocuments.map((item) => item.id);
     const allSelected =
-      pageIds.length > 0 &&
-      pageIds.every((id) => selectedDocumentIds.includes(id));
+      pageIds.length > 0 && pageIds.every((id) => selectedDocumentIds.includes(id));
 
     setSelectedDocumentIds((prev) =>
-      allSelected ? prev.filter((id) => !pageIds.includes(id)) : [...new Set([...prev, ...pageIds])],
+      allSelected
+        ? prev.filter((id) => !pageIds.includes(id))
+        : [...new Set([...prev, ...pageIds])],
     );
   }
 
   async function confirmBulkDeleteDocuments() {
     if (selectedDocumentIds.length === 0) return;
+
     try {
       setDeletingDocument(true);
+
       const results = await Promise.allSettled(
         selectedDocumentIds.map((id) => deleteVehicleDocument(id)),
       );
+
       const failedCount = results.filter((result) => result.status === "rejected").length;
 
       if (failedCount > 0) {
@@ -710,34 +815,79 @@ export function VehicleDocumentsPage() {
     }
   }
 
+  function openEditSelectedDocument() {
+    if (selectedDocumentIds.length !== 1) return;
+
+    const selectedDocument = filteredDocuments.find(
+      (item) => item.id === selectedDocumentIds[0],
+    );
+
+    if (selectedDocument) {
+      openEditModal(selectedDocument);
+    }
+  }
+
   const allDocumentsOnPageSelected =
     paginatedDocuments.length > 0 &&
     paginatedDocuments.every((item) => selectedDocumentIds.includes(item.id));
 
-  const typeOptions = getTypeOptionsByTab(form.ownerType);
-
+  const typeOptions = getTypeOptionsByTab(activeTab);
+  const modalTypeOptions = getTypeOptionsByTab(form.ownerType);
 
   return (
     <div className="min-w-0 space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Gestão de Documentos</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-slate-900">Gestão de Documentos</h1>
+          <p className="mt-1 text-sm text-slate-500">
             Controle de validade, vencimentos e rastreabilidade documental da operação.
           </p>
         </div>
+
         <button
+          type="button"
           onClick={() => openCreateModal(activeTab)}
-          className="w-full cursor-pointer rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
+          className="btn-ui btn-ui-primary w-full sm:w-auto"
         >
           + Cadastrar documento
         </button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Totais
+          </p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{summary.total}</p>
+        </div>
+
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+            Válidos
+          </p>
+          <p className="mt-1 text-2xl font-bold text-emerald-800">{summary.valid}</p>
+        </div>
+
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+            Vencendo
+          </p>
+          <p className="mt-1 text-2xl font-bold text-amber-800">{summary.expiring}</p>
+        </div>
+
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+            Vencidos
+          </p>
+          <p className="mt-1 text-2xl font-bold text-red-800">{summary.expired}</p>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
         <div className="grid gap-2 md:grid-cols-3">
           {(["VEHICLE", "DRIVER", "GENERAL"] as DocumentTab[]).map((tab) => {
             const active = activeTab === tab;
+
             return (
               <button
                 key={tab}
@@ -755,154 +905,44 @@ export function VehicleDocumentsPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Totais</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{summary.total}</p>
-        </div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Válidos</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-800">{summary.valid}</p>
-        </div>
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Vencendo (30d)</p>
-          <p className="mt-1 text-2xl font-bold text-amber-800">{summary.expiring}</p>
-        </div>
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Vencidos</p>
-          <p className="mt-1 text-2xl font-bold text-red-800">{summary.expired}</p>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <label className="text-sm text-slate-700 xl:col-span-2">
-            <span className="font-medium text-slate-700">Empresa</span>
-            <input
-              value={"Empresa atual"}
-              disabled
-              className="mt-1 h-12 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 px-4 text-sm text-slate-500 outline-none"
-            />
-          </label>
-
-          {activeTab === "VEHICLE" ? (
-            <label className="text-sm text-slate-700">
-              <span className="font-medium text-slate-700">Veículo</span>
-              <select
-                value={draftFilters.vehicleId}
-                onChange={(e) => handleFilterChange("vehicleId", e.target.value)}
-                className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-              >
-                <option value="">Todos</option>
-                {availableVehicles.map((vehicle) => (
-                  <option key={vehicle.id} value={vehicle.id}>
-                    {formatVehicleLabel(vehicle)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-
-          {activeTab === "DRIVER" ? (
-            <label className="text-sm text-slate-700">
-              <span className="font-medium text-slate-700">Motorista</span>
-              <select
-                value={draftFilters.driverId}
-                onChange={(e) => handleFilterChange("driverId", e.target.value)}
-                className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-              >
-                <option value="">Todos</option>
-                {availableDrivers.map((driver) => (
-                  <option key={driver.id} value={driver.id}>
-                    {driver.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-
-          <label className="text-sm text-slate-700">
-            <span className="font-medium text-slate-700">Tipo</span>
-            <select
-              value={draftFilters.type}
-              onChange={(e) =>
-                handleFilterChange("type", e.target.value as VehicleDocumentType | "")
-              }
-              className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            >
-              <option value="">Todos</option>
-              {getTypeOptionsByTab(activeTab).map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="text-sm text-slate-700">
-            <span className="font-medium text-slate-700">Status</span>
-            <select
-              value={draftFilters.status}
-              onChange={(e) =>
-                handleFilterChange("status", e.target.value as VehicleDocumentStatus | "")
-              }
-              className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            >
-              <option value="">Todos</option>
-              <option value="VALID">Válido</option>
-              <option value="EXPIRING">Vencendo</option>
-              <option value="EXPIRED">Vencido</option>
-            </select>
-          </label>
-
-          <label className="text-sm text-slate-700">
-            <span className="font-medium text-slate-700">Emissor</span>
-            <input
-              value={draftFilters.issuer}
-              onChange={(e) => handleFilterChange("issuer", e.target.value)}
-              className="mt-1 h-12 w-full rounded-xl border border-slate-300 px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-              placeholder="Ex.: Detran"
-            />
-          </label>
-
-          <label className="text-sm text-slate-700">
-            <span className="font-medium text-slate-700">Data inicial</span>
-            <input
-              type="date"
-              value={draftFilters.startDate}
-              onChange={(e) => handleFilterChange("startDate", e.target.value)}
-              className="mt-1 h-12 w-full rounded-xl border border-slate-300 px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            />
-          </label>
-
-          <label className="text-sm text-slate-700">
-            <span className="font-medium text-slate-700">Data final</span>
-            <input
-              type="date"
-              value={draftFilters.endDate}
-              onChange={(e) => handleFilterChange("endDate", e.target.value)}
-              className="mt-1 h-12 w-full rounded-xl border border-slate-300 px-4 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            />
-          </label>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            onClick={handleSearch}
-            className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 sm:w-auto"
-          >
-            Consultar
-          </button>
-          <button
-            type="button"
-            onClick={handleClearFilters}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-600 sm:w-auto"
-          >
-            Limpar
-          </button>
-        </div>
-      </div>
+      <DocumentsTablesSection
+        activeTab={activeTab}
+        loading={loading}
+        hasSearched={hasSearched}
+        draftFilters={draftFilters}
+        vehicles={availableVehicles}
+        drivers={availableDrivers}
+        typeOptions={typeOptions}
+        paginatedDocuments={paginatedDocuments}
+        filteredDocumentsLength={filteredDocuments.length}
+        selectedDocumentIds={selectedDocumentIds}
+        allDocumentsOnPageSelected={allDocumentsOnPageSelected}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        tablePageSize={TABLE_PAGE_SIZE}
+        quickStatusDocumentId={quickStatusDocumentId}
+        highlightedDocumentId={highlightedDocumentId}
+        onFilterChange={handleFilterChange}
+        onConsult={handleSearch}
+        onClearFilters={handleClearFilters}
+        onToggleDocument={handleToggleDocument}
+        onToggleAllDocuments={handleToggleAllDocuments}
+        onOpenEditSelected={openEditSelectedDocument}
+        onOpenBulkDelete={() => setBulkDeleteOpen(true)}
+        onOpenEdit={openEditModal}
+        onDelete={handleDelete}
+        onQuickStatusChange={handleQuickStatusChange}
+        onPreviousPage={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+        onNextPage={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+        onSort={handleSort}
+        getSortArrow={getSortArrow}
+        getReferenceLabel={getReferenceLabel}
+        documentTypeLabel={documentTypeLabel}
+        statusLabel={statusLabel}
+        statusClass={statusClass}
+        getEffectiveStatus={getEffectiveStatus}
+        resolveFileUrl={resolveFileUrl}
+      />
 
       {pageErrorMessage ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -910,329 +950,268 @@ export function VehicleDocumentsPage() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm">
-          <span className="text-slate-500">
-            {selectedDocumentIds.length > 0
-              ? `${selectedDocumentIds.length} documento(s) selecionado(s)`
-              : "Selecione registros para excluir em lote"}
-          </span>
-          <button
-            type="button"
-            onClick={() => setBulkDeleteOpen(true)}
-            disabled={selectedDocumentIds.length === 0}
-            className="btn-ui btn-ui-danger disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Excluir selecionados
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={allDocumentsOnPageSelected}
-                    onChange={handleToggleAllDocuments}
-                    aria-label="Selecionar documentos da página"
-                    className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
-                  />
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <button type="button" onClick={() => handleSort("type")} className="cursor-pointer">
-                    Tipo {getSortArrow("type")}
-                  </button>
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <button type="button" onClick={() => handleSort("name")} className="cursor-pointer">
-                    Documento {getSortArrow("name")}
-                  </button>
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <button type="button" onClick={() => handleSort("reference")} className="cursor-pointer">
-                    {activeTab === "VEHICLE"
-                      ? `Veículo ${getSortArrow("reference")}`
-                      : activeTab === "DRIVER"
-                        ? `Motorista ${getSortArrow("reference")}`
-                        : `Referência ${getSortArrow("reference")}`}
-                  </button>
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <button type="button" onClick={() => handleSort("expiryDate")} className="cursor-pointer">
-                    Vencimento {getSortArrow("expiryDate")}
-                  </button>
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
-                  <button type="button" onClick={() => handleSort("status")} className="cursor-pointer">
-                    Status {getSortArrow("status")}
-                  </button>
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">
-                    Carregando documentos...
-                  </td>
-                </tr>
-              ) : !hasSearched ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">
-                    Faça uma consulta para visualizar os documentos.
-                  </td>
-                </tr>
-              ) : filteredDocuments.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">
-                    Nenhum documento encontrado.
-                  </td>
-                </tr>
-              ) : (
-                paginatedDocuments.map((item) => {
-                  const effectiveStatus = getEffectiveStatus(item);
-                  const isHighlighted = highlightedDocumentId === item.id;
-
-                  return (
-                    <tr
-                      id={`vehicle-document-row-${item.id}`}
-                      key={item.id}
-                      className={`border-t border-slate-200 ${isHighlighted ? "notification-highlight" : ""}`}
-                    >
-                      <td className="px-6 py-4 text-sm text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={selectedDocumentIds.includes(item.id)}
-                          onChange={() => handleToggleDocument(item.id)}
-                          aria-label={`Selecionar documento ${item.name}`}
-                          className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-700">{documentTypeLabel(item.type)}</td>
-                      <td className="px-6 py-4 text-sm text-slate-700">
-                        <p className="font-medium text-slate-900">{item.name}</p>
-                        <p className="text-xs text-slate-500">{item.number || "Sem número"}</p>
-                        {item.fileUrl ? (
-                          <a
-                            href={resolveFileUrl(item.fileUrl)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-1 inline-flex text-xs font-semibold text-blue-700 hover:underline"
-                          >
-                            Ver anexo
-                          </a>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(item)}
-                            className="mt-1 inline-flex text-xs font-semibold text-orange-700 hover:underline"
-                          >
-                            Anexar
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-700">{getReferenceLabel(item)}</td>
-                      <td className="px-6 py-4 text-sm text-slate-700">{toDateText(item.expiryDate)}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className={`status-pill ${statusClass(effectiveStatus)}`}>
-                            {statusLabel(effectiveStatus)}
-                          </span>
-                          {effectiveStatus !== "VALID" ? (
-                            <QuickStatusAction
-                              label={`Atualizar status do documento ${item.name}`}
-                              loading={quickStatusDocumentId === item.id}
-                              options={[
-                                { value: "VALID", label: "Marcar como válido" },
-                                { value: "EXPIRING", label: "Marcar como vencendo" },
-                                { value: "EXPIRED", label: "Marcar como vencido" },
-                              ]}
-                              onSelect={(value) =>
-                                handleQuickStatusChange(item, value as VehicleDocumentStatus)
-                              }
-                            />
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <div className="flex gap-2">
-                          <button onClick={() => openEditModal(item)} className="btn-ui btn-ui-neutral">
-                            Editar
-                          </button>
-                          <button onClick={() => handleDelete(item)} className="btn-ui btn-ui-danger">
-                            Excluir
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        {!loading && hasSearched && filteredDocuments.length > 0 ? (
-          <TablePagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={filteredDocuments.length}
-            pageSize={TABLE_PAGE_SIZE}
-            itemLabel="documentos"
-            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-          />
-        ) : null}
-      </div>
-
       {isModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
-          <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+          <form
+            onSubmit={handleSubmit}
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">
                   {editingDocument ? "Editar documento" : "Cadastrar documento"}
                 </h2>
-                <p className="text-sm text-slate-500">
-                  Gerencie validade e rastreabilidade documental de {getTabTitle(form.ownerType).toLowerCase()}.
+                <p className="mt-1 text-sm text-slate-500">
+                  Preencha as informações de controle documental.
                 </p>
               </div>
-              <button onClick={closeModal} className="btn-ui btn-ui-neutral">
+
+              <button
+                type="button"
+                onClick={closeModal}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
                 Fechar
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto p-6">
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Identificação</p>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {form.ownerType === "VEHICLE" ? (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700">Veículo</label>
-                      <select value={form.vehicleId} onChange={(e) => handleChange("vehicleId", e.target.value)} className={inputClass("vehicleId")}>
-                        <option value="">Selecione um veículo</option>
-                        {availableVehicles.map((vehicle) => (
-                          <option key={vehicle.id} value={vehicle.id}>
-                            {formatVehicleLabel(vehicle)}
-                          </option>
-                        ))}
-                      </select>
-                      {fieldErrors.vehicleId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.vehicleId}</p> : null}
-                    </div>
-                  ) : null}
-                  {form.ownerType === "DRIVER" ? (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700">Motorista</label>
-                      <select value={form.driverId} onChange={(e) => handleChange("driverId", e.target.value)} className={inputClass("driverId")}>
-                        <option value="">Selecione um motorista</option>
-                        {availableDrivers.map((driver) => (
-                          <option key={driver.id} value={driver.id}>
-                            {driver.name}
-                          </option>
-                        ))}
-                      </select>
-                      {fieldErrors.driverId ? <p className="mt-1 text-xs text-red-600">{fieldErrors.driverId}</p> : null}
-                    </div>
-                  ) : null}
-                  {form.ownerType === "GENERAL" ? (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 md:col-span-2">
-                      Este documento será cadastrado como documento geral da empresa selecionada no escopo.
-                    </div>
-                  ) : null}
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Tipo</label>
-                    <select value={form.type} onChange={(e) => handleChange("type", e.target.value as VehicleDocumentType | "")} className={inputClass("type")}>
-                      <option value="">Selecione o tipo</option>
-                      {typeOptions.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldErrors.type ? <p className="mt-1 text-xs text-red-600">{fieldErrors.type}</p> : null}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Nome do documento</label>
-                    <input value={form.name} onChange={(e) => handleChange("name", e.target.value)} className={inputClass("name")} placeholder="Ex: CRLV 2026" />
-                    {fieldErrors.name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p> : null}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Número</label>
-                    <input value={form.number} onChange={(e) => handleChange("number", e.target.value)} className={inputClass()} placeholder="Opcional" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Órgão emissor</label>
-                    <input value={form.issuer} onChange={(e) => handleChange("issuer", e.target.value)} className={inputClass()} placeholder="Detran, IBAMA, transportadora..." />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Status</label>
-                    <select value={form.status} onChange={(e) => handleChange("status", e.target.value as VehicleDocumentStatus | "")} className={inputClass("status")}>
-                      <option value="">Selecione o status</option>
-                      <option value="VALID">Válido</option>
-                      <option value="EXPIRING">Vencendo</option>
-                      <option value="EXPIRED">Vencido</option>
-                    </select>
-                    {fieldErrors.status ? <p className="mt-1 text-xs text-red-600">{fieldErrors.status}</p> : null}
-                  </div>
-                </div>
-              </div>
 
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Vigência</p>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {!isCpfDocument ? (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700">Data de emiss??o</label>
-                        <input type="date" value={form.issueDate} onChange={(e) => handleChange("issueDate", e.target.value)} className={inputClass()} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700">Data de vencimento</label>
-                        <input type="date" value={form.expiryDate} onChange={(e) => handleChange("expiryDate", e.target.value)} className={inputClass()} />
-                      </div>
-                    </>
-                  ) : (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 md:col-span-2">
-                      CPF não exige controle de emissão ou vencimento.
-                    </div>
-                  )}
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700">Anexo do documento</label>
-                    <input type="file" accept=".pdf,image/*" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="mt-1 w-full cursor-pointer rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-orange-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-orange-700 hover:file:bg-orange-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200" />
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                      {selectedFile ? <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-700">Novo arquivo: {selectedFile.name}</span> : null}
-                      {!selectedFile && form.fileUrl ? (
-                        <>
-                          <a href={resolveFileUrl(form.fileUrl)} target="_blank" rel="noreferrer" className="font-semibold text-blue-700 hover:underline">Ver anexo atual</a>
-                          <button type="button" onClick={() => handleChange("fileUrl", "")} className="btn-ui btn-ui-danger">Remover anexo</button>
-                        </>
-                      ) : (
-                        <span className="text-slate-500">Aceita PDF, PNG, JPG e WEBP (até 10MB).</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700">Observações</label>
-                    <textarea value={form.notes} onChange={(e) => handleChange("notes", e.target.value)} rows={3} className={inputClass()} placeholder="Informações adicionais" />
-                  </div>
-                </div>
-              </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="text-sm font-semibold text-slate-700">
+                Categoria
+                <select
+                  value={form.ownerType}
+                  onChange={(event) =>
+                    handleChange("ownerType", event.target.value as VehicleDocumentOwnerType)
+                  }
+                  className={inputClass()}
+                >
+                  <option value="VEHICLE">Veículo</option>
+                  <option value="DRIVER">Motorista</option>
+                  <option value="GENERAL">Geral</option>
+                </select>
+              </label>
 
-              <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pt-4">
-                <button type="button" onClick={closeModal} className="btn-ui btn-ui-neutral">Cancelar</button>
-                <button type="submit" disabled={saving} className="btn-ui btn-ui-primary disabled:cursor-not-allowed disabled:opacity-70">
-                  {saving ? "Salvando..." : editingDocument ? "Salvar alterações" : "Cadastrar documento"}
-                </button>
-              </div>
-            </form>
-          </div>
+              {form.ownerType === "VEHICLE" ? (
+                <label className="text-sm font-semibold text-slate-700">
+                  Veículo
+                  <select
+                    value={form.vehicleId}
+                    onChange={(event) => handleChange("vehicleId", event.target.value)}
+                    className={inputClass("vehicleId")}
+                  >
+                    <option value="">Selecione</option>
+                    {availableVehicles.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {formatVehicleLabel(vehicle)}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.vehicleId ? (
+                    <span className="mt-1 block text-xs text-red-600">
+                      {fieldErrors.vehicleId}
+                    </span>
+                  ) : null}
+                </label>
+              ) : null}
+
+              {form.ownerType === "DRIVER" ? (
+                <label className="text-sm font-semibold text-slate-700">
+                  Motorista
+                  <select
+                    value={form.driverId}
+                    onChange={(event) => handleChange("driverId", event.target.value)}
+                    className={inputClass("driverId")}
+                  >
+                    <option value="">Selecione</option>
+                    {availableDrivers.map((driver) => (
+                      <option key={driver.id} value={driver.id}>
+                        {driver.name}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.driverId ? (
+                    <span className="mt-1 block text-xs text-red-600">
+                      {fieldErrors.driverId}
+                    </span>
+                  ) : null}
+                </label>
+              ) : null}
+
+              <label className="text-sm font-semibold text-slate-700">
+                Tipo
+                <select
+                  value={form.type}
+                  onChange={(event) =>
+                    handleChange("type", event.target.value as VehicleDocumentType | "")
+                  }
+                  className={inputClass("type")}
+                >
+                  <option value="">Selecione</option>
+                  {modalTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {fieldErrors.type ? (
+                  <span className="mt-1 block text-xs text-red-600">
+                    {fieldErrors.type}
+                  </span>
+                ) : null}
+              </label>
+
+              <label className="text-sm font-semibold text-slate-700">
+                Status
+                <select
+                  value={form.status}
+                  onChange={(event) =>
+                    handleChange("status", event.target.value as VehicleDocumentStatus | "")
+                  }
+                  className={inputClass("status")}
+                >
+                  <option value="">Selecione</option>
+                  <option value="VALID">Válido</option>
+                  <option value="EXPIRING">Vencendo</option>
+                  <option value="EXPIRED">Vencido</option>
+                </select>
+                {fieldErrors.status ? (
+                  <span className="mt-1 block text-xs text-red-600">
+                    {fieldErrors.status}
+                  </span>
+                ) : null}
+              </label>
+
+              <label className="text-sm font-semibold text-slate-700 md:col-span-2">
+                Nome do documento
+                <input
+                  value={form.name}
+                  onChange={(event) => handleChange("name", event.target.value)}
+                  className={inputClass("name")}
+                  placeholder="Ex.: CRLV 2026"
+                />
+                {fieldErrors.name ? (
+                  <span className="mt-1 block text-xs text-red-600">
+                    {fieldErrors.name}
+                  </span>
+                ) : null}
+              </label>
+
+              <label className="text-sm font-semibold text-slate-700">
+                Número
+                <input
+                  value={form.number}
+                  onChange={(event) => handleChange("number", event.target.value)}
+                  className={inputClass()}
+                  placeholder="Número do documento"
+                />
+              </label>
+
+              <label className="text-sm font-semibold text-slate-700">
+                Emissor
+                <input
+                  value={form.issuer}
+                  onChange={(event) => handleChange("issuer", event.target.value)}
+                  className={inputClass()}
+                  placeholder="Órgão emissor"
+                />
+              </label>
+
+              {!isCpfDocument ? (
+                <>
+                  <label className="text-sm font-semibold text-slate-700">
+                    Data de emissão
+                    <input
+                      type="date"
+                      value={form.issueDate}
+                      onChange={(event) => handleChange("issueDate", event.target.value)}
+                      className={inputClass()}
+                    />
+                  </label>
+
+                  <label className="text-sm font-semibold text-slate-700">
+                    Data de vencimento
+                    <input
+                      type="date"
+                      value={form.expiryDate}
+                      onChange={(event) => handleChange("expiryDate", event.target.value)}
+                      className={inputClass()}
+                    />
+                  </label>
+                </>
+              ) : null}
+
+              <label className="text-sm font-semibold text-slate-700 md:col-span-2">
+                Arquivo
+                <input
+                  type="file"
+                  onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
+                  className={inputClass()}
+                />
+              </label>
+
+              <label className="text-sm font-semibold text-slate-700 md:col-span-2">
+                URL do arquivo
+                <input
+                  value={form.fileUrl}
+                  onChange={(event) => handleChange("fileUrl", event.target.value)}
+                  className={inputClass()}
+                  placeholder="Opcional"
+                />
+              </label>
+
+              <label className="text-sm font-semibold text-slate-700 md:col-span-2">
+                Observações
+                <textarea
+                  value={form.notes}
+                  onChange={(event) => handleChange("notes", event.target.value)}
+                  className={`${inputClass()} min-h-24`}
+                  placeholder="Observações internas"
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="btn-ui btn-ui-neutral"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="btn-ui btn-ui-primary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? "Salvando..." : "Salvar documento"}
+              </button>
+            </div>
+          </form>
         </div>
       ) : null}
 
       <ConfirmDeleteModal
         isOpen={Boolean(documentToDelete)}
         title="Excluir documento"
-        description={documentToDelete ? `Deseja excluir o documento "${documentToDelete.name}"?` : ""}
+        description={
+          documentToDelete
+            ? `Deseja excluir o documento "${documentToDelete.name}"?`
+            : ""
+        }
+        loading={deletingDocument}
+        onCancel={() => setDocumentToDelete(null)}
+        onConfirm={confirmDeleteDocument}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(documentToDelete)}
+        title="Excluir documento"
+        description={
+          documentToDelete
+            ? `Deseja excluir o documento "${documentToDelete.name}"?`
+            : ""
+        }
         loading={deletingDocument}
         onCancel={() => setDocumentToDelete(null)}
         onConfirm={confirmDeleteDocument}

@@ -22,6 +22,7 @@ type VehiclesTablesSectionProps = {
   activeTab: ActiveTab;
   loading: boolean;
   hasSearched: boolean;
+  vehicles: Vehicle[];
   branches: Branch[];
   currentCompanyName?: string;
   filtersDraft: VehicleFilters;
@@ -52,6 +53,7 @@ type VehiclesTablesSectionProps = {
 
   selectedVehicleIds: string[];
   selectedCount: number;
+  onOpenEditSelected: () => void;
   onOpenBulkDelete: () => void;
   onOpenCompositionImplements: (vehicle: Vehicle) => void;
   onOpenLinkedVehicle: (vehicle: Vehicle) => void;
@@ -112,15 +114,19 @@ function CompactMultiSelectField({
 
   const filteredOptions = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return options.filter((item) => {
-      if (selectedIds.includes(item.id)) return false;
-      if (!normalized) return true;
-      return item.label.toLowerCase().includes(normalized);
-    });
+
+    return options
+      .filter((item) => {
+        if (selectedIds.includes(item.id)) return false;
+        if (!normalized) return true;
+        return item.label.toLowerCase().includes(normalized);
+      })
+      .slice(0, 10);
   }, [options, selectedIds, query]);
 
   function addItem(id: string) {
     if (disabled || selectedIds.includes(id)) return;
+
     onChange([...selectedIds, id]);
     setQuery("");
     setOpen(false);
@@ -129,6 +135,7 @@ function CompactMultiSelectField({
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
       if (!containerRef.current) return;
+
       const target = event.target as Node;
       if (!containerRef.current.contains(target)) setOpen(false);
     }
@@ -151,6 +158,7 @@ function CompactMultiSelectField({
       <label className="mb-1 block text-sm font-semibold text-slate-700">
         {label}
       </label>
+
       <div ref={containerRef} className="relative">
         <div
           className={`min-h-[40px] w-full rounded-xl border bg-white px-2.5 py-1.5 text-sm focus-within:ring-2 ${disabled
@@ -158,23 +166,33 @@ function CompactMultiSelectField({
             : "border-slate-300 focus-within:border-orange-500 focus-within:ring-orange-200"
             }`}
           onClick={() => {
-            if (!disabled) setOpen(true);
+            if (!disabled) {
+              const input = containerRef.current?.querySelector("input");
+              input?.focus();
+              setOpen(true);
+            }
           }}
         >
           <div className="flex flex-wrap items-center gap-1.5">
             {selectedOptions.map((item) => (
               <span
                 key={item.id}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700"
+                className="inline-flex cursor-default items-center gap-1 rounded-md border border-slate-300 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700"
+                onClick={(event) => event.stopPropagation()}
               >
                 {item.label}
+
                 <button
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    if (!disabled) onChange(selectedIds.filter((id) => id !== item.id));
+                    if (!disabled) {
+                      onChange(selectedIds.filter((id) => id !== item.id));
+                    }
                   }}
-                  className={`leading-none ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:text-red-600"
+                  className={`leading-none ${disabled
+                    ? "cursor-not-allowed opacity-50"
+                    : "cursor-pointer hover:text-red-600"
                     }`}
                 >
                   ×
@@ -186,8 +204,10 @@ function CompactMultiSelectField({
               value={query}
               onChange={(event) => {
                 if (disabled) return;
-                setQuery(event.target.value);
-                setOpen(true);
+
+                const nextQuery = event.target.value;
+                setQuery(nextQuery);
+                setOpen(Boolean(nextQuery.trim()));
               }}
               onFocus={() => {
                 if (!disabled) setOpen(true);
@@ -329,7 +349,6 @@ function ActionButtons({
         <Clock3 size={16} />
         <span>Histórico</span>
       </button>
-
     </div>
   );
 }
@@ -340,13 +359,13 @@ function EmptyState({ activeTab }: { activeTab: ActiveTab }) {
       ? "Nenhum veículo encontrado para os filtros informados."
       : "Nenhum implemento encontrado para os filtros informados.";
 
-  const description = "Ajuste os filtros e tente novamente para localizar os registros desejados.";
-
   return (
     <div className="px-6 py-12 text-center">
       <div className="mx-auto max-w-xl rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8">
         <p className="text-base font-semibold text-slate-700">{title}</p>
-        <p className="mt-2 text-sm text-slate-500">{description}</p>
+        <p className="mt-2 text-sm text-slate-500">
+          Ajuste os filtros e tente novamente para localizar os registros desejados.
+        </p>
       </div>
     </div>
   );
@@ -355,6 +374,7 @@ function EmptyState({ activeTab }: { activeTab: ActiveTab }) {
 export function VehiclesTablesSection({
   activeTab,
   loading,
+  vehicles,
   filtersDraft,
   onFiltersDraftChange,
   onConsult,
@@ -374,6 +394,7 @@ export function VehiclesTablesSection({
   tablePageSize,
   selectedVehicleIds,
   selectedCount,
+  onOpenEditSelected,
   onOpenBulkDelete,
   onOpenCompositionImplements,
   onOpenLinkedVehicle,
@@ -396,7 +417,9 @@ export function VehiclesTablesSection({
 
   const selectedLabel = activeTab === "vehicles" ? "veículo(s)" : "implemento(s)";
   const totalItems =
-    activeTab === "vehicles" ? filteredVehiclesOnlyLength : filteredImplementsOnlyLength;
+    activeTab === "vehicles"
+      ? filteredVehiclesOnlyLength
+      : filteredImplementsOnlyLength;
 
   const vehicleTypeOptions: SelectOption[] = [
     { id: "LIGHT", label: "Leve" },
@@ -416,11 +439,71 @@ export function VehiclesTablesSection({
     { id: "SOLD", label: "Vendido" },
   ];
 
+  const filterBaseVehicles = useMemo(
+    () =>
+      activeTab === "implements"
+        ? vehicles.filter((vehicle) => vehicle.category === "IMPLEMENT")
+        : vehicles.filter((vehicle) => vehicle.category !== "IMPLEMENT"),
+    [activeTab, vehicles],
+  );
+
+  const plateOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          filterBaseVehicles
+            .map((vehicle) => vehicle.plate)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ).map((plate) => ({
+        id: plate,
+        label: plate,
+      })),
+    [filterBaseVehicles],
+  );
+
+  const brandOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          filterBaseVehicles
+            .map((vehicle) => vehicle.brand)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ).map((brand) => ({
+        id: brand,
+        label: brand,
+      })),
+    [filterBaseVehicles],
+  );
+
+  const modelOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          filterBaseVehicles
+            .map((vehicle) => vehicle.model)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ).map((model) => ({
+        id: model,
+        label: model,
+      })),
+    [filterBaseVehicles],
+  );
+
+  const selectedPlates = parseCsvValue(filtersDraft.plate);
+  const selectedBrands = parseCsvValue(filtersDraft.brand);
+  const selectedModels = parseCsvValue(filtersDraft.model);
   const selectedVehicleTypes = parseCsvValue(filtersDraft.vehicleType).filter(
     (item) => item !== "ALL",
   );
-  const selectedCategories = parseCsvValue(filtersDraft.category).filter((item) => item !== "ALL");
-  const selectedStatuses = parseCsvValue(filtersDraft.status).filter((item) => item !== "ALL");
+  const selectedCategories = parseCsvValue(filtersDraft.category).filter(
+    (item) => item !== "ALL",
+  );
+  const selectedStatuses = parseCsvValue(filtersDraft.status).filter(
+    (item) => item !== "ALL",
+  );
 
   return (
     <div className="space-y-6">
@@ -435,45 +518,33 @@ export function VehiclesTablesSection({
                 type="text"
                 value={currentCompany?.name || "Empresa não selecionada"}
                 disabled
-                className="w-full cursor-not-allowed rounded-xl border border-slate-300 bg-slate-200 px-3 py-2 text-sm text-slate-600 outline-none"
+                className="h-10 w-full cursor-not-allowed rounded-xl border border-slate-300 bg-slate-200 px-3 text-sm text-slate-600 outline-none"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="mb-1 block text-sm font-semibold text-slate-700">
-                Placa
-              </label>
-              <input
-                value={filtersDraft.plate}
-                onChange={(e) => onFiltersDraftChange("plate", e.target.value)}
-                placeholder="Digite a placa"
-                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-              />
-            </div>
+            <CompactMultiSelectField
+              label="Placa"
+              options={plateOptions}
+              selectedIds={selectedPlates}
+              onChange={(value) => onFiltersDraftChange("plate", toCsvValue(value))}
+              placeholder="Todas as placas"
+            />
 
-            <div className="space-y-1.5">
-              <label className="mb-1 block text-sm font-semibold text-slate-700">
-                Marca
-              </label>
-              <input
-                value={filtersDraft.brand}
-                onChange={(e) => onFiltersDraftChange("brand", e.target.value)}
-                placeholder="Digite a marca"
-                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-              />
-            </div>
+            <CompactMultiSelectField
+              label="Marca"
+              options={brandOptions}
+              selectedIds={selectedBrands}
+              onChange={(value) => onFiltersDraftChange("brand", toCsvValue(value))}
+              placeholder="Todas as marcas"
+            />
 
-            <div className="space-y-1.5">
-              <label className="mb-1 block text-sm font-semibold text-slate-700">
-                Modelo
-              </label>
-              <input
-                value={filtersDraft.model}
-                onChange={(e) => onFiltersDraftChange("model", e.target.value)}
-                placeholder="Digite o modelo"
-                className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-              />
-            </div>
+            <CompactMultiSelectField
+              label="Modelo"
+              options={modelOptions}
+              selectedIds={selectedModels}
+              onChange={(value) => onFiltersDraftChange("model", toCsvValue(value))}
+              placeholder="Todos os modelos"
+            />
 
             {activeTab === "vehicles" ? (
               <>
@@ -481,7 +552,9 @@ export function VehiclesTablesSection({
                   label="Tipo de peso"
                   options={vehicleTypeOptions}
                   selectedIds={selectedVehicleTypes}
-                  onChange={(value) => onFiltersDraftChange("vehicleType", toCsvValue(value))}
+                  onChange={(value) =>
+                    onFiltersDraftChange("vehicleType", toCsvValue(value))
+                  }
                   placeholder="Selecione os tipos"
                 />
 
@@ -489,7 +562,9 @@ export function VehiclesTablesSection({
                   label="Categoria"
                   options={categoryOptions}
                   selectedIds={selectedCategories}
-                  onChange={(value) => onFiltersDraftChange("category", toCsvValue(value))}
+                  onChange={(value) =>
+                    onFiltersDraftChange("category", toCsvValue(value))
+                  }
                   placeholder="Selecione as categorias"
                 />
               </>
@@ -505,15 +580,24 @@ export function VehiclesTablesSection({
           </div>
 
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-start">
-            <button type="button" onClick={onClearFilters} className="btn-ui btn-ui-neutral">
+            <button
+              type="button"
+              onClick={onClearFilters}
+              className="btn-ui btn-ui-neutral"
+            >
               Limpar filtros
             </button>
-            <button type="button" onClick={onConsult} className="btn-ui btn-ui-primary">
+
+            <button
+              type="button"
+              onClick={onConsult}
+              className="btn-ui btn-ui-primary"
+            >
               Consultar
             </button>
           </div>
         </div>
-      </section >
+      </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-4 py-4">
@@ -528,6 +612,20 @@ export function VehiclesTablesSection({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  onClick={onOpenEditSelected}
+                  disabled={selectedCount !== 1}
+                  title={
+                    selectedCount > 1
+                      ? "Você pode editar apenas 1 veículo selecionado"
+                      : undefined
+                  }
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Editar selecionado
+                </button>
+
+                <button
+                  type="button"
                   onClick={onOpenBulkDelete}
                   className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
                 >
@@ -537,7 +635,9 @@ export function VehiclesTablesSection({
             </div>
           ) : (
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-slate-600">{totalItems} registro(s) encontrado(s).</p>
+              <p className="text-sm text-slate-600">
+                {totalItems} registro(s) encontrado(s).
+              </p>
             </div>
           )}
         </div>
@@ -557,6 +657,7 @@ export function VehiclesTablesSection({
                         aria-label="Selecionar veículos da página"
                       />
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       <button
                         type="button"
@@ -566,6 +667,7 @@ export function VehiclesTablesSection({
                         Placa <span className="text-xs">{getSortArrow("plate")}</span>
                       </button>
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       <button
                         type="button"
@@ -575,6 +677,7 @@ export function VehiclesTablesSection({
                         Veículo <span className="text-xs">{getSortArrow("vehicle")}</span>
                       </button>
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       <button
                         type="button"
@@ -584,15 +687,19 @@ export function VehiclesTablesSection({
                         Tipo <span className="text-xs">{getSortArrow("type")}</span>
                       </button>
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       Eixos
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       Configuração
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       Conjunto
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       <button
                         type="button"
@@ -602,11 +709,13 @@ export function VehiclesTablesSection({
                         Status <span className="text-xs">{getSortArrow("status")}</span>
                       </button>
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       Ações
                     </th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {loading ? (
                     <tr>
@@ -632,29 +741,38 @@ export function VehiclesTablesSection({
                             aria-label={`Selecionar veículo ${vehicle.plate}`}
                           />
                         </td>
+
                         <td className="px-6 py-4 text-sm font-medium text-slate-900">
                           {vehicle.plate}
                         </td>
+
                         <td className="px-6 py-4 text-sm text-slate-600">
                           {vehicle.brand} {vehicle.model}
                         </td>
+
                         <td className="px-6 py-4 text-sm text-slate-600">
-                          {getCategoryLabel(vehicle.category)} | {getVehicleTypeLabel(vehicle.vehicleType)}
+                          {getCategoryLabel(vehicle.category)} |{" "}
+                          {getVehicleTypeLabel(vehicle.vehicleType)}
                         </td>
+
                         <td className="px-6 py-4 text-sm text-slate-600">
                           {getVehicleAxleCount(vehicle)}
                         </td>
+
                         <td className="px-6 py-4 text-sm text-slate-600">
                           {getVehicleAxleConfiguration(vehicle)}
                         </td>
+
                         <td className="px-6 py-4 text-sm text-slate-600">
                           {renderVehicleComposition(vehicle, onOpenCompositionImplements)}
                         </td>
+
                         <td className="px-6 py-4 text-sm">
                           <span className={`status-pill ${getStatusClass(vehicle.status)}`}>
                             {getStatusLabel(vehicle.status)}
                           </span>
                         </td>
+
                         <td className="px-6 py-4 text-sm">
                           <ActionButtons
                             vehicle={vehicle}
@@ -701,6 +819,7 @@ export function VehiclesTablesSection({
                         aria-label="Selecionar implementos da página"
                       />
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       <button
                         type="button"
@@ -710,6 +829,7 @@ export function VehiclesTablesSection({
                         Placa <span className="text-xs">{getSortArrow("plate")}</span>
                       </button>
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       <button
                         type="button"
@@ -719,23 +839,29 @@ export function VehiclesTablesSection({
                         Implemento <span className="text-xs">{getSortArrow("vehicle")}</span>
                       </button>
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       Tipo
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       Eixos
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       Veículo vinculado
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       Status
                     </th>
+
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-600">
                       Ações
                     </th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {loading ? (
                     <tr>
@@ -761,26 +887,34 @@ export function VehiclesTablesSection({
                             aria-label={`Selecionar implemento ${vehicle.plate}`}
                           />
                         </td>
+
                         <td className="px-6 py-4 text-sm font-medium text-slate-900">
                           {vehicle.plate}
                         </td>
+
                         <td className="px-6 py-4 text-sm text-slate-600">
                           {vehicle.brand} {vehicle.model}
                         </td>
+
                         <td className="px-6 py-4 text-sm text-slate-600">
-                          {getCategoryLabel(vehicle.category)} | {getVehicleTypeLabel(vehicle.vehicleType)}
+                          {getCategoryLabel(vehicle.category)} |{" "}
+                          {getVehicleTypeLabel(vehicle.vehicleType)}
                         </td>
+
                         <td className="px-6 py-4 text-sm text-slate-600">
                           {getVehicleAxleCount(vehicle)}
                         </td>
+
                         <td className="px-6 py-4 text-sm text-slate-600">
                           {renderLinkedVehicle(vehicle, onOpenLinkedVehicle)}
                         </td>
+
                         <td className="px-6 py-4 text-sm">
                           <span className={`status-pill ${getStatusClass(vehicle.status)}`}>
                             {getStatusLabel(vehicle.status)}
                           </span>
                         </td>
+
                         <td className="px-6 py-4 text-sm">
                           <ActionButtons
                             vehicle={vehicle}
@@ -814,6 +948,6 @@ export function VehiclesTablesSection({
           </>
         )}
       </section>
-    </div >
+    </div>
   );
 }

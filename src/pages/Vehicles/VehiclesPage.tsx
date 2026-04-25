@@ -25,6 +25,7 @@ import useVehiclesTables, {
   initialVehicleFilters,
   type VehicleFilters,
 } from "./useVehiclesTables";
+import { VehicleImportDropdown } from "./VehicleImportDropdown";
 import {
   type AxleConfiguration,
   type VehicleFieldErrors,
@@ -57,6 +58,40 @@ function parseCurrencyToNumber(value: string): number | null {
   const parsed = Number(normalized);
 
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatNumberToCurrencyInput(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "";
+
+  const parsed =
+    typeof value === "number"
+      ? value
+      : Number(String(value).replace(/\./g, "").replace(",", "."));
+
+  if (!Number.isFinite(parsed)) return "";
+
+  return parsed.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatCurrency(value: number): string {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
+function toSafeNumber(value: unknown): number {
+  if (value === null || value === undefined || value === "") return 0;
+
+  const parsed =
+    typeof value === "number"
+      ? value
+      : Number(String(value).replace(/\./g, "").replace(",", "."));
+
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export function VehiclesPage() {
@@ -230,11 +265,7 @@ export function VehiclesPage() {
     if (!hasSearched) {
       return {
         total: 0,
-        active: 0,
-        maintenance: 0,
-        linked: 0,
-        light: 0,
-        heavy: 0,
+        patrimony: 0,
       };
     }
 
@@ -243,28 +274,15 @@ export function VehiclesPage() {
     const vehiclesOnly = scoped.filter((vehicle) => vehicle.category !== "IMPLEMENT");
     const implementsOnly = scoped.filter((vehicle) => vehicle.category === "IMPLEMENT");
 
-    if (activeTab === "implements") {
-      return {
-        total: implementsOnly.length,
-        active: implementsOnly.filter((vehicle) => vehicle.status === "ACTIVE").length,
-        maintenance: implementsOnly.filter(
-          (vehicle) => vehicle.status === "MAINTENANCE",
-        ).length,
-        linked: 0,
-        light: 0,
-        heavy: 0,
-      };
-    }
+    const currentList = activeTab === "implements" ? implementsOnly : vehiclesOnly;
 
     return {
-      total: vehiclesOnly.length,
-      active: vehiclesOnly.filter((vehicle) => vehicle.status === "ACTIVE").length,
-      maintenance: vehiclesOnly.filter(
-        (vehicle) => vehicle.status === "MAINTENANCE",
-      ).length,
-      linked: 0,
-      light: vehiclesOnly.filter((vehicle) => vehicle.vehicleType === "LIGHT").length,
-      heavy: vehiclesOnly.filter((vehicle) => vehicle.vehicleType === "HEAVY").length,
+      total: currentList.length,
+      patrimony: currentList.reduce(
+        (sum, vehicle) =>
+          sum + toSafeNumber((vehicle as Vehicle & { fipeValue?: unknown }).fipeValue),
+        0,
+      ),
     };
   }, [activeTab, filteredImplements, filteredVehicles, hasSearched]);
 
@@ -326,12 +344,12 @@ export function VehiclesPage() {
 
     const safeFuelType: VehicleFormData["fuelType"] =
       vehicle.fuelType === "GASOLINE" ||
-      vehicle.fuelType === "ETHANOL" ||
-      vehicle.fuelType === "DIESEL" ||
-      vehicle.fuelType === "FLEX" ||
-      vehicle.fuelType === "ELECTRIC" ||
-      vehicle.fuelType === "HYBRID" ||
-      vehicle.fuelType === "CNG"
+        vehicle.fuelType === "ETHANOL" ||
+        vehicle.fuelType === "DIESEL" ||
+        vehicle.fuelType === "FLEX" ||
+        vehicle.fuelType === "ELECTRIC" ||
+        vehicle.fuelType === "HYBRID" ||
+        vehicle.fuelType === "CNG"
         ? vehicle.fuelType
         : "";
 
@@ -342,13 +360,9 @@ export function VehiclesPage() {
         model: vehicle.model,
         brand: vehicle.brand,
         year: String(vehicle.year),
-        fipeValue:
-          typeof vehicle.fipeValue === "number" && Number.isFinite(vehicle.fipeValue)
-            ? vehicle.fipeValue.toLocaleString("pt-BR", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })
-            : "",
+        fipeValue: formatNumberToCurrencyInput(
+          (vehicle as Vehicle & { fipeValue?: unknown }).fipeValue,
+        ),
         vehicleType: vehicle.vehicleType,
         category: vehicle.category || "CAR",
         axleCount:
@@ -515,14 +529,14 @@ export function VehiclesPage() {
           form.category === "IMPLEMENT"
             ? undefined
             : (form.fuelType as
-                | "GASOLINE"
-                | "ETHANOL"
-                | "DIESEL"
-                | "ARLA32"
-                | "FLEX"
-                | "ELECTRIC"
-                | "HYBRID"
-                | "CNG"),
+              | "GASOLINE"
+              | "ETHANOL"
+              | "DIESEL"
+              | "ARLA32"
+              | "FLEX"
+              | "ELECTRIC"
+              | "HYBRID"
+              | "CNG"),
         tankCapacity:
           form.category === "IMPLEMENT"
             ? undefined
@@ -779,27 +793,56 @@ export function VehiclesPage() {
           <p className="text-sm text-slate-500">{pageSubtitle}</p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (loading) return;
-            openCreate();
-          }}
-          disabled={loading}
-          className={`inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-center text-sm font-semibold text-white transition sm:w-auto ${
-            loading
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <VehicleImportDropdown
+            importing={saving}
+            onImport={async (vehiclesToImport) => {
+              setSaving(true);
+
+              try {
+                const currentVehicles = await getVehicles();
+
+                for (const vehicle of vehiclesToImport) {
+                  const existingVehicle = currentVehicles.find(
+                    (item) =>
+                      item.plate.trim().toUpperCase() === vehicle.plate.trim().toUpperCase(),
+                  );
+
+                  if (existingVehicle) {
+                    await updateVehicle(existingVehicle.id, vehicle);
+                  } else {
+                    await createVehicle(vehicle);
+                  }
+                }
+
+                await loadData(appliedFilters);
+                setPageErrorMessage("Veículos importados com sucesso.");
+              } finally {
+                setSaving(false);
+              }
+            }}
+          />
+
+          <button
+            type="button"
+            onClick={() => {
+              if (loading) return;
+              openCreate();
+            }}
+            disabled={loading}
+            className={`inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-center text-sm font-semibold text-white transition sm:w-auto ${loading
               ? "cursor-not-allowed bg-slate-400"
               : "cursor-pointer bg-orange-500 hover:bg-orange-600"
-          }`}
-        >
-          + Cadastrar
-        </button>
+              }`}
+          >
+            + Cadastrar
+          </button>
+        </div>
       </div>
 
       <div
-        className={`grid gap-3 sm:grid-cols-2 ${
-          activeTab === "vehicles" ? "xl:grid-cols-5" : "xl:grid-cols-3"
-        }`}
+        className={`grid gap-3 sm:grid-cols-2 ${activeTab === "vehicles" ? "xl:grid-cols-5" : "xl:grid-cols-3"
+          }`}
       >
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -807,44 +850,14 @@ export function VehiclesPage() {
           </p>
           <p className="mt-1 text-2xl font-bold text-slate-900">{summary.total}</p>
         </div>
-
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-            Ativos
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
+            Patrimônio total de Veículos
           </p>
-          <p className="mt-1 text-2xl font-bold text-emerald-800">{summary.active}</p>
-        </div>
-
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-            Manutenção
-          </p>
-          <p className="mt-1 text-2xl font-bold text-amber-800">
-            {summary.maintenance}
+          <p className="mt-1 text-2xl font-bold text-orange-800">
+            {formatCurrency(summary.patrimony)}
           </p>
         </div>
-
-        {activeTab === "vehicles" ? (
-          <>
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
-                Leves
-              </p>
-              <p className="mt-1 text-2xl font-bold text-red-800">
-                {summary.light}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-                Pesados
-              </p>
-              <p className="mt-1 text-2xl font-bold text-blue-800">
-                {summary.heavy}
-              </p>
-            </div>
-          </>
-        ) : null}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
@@ -852,11 +865,10 @@ export function VehiclesPage() {
           <button
             type="button"
             onClick={() => setActiveTab("vehicles")}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              activeTab === "vehicles"
-                ? "bg-orange-500 text-white"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === "vehicles"
+              ? "bg-orange-500 text-white"
+              : "text-slate-600 hover:bg-slate-100"
+              }`}
           >
             Veículos
           </button>
@@ -864,11 +876,10 @@ export function VehiclesPage() {
           <button
             type="button"
             onClick={() => setActiveTab("implements")}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              activeTab === "implements"
-                ? "bg-orange-500 text-white"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === "implements"
+              ? "bg-orange-500 text-white"
+              : "text-slate-600 hover:bg-slate-100"
+              }`}
           >
             Implementos
           </button>
@@ -879,6 +890,7 @@ export function VehiclesPage() {
         activeTab={activeTab}
         loading={loading}
         hasSearched={hasSearched}
+        vehicles={vehicles}
         branches={branchFieldsEnabled ? branches : []}
         filtersDraft={filtersDraft}
         onFiltersDraftChange={updateFilterDraft}
@@ -901,6 +913,14 @@ export function VehiclesPage() {
         tablePageSize={TABLE_PAGE_SIZE}
         selectedVehicleIds={allSelectedIds}
         selectedCount={allSelectedIds.length}
+        onOpenEditSelected={() => {
+          const selectedId = allSelectedIds[0];
+          const selectedVehicle = vehicles.find((item) => item.id === selectedId);
+
+          if (selectedVehicle) {
+            openEdit(selectedVehicle);
+          }
+        }}
         onOpenBulkDelete={() => setIsBulkDeleteModalOpen(true)}
         onOpenCompositionImplements={handleOpenCompositionImplements}
         onOpenLinkedVehicle={handleOpenLinkedVehicle}

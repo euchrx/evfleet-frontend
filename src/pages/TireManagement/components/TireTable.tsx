@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Tire, TireAlert, TireStatus } from "../../../types/tire";
 import {
   brandModelLabel,
@@ -9,9 +10,9 @@ import {
   tireVehicleLabel,
 } from "../helpers";
 
-type LinkFilter = "ALL" | "LINKED" | "UNLINKED";
+export type LinkFilter = "" | "LINKED" | "UNLINKED";
 
-type TireSearchFilters = {
+export type TireSearchFilters = {
   serialNumber: string;
   brand: string;
   model: string;
@@ -22,9 +23,11 @@ type TireSearchFilters = {
   branch: string;
   purchaseDateStart: string;
   purchaseDateEnd: string;
-  linkFilter: LinkFilter;
-  alertFilter: "ALL" | "ONLY_ALERTS" | "WITHOUT_ALERTS";
+  linkFilter: string;
+  alertFilter: string;
 };
+
+type SelectOption = { id: string; label: string };
 
 type Props = {
   tires: Tire[];
@@ -51,6 +54,204 @@ type Props = {
   getAlertsForTire: (tireId: string) => TireAlert[];
 };
 
+function splitFilterValue(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function joinFilterValue(values: string[]) {
+  return values.join(",");
+}
+
+function uniqueOptions(values: Array<string | null | undefined>): SelectOption[] {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  )
+    .sort((a, b) => a.localeCompare(b, "pt-BR"))
+    .map((value) => ({
+      id: value,
+      label: value,
+    }));
+}
+
+function MultiSelectField({
+  label,
+  options,
+  selectedIds,
+  onChange,
+  placeholder,
+  error,
+  disabled = false,
+  openOnClick = false,
+  keepOpenOnSelect = false,
+}: {
+  label: string;
+  options: SelectOption[];
+  selectedIds: string[];
+  onChange: (value: string[]) => void;
+  placeholder: string;
+  error?: string;
+  disabled?: boolean;
+  openOnClick?: boolean;
+  keepOpenOnSelect?: boolean;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const selectedOptions = useMemo(
+    () => options.filter((item) => selectedIds.includes(item.id)),
+    [options, selectedIds],
+  );
+
+  const filteredOptions = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+
+    return options
+      .filter((item) => {
+        if (selectedIds.includes(item.id)) return false;
+        if (!normalized && !openOnClick) return false;
+        if (!normalized) return true;
+        return item.label.toLowerCase().includes(normalized);
+      })
+      .slice(0, 10);
+  }, [options, selectedIds, query, openOnClick]);
+
+  function addItem(id: string) {
+    if (disabled || selectedIds.includes(id)) return;
+
+    onChange([...selectedIds, id]);
+    setQuery("");
+
+    if (keepOpenOnSelect) {
+      setOpen(true);
+      requestAnimationFrame(() => inputRef.current?.focus());
+      return;
+    }
+
+    setOpen(false);
+  }
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (!containerRef.current) return;
+
+      const target = event.target as Node;
+      if (!containerRef.current.contains(target)) setOpen(false);
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    window.addEventListener("mousedown", handleOutsideClick);
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("mousedown", handleOutsideClick);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  return (
+    <div className="space-y-1">
+      <label className="block text-sm font-semibold text-slate-700">{label}</label>
+
+      <div ref={containerRef} className="relative">
+        <div
+          className={`min-h-[44px] w-full rounded-xl border bg-white px-2.5 py-2 text-sm focus-within:ring-2 ${error
+              ? "border-red-300 focus-within:border-red-500 focus-within:ring-red-200"
+              : "border-slate-300 focus-within:border-orange-500 focus-within:ring-orange-200"
+            }`}
+          onClick={() => {
+            if (disabled) return;
+            inputRef.current?.focus();
+            if (openOnClick) setOpen(true);
+          }}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedOptions.map((item) => (
+              <span
+                key={item.id}
+                className="inline-flex cursor-default items-center gap-1 rounded-md border border-slate-300 bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {item.label}
+
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+
+                    if (!disabled) {
+                      onChange(selectedIds.filter((id) => id !== item.id));
+                      requestAnimationFrame(() => inputRef.current?.focus());
+                    }
+                  }}
+                  className={`text-slate-500 ${disabled
+                      ? "cursor-not-allowed opacity-50"
+                      : "cursor-pointer hover:text-red-600"
+                    }`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(event) => {
+                if (disabled) return;
+
+                const nextQuery = event.target.value;
+                setQuery(nextQuery);
+                setOpen(Boolean(nextQuery.trim()) || openOnClick);
+              }}
+              onFocus={() => {
+                if (disabled) return;
+                if (openOnClick || query.trim()) setOpen(true);
+              }}
+              placeholder={
+                selectedOptions.length === 0 ? placeholder : "Digite para buscar..."
+              }
+              disabled={disabled}
+              className="min-w-[180px] flex-1 bg-transparent px-1 py-1 text-sm outline-none disabled:cursor-not-allowed"
+            />
+          </div>
+        </div>
+
+        {open && !disabled && filteredOptions.length > 0 ? (
+          <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+            {filteredOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  addItem(option.id);
+                }}
+                className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+    </div>
+  );
+}
+
 export function TireTable({
   tires,
   draftFilters,
@@ -75,139 +276,161 @@ export function TireTable({
   const allSelected =
     tires.length > 0 && tires.every((tire) => selectedIds.has(tire.id));
 
+  const serialNumberOptions = useMemo(
+    () => uniqueOptions(tires.map((tire) => tire.serialNumber)),
+    [tires],
+  );
+
+  const brandOptions = useMemo(
+    () => uniqueOptions(tires.map((tire) => tire.brand)),
+    [tires],
+  );
+
+  const modelOptions = useMemo(
+    () => uniqueOptions(tires.map((tire) => tire.model)),
+    [tires],
+  );
+
+  const sizeOptions = useMemo(
+    () => uniqueOptions(tires.map((tire) => tire.size)),
+    [tires],
+  );
+
+  const conditionOptions = useMemo(
+    () => uniqueOptions(tires.map((tire) => tireConditionLabel(tire))),
+    [tires],
+  );
+
+  const vehicleOptions = useMemo(
+    () => uniqueOptions(tires.map((tire) => tireVehicleLabel(tire))),
+    [tires],
+  );
+
+  const statusOptions: SelectOption[] = [
+    { id: "IN_STOCK", label: "Em estoque" },
+    { id: "INSTALLED", label: "Instalado" },
+    { id: "MAINTENANCE", label: "Manutenção" },
+    { id: "RETREADED", label: "Recapado" },
+    { id: "SCRAPPED", label: "Descartado" },
+  ];
+
+  const linkOptions: SelectOption[] = [
+    { id: "ALL", label: "Todos" },
+    { id: "LINKED", label: "Somente vinculados" },
+    { id: "UNLINKED", label: "Somente não vinculados" },
+  ];
+
+  const alertOptions: SelectOption[] = [
+    { id: "ALL", label: "Todos" },
+    { id: "ONLY_ALERTS", label: "Somente com alertas" },
+    { id: "WITHOUT_ALERTS", label: "Sem alertas" },
+  ];
+
   return (
     <div className="space-y-4">
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <label className="text-sm text-slate-700">
-            Número de série
-            <input
-              value={draftFilters.serialNumber}
-              onChange={(event) =>
-                onDraftFilterChange("serialNumber", event.target.value)
-              }
-              placeholder="Ex.: 12345"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            />
-          </label>
+          <MultiSelectField
+            label="Número de série"
+            options={serialNumberOptions}
+            selectedIds={splitFilterValue(draftFilters.serialNumber)}
+            onChange={(value) =>
+              onDraftFilterChange("serialNumber", joinFilterValue(value))
+            }
+            placeholder="Ex.: 12345"
+            openOnClick
+            keepOpenOnSelect
+          />
 
-          <label className="text-sm text-slate-700">
-            Marca
-            <input
-              value={draftFilters.brand}
-              onChange={(event) =>
-                onDraftFilterChange("brand", event.target.value)
-              }
-              placeholder="Ex.: Michelin"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            />
-          </label>
+          <MultiSelectField
+            label="Marca"
+            options={brandOptions}
+            selectedIds={splitFilterValue(draftFilters.brand)}
+            onChange={(value) => onDraftFilterChange("brand", joinFilterValue(value))}
+            placeholder="Ex.: Michelin"
+            openOnClick
+            keepOpenOnSelect
+          />
 
-          <label className="text-sm text-slate-700">
-            Modelo
-            <input
-              value={draftFilters.model}
-              onChange={(event) =>
-                onDraftFilterChange("model", event.target.value)
-              }
-              placeholder="Ex.: X Multi"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            />
-          </label>
+          <MultiSelectField
+            label="Modelo"
+            options={modelOptions}
+            selectedIds={splitFilterValue(draftFilters.model)}
+            onChange={(value) => onDraftFilterChange("model", joinFilterValue(value))}
+            placeholder="Ex.: X Multi"
+            openOnClick
+            keepOpenOnSelect
+          />
 
-          <label className="text-sm text-slate-700">
-            Medida
-            <input
-              value={draftFilters.size}
-              onChange={(event) =>
-                onDraftFilterChange("size", event.target.value)
-              }
-              placeholder="Ex.: 295/80R22.5"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            />
-          </label>
+          <MultiSelectField
+            label="Medida"
+            options={sizeOptions}
+            selectedIds={splitFilterValue(draftFilters.size)}
+            onChange={(value) => onDraftFilterChange("size", joinFilterValue(value))}
+            placeholder="Ex.: 295/80R22.5"
+            openOnClick
+            keepOpenOnSelect
+          />
 
-          <label className="text-sm text-slate-700">
-            Estado
-            <input
-              value={draftFilters.condition}
-              onChange={(event) =>
-                onDraftFilterChange("condition", event.target.value)
-              }
-              placeholder="Ex.: Bom, Atenção..."
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            />
-          </label>
+          <MultiSelectField
+            label="Estado"
+            options={conditionOptions}
+            selectedIds={splitFilterValue(draftFilters.condition)}
+            onChange={(value) =>
+              onDraftFilterChange("condition", joinFilterValue(value))
+            }
+            placeholder="Ex.: Bom, Atenção..."
+            openOnClick
+            keepOpenOnSelect
+          />
 
-          <label className="text-sm text-slate-700">
-            Veículo
-            <input
-              value={draftFilters.vehicle}
-              onChange={(event) =>
-                onDraftFilterChange("vehicle", event.target.value)
-              }
-              placeholder="Placa, marca ou modelo"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            />
-          </label>
+          <MultiSelectField
+            label="Veículo"
+            options={vehicleOptions}
+            selectedIds={splitFilterValue(draftFilters.vehicle)}
+            onChange={(value) =>
+              onDraftFilterChange("vehicle", joinFilterValue(value))
+            }
+            placeholder="Placa, marca ou modelo"
+            openOnClick
+            keepOpenOnSelect
+          />
 
-          <label className="text-sm text-slate-700">
-            Status
-            <select
-              value={draftFilters.status}
-              onChange={(event) =>
-                onDraftFilterChange(
-                  "status",
-                  event.target.value as TireSearchFilters["status"],
-                )
-              }
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            >
-              <option value="">Todos</option>
-              <option value="IN_STOCK">Em estoque</option>
-              <option value="INSTALLED">Instalado</option>
-              <option value="MAINTENANCE">Manutenção</option>
-              <option value="RETREADED">Recapado</option>
-              <option value="SCRAPPED">Descartado</option>
-            </select>
-          </label>
+          <MultiSelectField
+            label="Status"
+            options={statusOptions}
+            selectedIds={splitFilterValue(draftFilters.status)}
+            onChange={(value) =>
+              onDraftFilterChange("status", joinFilterValue(value) as TireSearchFilters["status"])
+            }
+            placeholder="Selecione um ou mais status"
+            openOnClick
+            keepOpenOnSelect
+          />
 
-          <label className="text-sm text-slate-700">
-            Vínculo
-            <select
-              value={draftFilters.linkFilter}
-              onChange={(event) =>
-                onDraftFilterChange(
-                  "linkFilter",
-                  event.target.value as LinkFilter,
-                )
-              }
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            >
-              <option value="ALL">Todos</option>
-              <option value="LINKED">Somente vinculados</option>
-              <option value="UNLINKED">Somente não vinculados</option>
-            </select>
-          </label>
+          <MultiSelectField
+            label="Vínculo"
+            options={linkOptions}
+            selectedIds={splitFilterValue(draftFilters.linkFilter)}
+            onChange={(value) =>
+              onDraftFilterChange("linkFilter", joinFilterValue(value))
+            }
+            placeholder="Selecione um ou mais vínculos"
+            openOnClick
+            keepOpenOnSelect
+          />
 
-          <label className="text-sm text-slate-700">
-            Alertas
-            <select
-              value={draftFilters.alertFilter}
-              onChange={(event) =>
-                onDraftFilterChange(
-                  "alertFilter",
-                  event.target.value as TireSearchFilters["alertFilter"],
-                )
-              }
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-            >
-              <option value="ALL">Todos</option>
-              <option value="ONLY_ALERTS">Somente com alertas</option>
-              <option value="WITHOUT_ALERTS">Sem alertas</option>
-            </select>
-          </label>
+          <MultiSelectField
+            label="Alertas"
+            options={alertOptions}
+            selectedIds={splitFilterValue(draftFilters.alertFilter)}
+            onChange={(value) =>
+              onDraftFilterChange("alertFilter", joinFilterValue(value))
+            }
+            placeholder="Selecione um ou mais filtros"
+            openOnClick
+            keepOpenOnSelect
+          />
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -227,14 +450,12 @@ export function TireTable({
             Limpar filtros
           </button>
         </div>
-
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-5 py-4">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-
               <div>
                 <p className="text-sm font-semibold text-red-700">
                   {selectedIds.size} pneu(s) selecionado(s)
@@ -252,6 +473,7 @@ export function TireTable({
                   <option value={50}>50 por página</option>
                   <option value={100}>100 por página</option>
                 </select>
+
                 <button
                   type="button"
                   onClick={onOpenBulkEdit}
@@ -260,6 +482,7 @@ export function TireTable({
                 >
                   Editar em lote
                 </button>
+
                 <button
                   type="button"
                   onClick={onDeleteSelected}

@@ -7,13 +7,13 @@ type SortDirection = "asc" | "desc";
 type ActiveTab = "vehicles" | "implements";
 
 type VehicleFilters = {
-  branchId: string; // CSV
+  branchId: string;
   plate: string;
   brand: string;
   model: string;
-  vehicleType: string; // CSV
-  category: string; // CSV
-  status: string; // CSV
+  vehicleType: string;
+  category: string;
+  status: string;
   acquisitionDateStart: string;
   acquisitionDateEnd: string;
 };
@@ -27,10 +27,12 @@ type UseVehiclesTablesParams = {
 
 function splitCsv(value: string) {
   if (!value || value === "ALL") return [];
+
   return value
     .split(",")
     .map((v) => v.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((v) => v !== "ALL");
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -41,10 +43,16 @@ function normalizeText(value: string | null | undefined) {
     .trim();
 }
 
-function includesNormalized(source: string | null | undefined, search: string) {
-  const normalizedSearch = normalizeText(search);
-  if (!normalizedSearch) return true;
-  return normalizeText(source).includes(normalizedSearch);
+function matchesAnyNormalized(source: string | null | undefined, filters: string[]) {
+  if (filters.length === 0) return true;
+
+  const normalizedSource = normalizeText(source);
+
+  return filters.some((filter) => {
+    const normalizedFilter = normalizeText(filter);
+    if (!normalizedFilter) return true;
+    return normalizedSource.includes(normalizedFilter);
+  });
 }
 
 function normalizeDate(value?: string | null) {
@@ -54,9 +62,11 @@ function normalizeDate(value?: string | null) {
 
 function isDateWithinRange(value: string | undefined | null, start: string, end: string) {
   const normalizedValue = normalizeDate(value);
+
   if (!normalizedValue) return !start && !end;
   if (start && normalizedValue < start) return false;
   if (end && normalizedValue > end) return false;
+
   return true;
 }
 
@@ -66,6 +76,7 @@ function buildLinkedVehicleLabel(vehicle: Vehicle, vehicles: Vehicle[]) {
   );
 
   if (!linkedVehicle) return "Não vinculado";
+
   return `${linkedVehicle.plate} • ${linkedVehicle.brand} ${linkedVehicle.model}`;
 }
 
@@ -110,42 +121,45 @@ export default function useVehiclesTables({
     let list = vehiclesWithLinkedMeta;
 
     const branchIds = splitCsv(filters.branchId);
+    const plates = splitCsv(filters.plate);
+    const brands = splitCsv(filters.brand);
+    const models = splitCsv(filters.model);
     const vehicleTypes = splitCsv(filters.vehicleType);
     const categories = splitCsv(filters.category);
     const statuses = splitCsv(filters.status);
 
     if (branchIds.length) {
-      list = list.filter((v) => branchIds.includes(v.branchId || ""));
+      list = list.filter((vehicle) => branchIds.includes(vehicle.branchId || ""));
+    }
+
+    if (plates.length) {
+      list = list.filter((vehicle) => matchesAnyNormalized(vehicle.plate, plates));
+    }
+
+    if (brands.length) {
+      list = list.filter((vehicle) => matchesAnyNormalized(vehicle.brand, brands));
+    }
+
+    if (models.length) {
+      list = list.filter((vehicle) => matchesAnyNormalized(vehicle.model, models));
     }
 
     if (vehicleTypes.length) {
-      list = list.filter((v) => vehicleTypes.includes(v.vehicleType));
+      list = list.filter((vehicle) => vehicleTypes.includes(vehicle.vehicleType));
     }
 
     if (categories.length) {
-      list = list.filter((v) => categories.includes(v.category || "CAR"));
+      list = list.filter((vehicle) => categories.includes(vehicle.category || "CAR"));
     }
 
     if (statuses.length) {
-      list = list.filter((v) => statuses.includes(v.status || "ACTIVE"));
-    }
-
-    if (filters.plate.trim()) {
-      list = list.filter((v) => includesNormalized(v.plate, filters.plate));
-    }
-
-    if (filters.brand.trim()) {
-      list = list.filter((v) => includesNormalized(v.brand, filters.brand));
-    }
-
-    if (filters.model.trim()) {
-      list = list.filter((v) => includesNormalized(v.model, filters.model));
+      list = list.filter((vehicle) => statuses.includes(vehicle.status || "ACTIVE"));
     }
 
     if (filters.acquisitionDateStart || filters.acquisitionDateEnd) {
-      list = list.filter((v) =>
+      list = list.filter((vehicle) =>
         isDateWithinRange(
-          v.acquisitionDate,
+          vehicle.acquisitionDate,
           filters.acquisitionDateStart,
           filters.acquisitionDateEnd,
         ),
@@ -156,21 +170,26 @@ export default function useVehiclesTables({
 
     return [...list].sort((a, b) => {
       if (sortBy === "plate") {
-        return a.plate.localeCompare(b.plate, "pt-BR", {
-          sensitivity: "base",
-          numeric: true,
-        }) * direction;
+        return (
+          a.plate.localeCompare(b.plate, "pt-BR", {
+            sensitivity: "base",
+            numeric: true,
+          }) * direction
+        );
       }
 
       if (sortBy === "vehicle") {
-        return `${a.brand} ${a.model}`.localeCompare(`${b.brand} ${b.model}`, "pt-BR", {
-          sensitivity: "base",
-          numeric: true,
-        }) * direction;
+        return (
+          `${a.brand} ${a.model}`.localeCompare(`${b.brand} ${b.model}`, "pt-BR", {
+            sensitivity: "base",
+            numeric: true,
+          }) * direction
+        );
       }
 
       if (sortBy === "status") {
         const order = { ACTIVE: 0, MAINTENANCE: 1, SOLD: 2 };
+
         return (
           ((order[a.status || "ACTIVE"] ?? 0) - (order[b.status || "ACTIVE"] ?? 0)) *
           direction
@@ -178,17 +197,18 @@ export default function useVehiclesTables({
       }
 
       const weight = { LIGHT: 0, HEAVY: 1 };
+
       return ((weight[a.vehicleType] ?? 0) - (weight[b.vehicleType] ?? 0)) * direction;
     });
   }, [vehiclesWithLinkedMeta, filters, hasSearched, sortBy, sortDirection]);
 
   const filteredVehicles = useMemo(
-    () => filtered.filter((v) => v.category !== "IMPLEMENT"),
+    () => filtered.filter((vehicle) => vehicle.category !== "IMPLEMENT"),
     [filtered],
   );
 
   const filteredImplements = useMemo(
-    () => filtered.filter((v) => v.category === "IMPLEMENT"),
+    () => filtered.filter((vehicle) => vehicle.category === "IMPLEMENT"),
     [filtered],
   );
 
