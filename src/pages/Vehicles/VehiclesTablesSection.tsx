@@ -918,7 +918,7 @@ export function VehiclesTablesSection({
                         <td className="px-6 py-4 text-sm">
                           <ActionButtons
                             vehicle={vehicle}
-                            showLinkButton={false}
+                            showLinkButton
                             onOpenLinkModal={onOpenLinkModal}
                             onOpenHistory={openHistory}
                             onOpenEdit={openEdit}

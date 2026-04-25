@@ -1,5 +1,14 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { createTrip, deleteTrip, getTrips, updateTrip } from "../../services/trips";
+import {
+  createTrip,
+  deleteTrip,
+  generateEmergencySheet,
+  generateMdfe,
+  getTrips,
+  startTrip,
+  updateTrip,
+  validateTripCompliance,
+} from "../../services/trips";
 import { getVehicles } from "../../services/vehicles";
 import { getDrivers } from "../../services/drivers";
 import { useBranch } from "../../contexts/BranchContext";
@@ -23,7 +32,6 @@ type TripFormData = {
   returnKm: string;
   departureAt: string;
   returnAt: string;
-  status: TripStatus;
   notes: string;
 };
 
@@ -62,7 +70,6 @@ const initialForm: TripFormData = {
   returnKm: "",
   departureAt: "",
   returnAt: "",
-  status: "OPEN",
   notes: "",
 };
 
@@ -111,9 +118,17 @@ function parseLocalDate(value?: string | null) {
 }
 
 function statusLabel(status: TripStatus) {
-  if (status === "OPEN") return "Aberta";
-  if (status === "COMPLETED") return "Concluída";
-  return "Cancelada";
+  const labels: Record<TripStatus, string> = {
+    DRAFT: "Rascunho",
+    PENDING_COMPLIANCE: "Pendente",
+    BLOCKED: "Bloqueada",
+    APPROVED: "Liberada",
+    IN_PROGRESS: "Em andamento",
+    COMPLETED: "Concluída",
+    CANCELLED: "Cancelada",
+  };
+
+  return labels[status] ?? status;
 }
 
 function MultiSelectField({
@@ -198,13 +213,15 @@ function MultiSelectField({
 
   return (
     <div className="space-y-1">
-      <label className="block text-sm font-semibold text-slate-700">{label}</label>
+      <label className="block text-sm font-semibold text-slate-700">
+        {label}
+      </label>
 
       <div ref={containerRef} className="relative">
         <div
           className={`min-h-[44px] w-full rounded-xl border bg-white px-2.5 py-2 text-sm focus-within:ring-2 ${error
-            ? "border-red-300 focus-within:border-red-500 focus-within:ring-red-200"
-            : "border-slate-300 focus-within:border-orange-500 focus-within:ring-orange-200"
+              ? "border-red-300 focus-within:border-red-500 focus-within:ring-red-200"
+              : "border-slate-300 focus-within:border-orange-500 focus-within:ring-orange-200"
             }`}
           onClick={() => {
             if (disabled) return;
@@ -232,8 +249,8 @@ function MultiSelectField({
                     }
                   }}
                   className={`text-slate-500 ${disabled
-                    ? "cursor-not-allowed opacity-50"
-                    : "cursor-pointer hover:text-red-600"
+                      ? "cursor-not-allowed opacity-50"
+                      : "cursor-pointer hover:text-red-600"
                     }`}
                 >
                   ×
@@ -256,7 +273,9 @@ function MultiSelectField({
                 if (openOnClick || query.trim()) setOpen(true);
               }}
               placeholder={
-                selectedOptions.length === 0 ? placeholder : "Digite para buscar..."
+                selectedOptions.length === 0
+                  ? placeholder
+                  : "Digite para buscar..."
               }
               disabled={disabled}
               className="min-w-[180px] flex-1 bg-transparent px-1 py-1 text-sm outline-none disabled:cursor-not-allowed"
@@ -311,7 +330,15 @@ export function TripsPage() {
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [form, setForm] = useState<TripFormData>(initialForm);
-  const [quickStatusTripId, setQuickStatusTripId] = useState<string | null>(null);
+
+  const [validatingTripId, setValidatingTripId] = useState<string | null>(null);
+  const [generatingEmergencyTripId, setGeneratingEmergencyTripId] = useState<
+    string | null
+  >(null);
+  const [generatingMdfeTripId, setGeneratingMdfeTripId] = useState<string | null>(
+    null,
+  );
+  const [startingTripId, setStartingTripId] = useState<string | null>(null);
 
   async function loadPageData() {
     try {
@@ -419,7 +446,11 @@ export function TripsPage() {
   );
 
   const statusFilterOptions: SelectOption[] = [
-    { id: "OPEN", label: "Aberta" },
+    { id: "DRAFT", label: "Rascunho" },
+    { id: "PENDING_COMPLIANCE", label: "Pendente" },
+    { id: "BLOCKED", label: "Bloqueada" },
+    { id: "APPROVED", label: "Liberada" },
+    { id: "IN_PROGRESS", label: "Em andamento" },
     { id: "COMPLETED", label: "Concluída" },
     { id: "CANCELLED", label: "Cancelada" },
   ];
@@ -518,6 +549,7 @@ export function TripsPage() {
           .includes(term),
       );
     }
+
     const direction = sortDirection === "asc" ? 1 : -1;
 
     return [...filtered].sort((a, b) => {
@@ -601,7 +633,9 @@ export function TripsPage() {
 
   const summary = useMemo(() => {
     const total = filteredTrips.length;
-    const open = filteredTrips.filter((trip) => trip.status === "OPEN").length;
+    const open = filteredTrips.filter((trip) =>
+      ["DRAFT", "PENDING_COMPLIANCE", "BLOCKED", "APPROVED"].includes(trip.status),
+    ).length;
     const completed = filteredTrips.filter(
       (trip) => trip.status === "COMPLETED",
     ).length;
@@ -655,7 +689,6 @@ export function TripsPage() {
     setFieldErrors({});
     setIsModalOpen(true);
   }
-
   function openEditModal(trip: Trip) {
     setEditingTrip(trip);
     setForm({
@@ -671,7 +704,6 @@ export function TripsPage() {
           : "",
       departureAt: String(trip.departureAt).slice(0, 10),
       returnAt: trip.returnAt ? String(trip.returnAt).slice(0, 10) : "",
-      status: trip.status,
       notes: trip.notes || "",
     });
     setFieldErrors({});
@@ -731,6 +763,7 @@ export function TripsPage() {
       returnKm: "",
     }));
   }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
 
@@ -748,7 +781,6 @@ export function TripsPage() {
         returnKm: form.returnKm ? Number(form.returnKm) : undefined,
         departureAt: form.departureAt,
         returnAt: form.returnAt || undefined,
-        status: form.status,
         notes: form.notes.trim() || undefined,
       };
 
@@ -845,30 +877,105 @@ export function TripsPage() {
     }
   }
 
-  async function handleQuickTripStatusChange(trip: Trip, status: TripStatus) {
+  async function handleValidateCompliance(trip: Trip) {
     try {
-      setQuickStatusTripId(trip.id);
+      setValidatingTripId(trip.id);
 
-      await updateTrip(trip.id, {
-        vehicleId: trip.vehicleId,
-        driverId: trip.driverId || null,
-        origin: trip.origin,
-        destination: trip.destination,
-        reason: trip.reason || undefined,
-        departureKm: trip.departureKm,
-        returnKm: trip.returnKm || undefined,
-        departureAt: String(trip.departureAt).slice(0, 10),
-        returnAt: trip.returnAt ? String(trip.returnAt).slice(0, 10) : undefined,
-        status,
-        notes: trip.notes || undefined,
+      await validateTripCompliance(trip.id);
+
+      showToast({
+        tone: "success",
+        title: "Compliance validado",
+        message: "A validação da viagem foi concluída.",
       });
 
       await runSearch(appliedFilters);
-    } catch (error) {
-      console.error("Erro ao atualizar status da viagem:", error);
-      setPageErrorMessage("Não foi possível atualizar o status da viagem.");
+    } catch (error: any) {
+      showToast({
+        tone: "error",
+        title: "Erro ao validar",
+        message:
+          error?.response?.data?.message ||
+          "Não foi possível validar o compliance da viagem.",
+      });
     } finally {
-      setQuickStatusTripId(null);
+      setValidatingTripId(null);
+    }
+  }
+
+  async function handleGenerateEmergencySheet(trip: Trip) {
+    try {
+      setGeneratingEmergencyTripId(trip.id);
+
+      await generateEmergencySheet(trip.id);
+
+      showToast({
+        tone: "success",
+        title: "Ficha gerada",
+        message: "Ficha de emergência gerada com sucesso.",
+      });
+
+      await runSearch(appliedFilters);
+    } catch (error: any) {
+      showToast({
+        tone: "error",
+        title: "Erro ao gerar ficha",
+        message:
+          error?.response?.data?.message ||
+          "Não foi possível gerar a ficha de emergência.",
+      });
+    } finally {
+      setGeneratingEmergencyTripId(null);
+    }
+  }
+
+  async function handleGenerateMdfe(trip: Trip) {
+    try {
+      setGeneratingMdfeTripId(trip.id);
+
+      await generateMdfe(trip.id);
+
+      showToast({
+        tone: "success",
+        title: "MDF-e gerado",
+        message: "MDF-e mock gerado com sucesso.",
+      });
+
+      await runSearch(appliedFilters);
+    } catch (error: any) {
+      showToast({
+        tone: "error",
+        title: "Erro ao gerar MDF-e",
+        message:
+          error?.response?.data?.message || "Não foi possível gerar o MDF-e.",
+      });
+    } finally {
+      setGeneratingMdfeTripId(null);
+    }
+  }
+
+  async function handleStartTrip(trip: Trip) {
+    try {
+      setStartingTripId(trip.id);
+
+      await startTrip(trip.id);
+
+      showToast({
+        tone: "success",
+        title: "Viagem iniciada",
+        message: "A viagem foi iniciada com sucesso.",
+      });
+
+      await runSearch(appliedFilters);
+    } catch (error: any) {
+      showToast({
+        tone: "error",
+        title: "Viagem bloqueada",
+        message:
+          error?.response?.data?.message || "Não foi possível iniciar a viagem.",
+      });
+    } finally {
+      setStartingTripId(null);
     }
   }
 
@@ -901,7 +1008,7 @@ export function TripsPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Gestão de Viagens</h1>
           <p className="text-sm text-slate-500">
-            Controle completo de uso da frota por veículo e motorista.
+            Controle completo de uso da frota, compliance e liberação operacional.
           </p>
         </div>
 
@@ -924,7 +1031,7 @@ export function TripsPage() {
 
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-            Abertas
+            Em liberação
           </p>
           <p className="mt-1 text-2xl font-bold text-amber-800">{summary.open}</p>
         </div>
@@ -1055,11 +1162,17 @@ export function TripsPage() {
         filteredTripsCount={filteredTrips.length}
         currentPage={currentPage}
         totalPages={totalPages}
-        quickStatusTripId={quickStatusTripId}
-        onQuickTripStatusChange={handleQuickTripStatusChange}
         pageSize={TABLE_PAGE_SIZE}
         selectedTripIds={selectedTripIds}
         allTripsOnPageSelected={allTripsOnPageSelected}
+        validatingTripId={validatingTripId}
+        generatingEmergencyTripId={generatingEmergencyTripId}
+        generatingMdfeTripId={generatingMdfeTripId}
+        startingTripId={startingTripId}
+        onValidateCompliance={handleValidateCompliance}
+        onGenerateEmergencySheet={handleGenerateEmergencySheet}
+        onGenerateMdfe={handleGenerateMdfe}
+        onStartTrip={handleStartTrip}
         onToggleTrip={(id) =>
           setSelectedTripIds((prev) =>
             prev.includes(id)
@@ -1287,21 +1400,9 @@ export function TripsPage() {
                     ) : null}
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">
-                      Status
-                    </label>
-                    <select
-                      value={form.status}
-                      onChange={(event) =>
-                        handleChange("status", event.target.value as TripStatus)
-                      }
-                      className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-                    >
-                      <option value="OPEN">Aberta</option>
-                      <option value="COMPLETED">Concluída</option>
-                      <option value="CANCELLED">Cancelada</option>
-                    </select>
+                  <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    A viagem será criada como <strong>pendente de compliance</strong>.
+                    Depois, adicione a carga, gere os documentos e valide a liberação.
                   </div>
 
                   <div>

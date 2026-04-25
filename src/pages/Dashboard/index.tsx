@@ -6,9 +6,7 @@ import {
   Fuel,
   Gauge,
   Package,
-  Route,
   Truck,
-  Users,
   Wrench,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -406,7 +404,7 @@ export function DashboardPage() {
       fuelTotal: fuelByCategory.length,
       debtsTotal: debtsByCategory.length,
       tripsTotal: tripsByCategory.length,
-      tripsOpen: tripsByCategory.filter((trip) => trip.status === "OPEN").length,
+      tripsOpen: tripsByCategory.filter((trip) => trip.status === "APPROVED").length,
       tripsCompleted: tripsByCategory.filter((trip) => trip.status === "COMPLETED")
         .length,
       fuelOperationsPeriod: fuelInPeriod.length,
@@ -1349,118 +1347,6 @@ export function DashboardPage() {
             </div>
           )}
         </DashboardCard>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <DashboardCard
-          title="Veículos da frota"
-          icon={
-            <div className="rounded-xl bg-blue-100 p-2 text-blue-700">
-              <CarFront size={16} />
-            </div>
-          }
-        >
-          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.vehiclesTotal}</p>
-          <div className="mt-4 flex items-center gap-2 text-xs">
-            <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
-              Ativos: {loading ? "..." : metrics.vehiclesActive}
-            </span>
-            <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-700">
-              Manutenção: {loading ? "..." : metrics.vehiclesMaintenance}
-            </span>
-          </div>
-          <p className="mt-3 text-xs text-slate-500">Total no escopo</p>
-        </DashboardCard>
-
-        <DashboardCard
-          title="Motoristas"
-          icon={
-            <div className="rounded-xl bg-indigo-100 p-2 text-indigo-700">
-              <Users size={16} />
-            </div>
-          }
-        >
-          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.driversTotal}</p>
-          <div className="mt-4 flex items-center gap-2 text-xs">
-            <span className="rounded-full bg-cyan-100 px-2 py-1 font-semibold text-cyan-700">
-              Ativos: {loading ? "..." : metrics.driversActive}
-            </span>
-            <span className="rounded-full bg-slate-200 px-2 py-1 font-semibold text-slate-700">
-              Inativos: {loading ? "..." : metrics.driversInactive}
-            </span>
-          </div>
-          <p className="mt-3 text-xs text-slate-500">Total no escopo</p>
-        </DashboardCard>
-
-        <DashboardCard
-          title="Manutenções"
-          icon={
-            <div className="rounded-xl bg-orange-100 p-2 text-orange-700">
-              <Wrench size={16} />
-            </div>
-          }
-        >
-          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.maintenanceTotal}</p>
-          <div className="mt-3 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Registros totais</span>
-            <span className="rounded-full bg-orange-100 px-2 py-1 font-semibold text-orange-700">
-              Pendentes: {loading ? "..." : metrics.pendingMaintenance}
-            </span>
-          </div>
-        </DashboardCard>
-
-        <DashboardCard
-          title="Gestão de Finanças"
-          icon={
-            <div className="rounded-xl bg-red-100 p-2 text-red-700">
-              <CircleAlert size={16} />
-            </div>
-          }
-        >
-          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.debtsTotal}</p>
-          <div className="mt-3 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Registros totais</span>
-            <span className="rounded-full bg-red-100 px-2 py-1 font-semibold text-red-700">
-              Pendentes: {loading ? "..." : metrics.pendingDebts}
-            </span>
-          </div>
-        </DashboardCard>
-
-        <DashboardCard
-          title="Abastecimentos"
-          icon={
-            <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700">
-              <Fuel size={16} />
-            </div>
-          }
-        >
-          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.fuelTotal}</p>
-          <div className="mt-3 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Registros totais</span>
-            <span className="font-semibold text-emerald-700">No período: {loading ? "..." : metrics.fuelOperationsPeriod}</span>
-          </div>
-        </DashboardCard>
-
-        <DashboardCard
-          title="Gestão de Viagens"
-          icon={
-            <div className="rounded-xl bg-violet-100 p-2 text-violet-700">
-              <Route size={16} />
-            </div>
-          }
-        >
-          <p className="mt-4 text-3xl font-bold text-slate-900">{loading ? "..." : metrics.tripsTotal}</p>
-          <div className="mt-4 flex items-center gap-2 text-xs">
-            <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-700">
-              Abertas: {loading ? "..." : metrics.tripsOpen}
-            </span>
-            <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
-              Concluídas: {loading ? "..." : metrics.tripsCompleted}
-            </span>
-          </div>
-          <p className="mt-3 text-xs text-slate-500">Total no escopo</p>
-        </DashboardCard>
-
       </div>
 
       {vehicleCostModal && vehicleCostModalData ? (
