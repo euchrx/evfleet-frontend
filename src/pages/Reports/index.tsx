@@ -47,10 +47,9 @@ function parseDateSafe(dateValue?: string | null) {
   if (!dateValue) return new Date("");
 
   const normalized = String(dateValue).trim();
-  const calendarDate = normalized.slice(0, 10);
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(calendarDate)) {
-    const [year, month, day] = calendarDate.split("-").map(Number);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    const [year, month, day] = normalized.split("-").map(Number);
     return new Date(year, month - 1, day);
   }
 
@@ -186,6 +185,17 @@ function formatVehicleDisplay(
 function formatDateTime(dateValue?: string | null) {
   if (!dateValue) return "-";
 
+  const normalized = String(dateValue).trim();
+
+  const match = normalized.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/
+  );
+
+  if (match) {
+    const [, year, month, day, hour, minute] = match;
+    return `${day}/${month}/${year}, ${hour}:${minute}`;
+  }
+
   const date = parseDateSafe(dateValue);
   if (Number.isNaN(date.getTime())) return "-";
 
@@ -253,7 +263,7 @@ function formatLinkedVehicle(vehicle: Vehicle) {
 }
 
 function formatBranchName(item: Record<string, any>) {
-  return item.branch?.name || item.branchName || "-";
+  return item.company?.name || item.companyName || item.retailProductImport?.company?.name || "-";
 }
 
 function formatAverageConsumption(item: FuelRecord) {
@@ -464,8 +474,8 @@ function MultiSelectField({
       <div ref={containerRef} className="relative">
         <div
           className={`min-h-[44px] w-full rounded-xl border bg-white px-2.5 py-2 text-sm focus-within:ring-2 ${error
-              ? "border-red-300 focus-within:border-red-500 focus-within:ring-red-200"
-              : "border-slate-300 focus-within:border-orange-500 focus-within:ring-orange-200"
+            ? "border-red-300 focus-within:border-red-500 focus-within:ring-red-200"
+            : "border-slate-300 focus-within:border-orange-500 focus-within:ring-orange-200"
             }`}
           onClick={() => {
             if (disabled) return;
@@ -492,8 +502,8 @@ function MultiSelectField({
                     }
                   }}
                   className={`text-slate-500 ${disabled
-                      ? "cursor-not-allowed opacity-50"
-                      : "cursor-pointer hover:text-red-600"
+                    ? "cursor-not-allowed opacity-50"
+                    : "cursor-pointer hover:text-red-600"
                     }`}
                 >
                   ×
@@ -803,9 +813,14 @@ export function ReportsPage() {
       (item) => vehicleSet.has(item.vehicleId) && inRange(item.dueDate || item.debtDate),
     );
 
-    const productsFiltered = products.filter((item) =>
-      inRange(item.retailProductImport?.issuedAt || item.createdAt),
-    );
+    const productsFiltered = products.filter((item) => {
+      const vehicleId = item.retailProductImport?.vehicle?.id;
+
+      return (
+        inRange(item.retailProductImport?.issuedAt || item.createdAt) &&
+        (!vehicleId || vehicleSet.has(vehicleId))
+      );
+    });
 
     const tiresFiltered = tires.filter((item) => {
       if (!item.vehicleId || !vehicleSet.has(item.vehicleId)) return false;
@@ -1264,25 +1279,45 @@ export function ReportsPage() {
         title: "Produtos",
         count: filteredData.products.length,
         html: `<h2>Produtos (${filteredData.products.length})</h2>
-          <table><thead><tr><th>Data</th><th>Produto</th><th>Categoria</th><th>Fornecedor</th><th>NF-e</th><th>Quantidade</th><th>Valor total</th></tr></thead>
-          <tbody>${filteredData.products
+  <table>
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Veículo</th>
+        <th>Produto</th>
+        <th>Categoria</th>
+        <th>Fornecedor</th>
+        <th>NF-e</th>
+        <th>Quantidade</th>
+        <th>Valor total</th>
+      </tr>
+    </thead>
+    <tbody>${filteredData.products
             .map(
               (item) =>
-                `<tr><td>${escapeHtml(
-                  formatDate(item.retailProductImport?.issuedAt || item.createdAt),
-                )}</td><td>${escapeHtml(item.description || "-")}</td><td>${escapeHtml(
-                  labelProductCategory(item.category),
-                )}</td><td>${escapeHtml(
-                  item.retailProductImport?.supplierName || "-",
-                )}</td><td>${escapeHtml(
-                  item.retailProductImport?.invoiceNumber || "-",
-                )}</td><td>${toNumber(item.quantity).toLocaleString("pt-BR", {
+                `<tr>
+            <td>${escapeHtml(formatDate(item.retailProductImport?.issuedAt || item.createdAt))}</td>
+            <td>${escapeHtml(
+                  formatVehicleDisplay(
+                    item.retailProductImport?.vehicle,
+                    item.retailProductImport?.vehicle?.id,
+                  ),
+                )}</td>
+            <td>${escapeHtml(item.description || "-")}</td>
+            <td>${escapeHtml(labelProductCategory(item.category))}</td>
+            <td>${escapeHtml(item.retailProductImport?.supplierName || "-")}</td>
+            <td>${escapeHtml(item.retailProductImport?.invoiceNumber || "-")}</td>
+            <td>${toNumber(item.quantity).toLocaleString("pt-BR", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
-                })}</td><td>${toCurrency(toNumber(item.totalValue))}</td></tr>`,
+                })}</td>
+            <td>${toCurrency(toNumber(item.totalValue))}</td>
+          </tr>`,
             )
-            .join("")}</tbody></table>
-          <div class="module-total">Total do módulo Produtos: ${toCurrency(
+            .join("")}
+    </tbody>
+  </table>
+  <div class="module-total">Total do módulo Produtos: ${toCurrency(
               productsModuleTotal,
             )}</div>`,
       },

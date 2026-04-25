@@ -226,20 +226,20 @@ export function DashboardPage() {
   const filteredData = useMemo(() => {
     const vehiclesFiltered = selectedBranchId
       ? vehicles.filter(
-          (vehicle) => !vehicle.branchId || vehicle.branchId === selectedBranchId
-        )
+        (vehicle) => !vehicle.branchId || vehicle.branchId === selectedBranchId
+      )
       : vehicles;
 
     const vehicleIds = new Set(vehiclesFiltered.map((vehicle) => vehicle.id));
 
     const driversFiltered = selectedBranchId
       ? drivers.filter(
-          (driver) =>
-            (driver.vehicle?.branchId && driver.vehicle.branchId === selectedBranchId) ||
-            (!driver.vehicle?.branchId &&
-              (driver.vehicleId ? vehicleIds.has(driver.vehicleId) : false)) ||
-            (driver.vehicleId ? vehicleIds.has(driver.vehicleId) : false)
-        )
+        (driver) =>
+          (driver.vehicle?.branchId && driver.vehicle.branchId === selectedBranchId) ||
+          (!driver.vehicle?.branchId &&
+            (driver.vehicleId ? vehicleIds.has(driver.vehicleId) : false)) ||
+          (driver.vehicleId ? vehicleIds.has(driver.vehicleId) : false)
+      )
       : drivers;
 
     const branchesFiltered = selectedBranchId
@@ -260,7 +260,7 @@ export function DashboardPage() {
     const productsFiltered = retailProducts.filter((item) =>
       selectedBranchId
         ? !item.retailProductImport.branch?.id ||
-          item.retailProductImport.branch.id === selectedBranchId
+        item.retailProductImport.branch.id === selectedBranchId
         : true
     );
     const tiresFiltered = tires.filter((item) =>
@@ -465,17 +465,57 @@ export function DashboardPage() {
         );
       });
 
+    filteredData.products
+      .filter((item) => {
+        const vehicleId = item.retailProductImport.vehicle?.id;
+
+        return (
+          Boolean(vehicleId) &&
+          isInPeriod(item.retailProductImport.issuedAt || item.createdAt, costPeriod) &&
+          isVehicleMatch(vehicleId as string)
+        );
+      })
+      .forEach((item) => {
+        const vehicleId = item.retailProductImport.vehicle?.id;
+        if (!vehicleId) return;
+
+        costMap.set(
+          vehicleId,
+          (costMap.get(vehicleId) ?? 0) + toSafeNumber(item.totalValue)
+        );
+      });
+
+    filteredData.tires
+      .filter((item) => {
+        if (!item.vehicleId) return false;
+
+        const effectiveDate = item.purchaseDate || item.installedAt || item.createdAt;
+
+        return (
+          isInPeriod(effectiveDate, costPeriod) &&
+          isVehicleMatch(item.vehicleId)
+        );
+      })
+      .forEach((item) => {
+        if (!item.vehicleId) return;
+
+        costMap.set(
+          item.vehicleId,
+          (costMap.get(item.vehicleId) ?? 0) + toSafeNumber(item.purchaseCost)
+        );
+      });
+
     const toLabel = new Map(filteredData.vehicles.map((vehicle) => [vehicle.id, vehicle]));
 
-    const ranked = [...costMap.entries()]
-      .map(([vehicleId, total]) => {
-        const vehicle = toLabel.get(vehicleId);
-        const label = vehicle
-          ? formatVehicleLabel(vehicle)
-          : `Veículo ${vehicleId.slice(0, 8)}`;
-        const vehicleType = vehicle?.vehicleType;
-        return { vehicleId, label, value: total, vehicleType };
-      });
+    const ranked = [...costMap.entries()].map(([vehicleId, total]) => {
+      const vehicle = toLabel.get(vehicleId);
+      const label = vehicle
+        ? formatVehicleLabel(vehicle)
+        : `Veículo ${vehicleId.slice(0, 8)}`;
+      const vehicleType = vehicle?.vehicleType;
+
+      return { vehicleId, label, value: total, vehicleType };
+    });
 
     return {
       LIGHT: ranked
@@ -521,10 +561,45 @@ export function DashboardPage() {
       )
       .sort((a, b) => parseDateSafe(b.debtDate).getTime() - parseDateSafe(a.debtDate).getTime());
 
+    const products = filteredData.products
+      .filter((item) => {
+        const importDate = item.retailProductImport.issuedAt || item.createdAt;
+
+        return (
+          item.retailProductImport.vehicle?.id === vehicleCostModal.vehicleId &&
+          isInPeriod(importDate, costPeriod)
+        );
+      })
+      .sort((a, b) => {
+        const dateA = a.retailProductImport.issuedAt || a.createdAt;
+        const dateB = b.retailProductImport.issuedAt || b.createdAt;
+
+        return parseDateSafe(dateB).getTime() - parseDateSafe(dateA).getTime();
+      });
+
+    const tires = filteredData.tires
+      .filter((item) => {
+        const effectiveDate = item.purchaseDate || item.installedAt || item.createdAt;
+
+        return (
+          item.vehicleId === vehicleCostModal.vehicleId &&
+          isInPeriod(effectiveDate, costPeriod)
+        );
+      })
+      .sort((a, b) => {
+        const dateA = a.purchaseDate || a.installedAt || a.createdAt;
+        const dateB = b.purchaseDate || b.installedAt || b.createdAt;
+
+        return parseDateSafe(dateB).getTime() - parseDateSafe(dateA).getTime();
+      });
+
     const fuelTotal = fuel.reduce((sum, item) => sum + toSafeNumber(item.totalValue), 0);
     const maintenanceTotal = maintenance.reduce((sum, item) => sum + toSafeNumber(item.cost), 0);
     const debtsTotal = debts.reduce((sum, item) => sum + toSafeNumber(item.amount), 0);
-    const total = fuelTotal + maintenanceTotal + debtsTotal;
+    const productsTotal = products.reduce((sum, item) => sum + toSafeNumber(item.totalValue), 0);
+    const tiresTotal = tires.reduce((sum, item) => sum + toSafeNumber(item.purchaseCost), 0);
+
+    const total = fuelTotal + maintenanceTotal + debtsTotal + productsTotal + tiresTotal;
 
     const history = [
       ...fuel.map((item) => ({
@@ -551,129 +626,102 @@ export function DashboardPage() {
         value: toSafeNumber(item.amount),
         description: `${item.description || "Registro"} • ${item.points || 0} pontos`,
       })),
+      ...products.map((item) => ({
+        id: `product-${item.id}`,
+        date: item.retailProductImport.issuedAt || item.createdAt,
+        type: "Produto",
+        value: toSafeNumber(item.totalValue),
+        description: `${item.category || "Produto"} • ${item.description || item.productCode || "Item importado"}`,
+      })),
+      ...tires.map((item) => ({
+        id: `tire-${item.id}`,
+        date: item.purchaseDate || item.installedAt || item.createdAt,
+        type: "Pneu",
+        value: toSafeNumber(item.purchaseCost),
+        description: `${item.brand || "Pneu"} ${item.model || ""}`.trim(),
+      })),
     ].sort((a, b) => parseDateSafe(b.date).getTime() - parseDateSafe(a.date).getTime());
 
     return {
       fuelTotal,
       maintenanceTotal,
       debtsTotal,
+      productsTotal,
+      tiresTotal,
       total,
       history,
     };
-  }, [vehicleCostModal, filteredData.fuel, filteredData.maintenance, filteredData.debts, costPeriod]);
+  }, [
+    vehicleCostModal,
+    filteredData.fuel,
+    filteredData.maintenance,
+    filteredData.debts,
+    filteredData.products,
+    filteredData.tires,
+    costPeriod,
+  ]);
 
-  const bestDriversByEfficiencyByType = useMemo(() => {
+  const topDriversByCostByType = useMemo(() => {
     const isVehicleMatch = (vehicleId: string) =>
       selectedVehicleCategory === "ALL" ||
       vehicleTypeById.get(vehicleId) === selectedVehicleCategory;
 
-    const kmsDrivenByDriver = new Map<string, number>();
-
-    filteredData.trips
-      .filter(
-        (trip) =>
-          trip.status === "COMPLETED" &&
-          Boolean(trip.driverId) &&
-          isVehicleMatch(trip.vehicleId) &&
-          isInPeriod(trip.returnAt || trip.departureAt, costPeriod) &&
-          typeof trip.departureKm === "number" &&
-          typeof trip.returnKm === "number" &&
-          trip.returnKm >= trip.departureKm
-      )
-      .forEach((trip) => {
-        const driverId = trip.driverId as string;
-        const traveledKm = Math.max(trip.returnKm! - trip.departureKm, 0);
-        kmsDrivenByDriver.set(
-          driverId,
-          (kmsDrivenByDriver.get(driverId) ?? 0) + traveledKm
-        );
-      });
-
-    const byDriver = {
-      LIGHT: new Map<
-        string,
-        {
-          label: string;
-          totalEfficiency: number;
-          samples: number;
-          driverId: string;
-          totalLiters: number;
-          totalValue: number;
-        }
-      >(),
-      HEAVY: new Map<
-        string,
-        {
-          label: string;
-          totalEfficiency: number;
-          samples: number;
-          driverId: string;
-          totalLiters: number;
-          totalValue: number;
-        }
-      >(),
-    };
+    const driverCostMap = new Map<
+      string,
+      {
+        driverId: string;
+        driverName: string;
+        vehicleTypes: Set<DriverCategory>;
+        totalValue: number;
+        totalLiters: number;
+        records: number;
+      }
+    >();
 
     filteredData.fuel
       .filter(
         (record) =>
           isInPeriod(record.fuelDate, costPeriod) &&
-          isVehicleMatch(record.vehicleId) &&
-          typeof record.averageConsumptionKmPerLiter === "number" &&
-          record.averageConsumptionKmPerLiter > 0
+          isVehicleMatch(record.vehicleId)
       )
       .forEach((record) => {
         const vehicleType = vehicleTypeById.get(record.vehicleId);
+
         if (vehicleType !== "LIGHT" && vehicleType !== "HEAVY") return;
 
         const driverId = record.driverId || "NO_DRIVER";
         const driverName = record.driver?.name?.trim() || "Sem motorista";
-        const current = byDriver[vehicleType].get(driverId) || {
+
+        const current = driverCostMap.get(driverId) || {
           driverId,
-          label: driverName,
-          totalEfficiency: 0,
-          samples: 0,
-          totalLiters: 0,
+          driverName,
+          vehicleTypes: new Set<DriverCategory>(),
           totalValue: 0,
+          totalLiters: 0,
+          records: 0,
         };
-        current.totalEfficiency += record.averageConsumptionKmPerLiter as number;
-        current.samples += 1;
-        current.totalLiters += record.liters || 0;
-        current.totalValue += record.totalValue || 0;
-        byDriver[vehicleType].set(driverId, current);
+
+        current.vehicleTypes.add(vehicleType);
+        current.totalValue += toSafeNumber(record.totalValue);
+        current.totalLiters += toSafeNumber(record.liters);
+        current.records += 1;
+
+        driverCostMap.set(driverId, current);
       });
 
-    const normalize = (
-      entries: Array<{
-        driverId: string;
-        label: string;
-        totalEfficiency: number;
-        samples: number;
-        totalLiters: number;
-        totalValue: number;
-      }>
-    ) =>
-      entries
-        .filter(
-          (entry) =>
-            entry.samples > 0 && (kmsDrivenByDriver.get(entry.driverId) ?? 0) > 0
-        )
-        .map((entry) => ({
-          driver: entry.label,
-          averageKmPerLiter: entry.totalEfficiency / entry.samples,
-          samples: entry.samples,
-          kmsDriven: kmsDrivenByDriver.get(entry.driverId) ?? 0,
-          totalLiters: entry.totalLiters,
-          totalValue: entry.totalValue,
-        }))
-        .sort((a, b) => b.averageKmPerLiter - a.averageKmPerLiter)
-        .slice(0, MAX_RANKING_ITEMS);
+    const ranked = [...driverCostMap.values()].sort(
+      (a, b) => b.totalValue - a.totalValue
+    );
 
     return {
-      LIGHT: normalize([...byDriver.LIGHT.values()]),
-      HEAVY: normalize([...byDriver.HEAVY.values()]),
+      LIGHT: ranked
+        .filter((item) => item.vehicleTypes.has("LIGHT"))
+        .slice(0, MAX_RANKING_ITEMS),
+      HEAVY: ranked
+        .filter((item) => item.vehicleTypes.has("HEAVY"))
+        .slice(0, MAX_RANKING_ITEMS),
     };
-  }, [filteredData.fuel, filteredData.trips, costPeriod, selectedVehicleCategory, vehicleTypeById]);
+  }, [filteredData.fuel, costPeriod, selectedVehicleCategory, vehicleTypeById]);
 
   const costDetails = useMemo(() => {
     const isVehicleMatch = (vehicleId: string) =>
@@ -1205,7 +1253,7 @@ export function DashboardPage() {
         </DashboardCard>
 
         <DashboardCard
-          title="Ranking melhores motoristas"
+          title="Ranking motoristas por custo"
           icon={
             <div className="rounded-xl bg-cyan-100 p-2 text-cyan-700">
               <Gauge size={16} />
@@ -1214,9 +1262,9 @@ export function DashboardPage() {
         >
           {loading ? (
             <p className="text-sm text-slate-500">Carregando...</p>
-          ) : bestDriversByEfficiencyByType.LIGHT.length === 0 &&
-            bestDriversByEfficiencyByType.HEAVY.length === 0 ? (
-            <p className="text-sm text-slate-500">Sem dados de eficiencia por motorista.</p>
+          ) : topDriversByCostByType.LIGHT.length === 0 &&
+            topDriversByCostByType.HEAVY.length === 0 ? (
+            <p className="text-sm text-slate-500">Sem dados de custo por motorista.</p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {[
@@ -1239,7 +1287,8 @@ export function DashboardPage() {
                   ),
                 },
               ].map((group) => {
-                const rows = bestDriversByEfficiencyByType[group.key];
+                const rows = topDriversByCostByType[group.key];
+
                 return (
                   <div
                     key={group.key}
@@ -1264,14 +1313,14 @@ export function DashboardPage() {
                         {rows.map((row, index) => (
                           <button
                             type="button"
-                            key={`${group.key}-${row.driver}-${index}`}
+                            key={`${group.key}-${row.driverId}-${index}`}
                             onClick={() =>
                               setBestDriverModal({
                                 category: group.key,
-                                driver: row.driver,
-                                averageKmPerLiter: row.averageKmPerLiter,
-                                samples: row.samples,
-                                kmsDriven: row.kmsDriven,
+                                driver: row.driverName,
+                                averageKmPerLiter: 0,
+                                samples: row.records,
+                                kmsDriven: 0,
                                 totalLiters: row.totalLiters,
                                 totalValue: row.totalValue,
                               })
@@ -1282,13 +1331,13 @@ export function DashboardPage() {
                               {index + 1}
                             </span>
                             <span
-                              title={row.driver}
+                              title={row.driverName}
                               className="text-sm font-semibold leading-tight text-slate-900 break-words"
                             >
-                              {row.driver}
+                              {row.driverName}
                             </span>
                             <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                              {row.kmsDriven.toLocaleString("pt-BR")} km
+                              {toCurrency(row.totalValue)}
                             </span>
                           </button>
                         ))}
@@ -1416,7 +1465,7 @@ export function DashboardPage() {
 
       {vehicleCostModal && vehicleCostModalData ? (
         <div className="fixed inset-0 z-[74] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:items-center">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-7xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-xl font-bold text-slate-900">
@@ -1436,25 +1485,42 @@ export function DashboardPage() {
               </button>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                 <p className="text-xs font-semibold uppercase text-emerald-700">Combustível</p>
                 <p className="mt-1 text-xl font-bold text-emerald-800">
                   {toCurrency(vehicleCostModalData.fuelTotal)}
                 </p>
               </div>
+
+              <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
+                <p className="text-xs font-semibold uppercase text-violet-700">Produtos</p>
+                <p className="mt-1 text-xl font-bold text-violet-800">
+                  {toCurrency(vehicleCostModalData.productsTotal)}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
+                <p className="text-xs font-semibold uppercase text-sky-700">Pneus</p>
+                <p className="mt-1 text-xl font-bold text-sky-800">
+                  {toCurrency(vehicleCostModalData.tiresTotal)}
+                </p>
+              </div>
+
               <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
                 <p className="text-xs font-semibold uppercase text-orange-700">Manutenção</p>
                 <p className="mt-1 text-xl font-bold text-orange-800">
                   {toCurrency(vehicleCostModalData.maintenanceTotal)}
                 </p>
               </div>
+
               <div className="rounded-xl border border-red-200 bg-red-50 p-3">
                 <p className="text-xs font-semibold uppercase text-red-700">Finanças</p>
                 <p className="mt-1 text-xl font-bold text-red-800">
                   {toCurrency(vehicleCostModalData.debtsTotal)}
                 </p>
               </div>
+
               <div className="rounded-xl border border-slate-300 bg-slate-100 p-3">
                 <p className="text-xs font-semibold uppercase text-slate-600">Total</p>
                 <p className="mt-1 text-xl font-bold text-slate-900">
@@ -1590,11 +1656,11 @@ export function DashboardPage() {
                     ? "Detalhamento - Custo com combustível"
                     : costModal === "PRODUCTS"
                       ? "Detalhamento - Custo com produtos"
-                    : costModal === "TIRES"
-                      ? "Detalhamento - Custo com pneus"
-                    : costModal === "MAINTENANCE"
-                      ? "Detalhamento - Custo com manutenção"
-                      : "Detalhamento - Custo com finanças"}
+                      : costModal === "TIRES"
+                        ? "Detalhamento - Custo com pneus"
+                        : costModal === "MAINTENANCE"
+                          ? "Detalhamento - Custo com manutenção"
+                          : "Detalhamento - Custo com finanças"}
                 </h3>
                 <p className="text-sm text-slate-500">
                   {periodLabel} • {costModal === "PRODUCTS" ? "Todas as categorias" : selectedVehicleLabel}
@@ -1894,10 +1960,3 @@ export function DashboardPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
