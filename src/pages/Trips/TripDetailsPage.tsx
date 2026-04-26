@@ -4,13 +4,13 @@ import {
   getTrip,
   validateTripCompliance,
   generateEmergencySheet,
-  generateMdfe,
   startTrip,
   addTripProduct,
   removeTripProduct,
 } from "../../services/trips";
 import type { Trip, TripGeneratedDocument } from "../../types/trip";
 import { getDangerousProducts } from "../../services/dangerousProducts";
+import { MdfeActions } from "../../components/mdfe/MdfeActions";
 
 type DangerousProductOption = {
   id: string;
@@ -51,16 +51,6 @@ function openPrintableHtml(html: string, title = "Documento") {
     printWindow.focus();
     printWindow.print();
   }, 300);
-}
-
-function hasGeneratedDocument(trip: Trip, type: string) {
-  return Boolean(
-    trip.generatedDocuments?.some(
-      (doc) =>
-        doc.type === type &&
-        ["DRAFT", "GENERATED", "SENT"].includes(doc.status),
-    ),
-  );
 }
 
 function getPendingComplianceResults(trip: Trip) {
@@ -105,7 +95,6 @@ function statusLabel(status: string) {
 function documentLabel(type: string) {
   const labels: Record<string, string> = {
     EMERGENCY_SHEET: "Ficha de emergência",
-    MDFE_MOCK: "MDF-e",
   };
 
   return labels[type] || type;
@@ -177,6 +166,8 @@ export function TripDetailsPage() {
 
       <ActionsCard trip={trip} reload={load} />
 
+      <MdfeActions tripId={trip.id} />
+
       <ComplianceActionsCard trip={trip} />
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -193,7 +184,9 @@ export function TripDetailsPage() {
 
 function Header({ trip, pendingCount }: { trip: Trip; pendingCount: number }) {
   const productsCount = trip.products?.length || 0;
-  const documentsCount = trip.generatedDocuments?.length || 0;
+  const documentsCount =
+    (trip.generatedDocuments?.length || 0) +
+    (trip.mdfes ? 1 : 0);
   const lastCompliance = trip.complianceChecks?.[0];
 
   return (
@@ -315,8 +308,14 @@ function ActionsCard({
   const [error, setError] = useState("");
 
   const hasProducts = Boolean(trip.products?.length);
-  const hasSheet = hasGeneratedDocument(trip, "EMERGENCY_SHEET");
-  const hasMdfe = hasGeneratedDocument(trip, "MDFE_MOCK");
+
+  const hasSheet = Boolean(
+    trip.generatedDocuments?.some(
+      (doc) =>
+        doc.type === "EMERGENCY_SHEET" &&
+        ["DRAFT", "GENERATED", "SENT"].includes(doc.status),
+    ),
+  );
 
   async function runAction(action: ActionKey, callback: () => Promise<unknown>) {
     try {
@@ -361,6 +360,7 @@ function ActionsCard({
         />
 
         <ActionButton
+
           title={hasSheet ? "Ficha gerada" : "Gerar ficha"}
           description={
             !hasProducts
@@ -373,21 +373,6 @@ function ActionsCard({
           disabled={Boolean(actionLoading) || !hasProducts || hasSheet}
           tone="amber"
           onClick={() => runAction("SHEET", () => generateEmergencySheet(trip.id))}
-        />
-
-        <ActionButton
-          title={hasMdfe ? "MDF-e gerado" : "Gerar MDF-e"}
-          description={
-            !hasProducts
-              ? "Adicione carga antes de gerar."
-              : hasMdfe
-                ? "Documento já criado para esta viagem."
-                : "Emite o MDF-e mock da viagem."
-          }
-          loading={actionLoading === "MDFE"}
-          disabled={Boolean(actionLoading) || !hasProducts || hasMdfe}
-          tone="purple"
-          onClick={() => runAction("MDFE", () => generateMdfe(trip.id))}
         />
 
         <ActionButton
@@ -574,10 +559,10 @@ function ComplianceCard({ trip }: { trip: Trip }) {
             <div
               key={result.id}
               className={`rounded-2xl border p-4 ${result.passed
-                  ? "border-green-200 bg-green-50"
-                  : result.severity === "BLOCKING"
-                    ? "border-red-200 bg-red-50"
-                    : "border-amber-200 bg-amber-50"
+                ? "border-green-200 bg-green-50"
+                : result.severity === "BLOCKING"
+                  ? "border-red-200 bg-red-50"
+                  : "border-amber-200 bg-amber-50"
                 }`}
             >
               <div className="flex items-start justify-between gap-4">
@@ -588,10 +573,10 @@ function ComplianceCard({ trip }: { trip: Trip }) {
 
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-bold ${result.passed
-                      ? "bg-green-100 text-green-700"
-                      : result.severity === "BLOCKING"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-amber-100 text-amber-700"
+                    ? "bg-green-100 text-green-700"
+                    : result.severity === "BLOCKING"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-amber-100 text-amber-700"
                     }`}
                 >
                   {result.passed ? "OK" : result.severity}
@@ -632,8 +617,6 @@ function DocumentsCard({ trip }: { trip: Trip }) {
             const canOpenEmergencySheet =
               doc.type === "EMERGENCY_SHEET" && Boolean(payload.html);
 
-            const canOpenMdfe = doc.type === "MDFE_MOCK";
-
             return (
               <div
                 key={doc.id}
@@ -662,42 +645,6 @@ function DocumentsCard({ trip }: { trip: Trip }) {
                         className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700 transition hover:bg-orange-100"
                       >
                         Abrir/Imprimir
-                      </button>
-                    ) : null}
-                    {canOpenMdfe ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openPrintableHtml(
-                            `
-          <html>
-            <head>
-              <title>MDF-e</title>
-              <style>
-                body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
-                h1 { font-size: 24px; margin-bottom: 16px; }
-                pre {
-                  white-space: pre-wrap;
-                  background: #f8fafc;
-                  border: 1px solid #cbd5e1;
-                  border-radius: 12px;
-                  padding: 16px;
-                  font-size: 12px;
-                }
-              </style>
-            </head>
-            <body>
-              <h1>MDF-e da viagem</h1>
-              <pre>${JSON.stringify(payload, null, 2)}</pre>
-            </body>
-          </html>
-        `,
-                            `MDF-e - ${trip.origin} para ${trip.destination}`,
-                          )
-                        }
-                        className="rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 transition hover:bg-purple-100"
-                      >
-                        Abrir MDF-e
                       </button>
                     ) : null}
 
@@ -783,8 +730,8 @@ function ProductsTable({
               <div
                 key={product.id}
                 className={`rounded-2xl border p-4 ${hasFispq
-                    ? "border-slate-200 bg-white"
-                    : "border-red-200 bg-red-50"
+                  ? "border-slate-200 bg-white"
+                  : "border-red-200 bg-red-50"
                   }`}
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -796,8 +743,8 @@ function ProductsTable({
 
                       <span
                         className={`rounded-full px-2 py-1 text-xs font-bold ${hasFispq
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
                           }`}
                       >
                         {hasFispq ? "FISPQ OK" : "FISPQ pendente"}
@@ -998,13 +945,31 @@ function AddProductModal({
                 </option>
               ))}
             </select>
+
+            <div className="mt-2 flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold text-slate-700">
+                  Não encontrou o produto?
+                </p>
+                <p className="text-xs text-slate-500">
+                  Cadastre um novo produto perigoso e depois volte para vincular à viagem.
+                </p>
+              </div>
+
+              <Link
+                to="/dangerous-products"
+                className="inline-flex w-fit items-center justify-center rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
+              >
+                + Cadastrar produto perigoso
+              </Link>
+            </div>
           </label>
 
           {selectedProduct ? (
             <div
               className={`rounded-2xl border p-4 ${selectedProductHasFispq
-                  ? "border-green-200 bg-green-50"
-                  : "border-red-200 bg-red-50"
+                ? "border-green-200 bg-green-50"
+                : "border-red-200 bg-red-50"
                 }`}
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

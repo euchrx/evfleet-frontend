@@ -30,6 +30,7 @@ import { RoleRoute } from "./RoleRoute";
 import { TripDetailsPage } from "../pages/Trips/TripDetailsPage";
 import { TripsDashboardPage } from "../pages/Trips/TripsDashboardPage";
 import { DangerousProductsPage } from "../pages/Trips/DangerousProductsPage";
+import { FiscalSettingsPage } from "../pages/FiscalSettings";
 
 export function AppRoutes() {
   return (
@@ -57,7 +58,7 @@ export function AppRoutes() {
             <Route path="/trips" element={<TripsPage />} />
             <Route path="/trips/dashboard" element={<TripsDashboardPage />} />
             <Route path="/trips/:id" element={<TripDetailsPage />} />
-            <Route path="/dangerous-products" element={<DangerousProductsPage />} />
+            <Route path="/dangerous-products" element={<DangerousProductsPage />} />´
 
             <Route path="/vehicle-documents" element={<VehicleDocumentsPage />} />
             <Route path="/debts" element={<DebtsPage />} />
@@ -75,6 +76,7 @@ export function AppRoutes() {
               <Route path="/finance" element={<Navigate to="/companies" replace />} />
               <Route path="/administration" element={<AdministrationPage />} />
               <Route path="/users" element={<UsersPage />} />
+              <Route path="/fiscal-settings" element={<FiscalSettingsPage />} />
             </Route>
           </Route>
         </Route>

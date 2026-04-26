@@ -14,7 +14,6 @@ export type ComplianceSeverity = "INFO" | "WARNING" | "BLOCKING";
 export type GeneratedDocumentType =
   | "EMERGENCY_SHEET"
   | "FISPQ"
-  | "MDFE_MOCK"
   | "CHECKLIST";
 
 export type GeneratedDocumentStatus =
@@ -84,6 +83,22 @@ export type TripProduct = {
   };
 };
 
+export type TripMdfe = {
+  id: string;
+  status:
+    | "DRAFT"
+    | "PROCESSING"
+    | "AUTHORIZED"
+    | "REJECTED"
+    | "CANCELED"
+    | "CLOSED"
+    | "ERROR";
+  accessKey?: string | null;
+  protocol?: string | null;
+  series?: number | null;
+  number?: number | null;
+};
+
 export type Trip = {
   id: string;
   origin: string;
@@ -91,6 +106,7 @@ export type Trip = {
   reason?: string | null;
   departureKm: number;
   returnKm?: number | null;
+  mdfes?: TripMdfe | null;
   departureAt: string;
   returnAt?: string | null;
   status: TripStatus;

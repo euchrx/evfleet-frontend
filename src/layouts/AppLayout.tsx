@@ -365,6 +365,12 @@ export function AppLayout() {
       roles: ["ADMIN", "FLEET_MANAGER"],
       requiresStarterPlan: true,
     },
+    {
+      name: "Fiscal",
+      path: "/fiscal-settings",
+      icon: FileText,
+      roles: ["ADMIN"],
+    },
     { name: "Empresas", path: "/companies", icon: Building2, roles: ["ADMIN"] },
     { name: "Usuários", path: "/users", icon: Users, roles: ["ADMIN"] },
     {
@@ -380,6 +386,7 @@ export function AppLayout() {
     "/users",
     "/administration",
     "/support",
+    "/fiscal-settings"
   ]);
   const isAdminWithoutCompanyScope =
     user?.role === "ADMIN" && !selectedCompanyId;

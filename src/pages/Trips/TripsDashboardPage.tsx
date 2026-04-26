@@ -65,11 +65,7 @@ export function TripsDashboardPage() {
             ["GENERATED", "SENT"].includes(doc.status),
         );
 
-        const hasMdfe = trip.generatedDocuments?.some(
-          (doc) =>
-            doc.type === "MDFE_MOCK" &&
-            ["GENERATED", "SENT"].includes(doc.status),
-        );
+        const hasMdfe = true;
 
         const missing = [
           !hasSheet ? "Ficha de emergência" : null,
