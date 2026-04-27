@@ -186,7 +186,7 @@ function Header({ trip, pendingCount }: { trip: Trip; pendingCount: number }) {
   const productsCount = trip.products?.length || 0;
   const documentsCount =
     (trip.generatedDocuments?.length || 0) +
-    (trip.mdfes ? 1 : 0);
+    (trip.mdfe ? 1 : 0);
   const lastCompliance = trip.complianceChecks?.[0];
 
   return (

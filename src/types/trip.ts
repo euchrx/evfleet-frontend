@@ -106,7 +106,7 @@ export type Trip = {
   reason?: string | null;
   departureKm: number;
   returnKm?: number | null;
-  mdfes?: TripMdfe | null;
+  mdfe?: TripMdfe | null;
   departureAt: string;
   returnAt?: string | null;
   status: TripStatus;

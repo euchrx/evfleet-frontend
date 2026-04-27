@@ -1,17 +1,17 @@
 # EvFleet Frontend
 
-Frontend do EvFleet, sistema web focado em rede de postos para acompanhar abastecimentos, produtos, frota, manutenção, documentos, débitos e visão financeira da operação.
+Frontend do EvFleet, plataforma web focada em **rede de postos**, abastecimentos, produtos comprados no posto, gestão da frota e controle financeiro-operacional da empresa.
 
 ## Posicionamento do produto
 
-O EvFleet foi estruturado para operações ligadas a rede de postos e empresas que dependem de:
+O frontend foi estruturado para operações ligadas a:
+- rede de postos
+- abastecimentos e ARLA
+- produtos de conveniência e itens comprados no posto
+- manutenção, pneus e documentos
+- visão gerencial de custos e compliance
 
-- controle de abastecimentos
-- leitura e importação de XML de NF-e
-- categorização de produtos comprados no posto
-- acompanhamento da frota e dos custos operacionais
-
-## Principais módulos da interface
+## Módulos principais da interface
 
 - Dashboard
 - Relatórios
@@ -20,11 +20,22 @@ O EvFleet foi estruturado para operações ligadas a rede de postos e empresas q
 - Abastecimentos
 - Produtos
 - Manutenções
+- Gestão de pneus
 - Débitos e Multas
 - Gestão de Viagens
 - Gestão de Documentos
 - Filiais
+- Como usar
 - Suporte
+
+## Fluxos importantes
+
+- importação de XML para Abastecimentos
+- importação de XML para Produtos
+- gestão visual de pneus em módulo dedicado
+- suporte ao cliente no plano Starter
+- aceite de termos por empresa, com versionamento
+- assinatura, cobrança e checkout
 
 ## Desenvolvimento
 

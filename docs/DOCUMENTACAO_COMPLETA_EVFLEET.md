@@ -2,234 +2,356 @@
 
 ## 1. Visão geral
 
-O **EvFleet** é um sistema SaaS para gestão corporativa de frota, com foco em operação, custos, compliance e rastreabilidade.
+O **EvFleet** é uma plataforma SaaS de gestão operacional e financeira com foco em **rede de postos**, abastecimentos, produtos comprados no posto e controle da frota vinculada à operação.
+
+O sistema foi organizado para atender dois cenários ao mesmo tempo:
+- operação diária da frota
+- visão gerencial e financeira da empresa
 
 Objetivos principais:
-- Centralizar dados de veículos, motoristas, abastecimentos, manutenções, viagens, documentos e débitos.
-- Melhorar controle financeiro e operacional com dashboard executivo e relatórios.
-- Reduzir risco operacional com notificações e regras de validação.
+- centralizar veículos, motoristas, abastecimentos, pneus, manutenções, viagens, documentos, débitos e produtos
+- reduzir retrabalho operacional com fluxos rápidos e contexto por veículo
+- apoiar a gestão de custos e compliance
+- dar rastreabilidade para mudanças, cobranças, suporte e histórico operacional
 
 ## 2. Stack e arquitetura
 
 ### Frontend
-- React + TypeScript + Vite
-- Tailwind utility classes para UI padronizada
-- Estado local com `useState`, `useEffect`, `useMemo`
-- Integração HTTP via `axios`
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- Axios para integração com a API
 
-### Backend (integração)
-- API REST consumida pelo frontend
-- Endpoints sem prefixo `/api` (ex.: `/vehicles`, `/drivers`, `/fuel-records`)
+### Backend
+- NestJS
+- Prisma
+- PostgreSQL
+- JWT para autenticação
 
-### Persistências usadas no frontend
-- Configurações administrativas: `evfleet_admin_settings_v1`
-- Visibilidade do menu: `evfleet_menu_visibility_v1`
-- Regras de consumo por veículo: `evfleet_consumption_rules_v1`
+### Modelo de operação
+- frontend SPA consumindo API REST
+- módulos administrativos e operacionais convivendo no mesmo produto
+- escopo por empresa, com filtros e permissões por perfil
 
 ## 3. Perfis e permissões
 
-Perfis ativos no sistema:
+Perfis ativos:
 - `ADMIN`
 - `FLEET_MANAGER`
 
-Regras:
-- `ADMIN`: acesso completo, inclusive **Usuários** e **Administração**.
-- `FLEET_MANAGER`: acesso operacional, sem páginas administrativas restritas.
+Regras principais:
+- `ADMIN` acessa empresas, usuários, administração, assinatura, suporte e visão global
+- `FLEET_MANAGER` atua no fluxo operacional da empresa vinculada
+- algumas páginas ficam visíveis ou ocultas conforme configuração da Administração
 
-## 4. Menu lateral (ordem atual)
+## 4. Assinatura, planos e cobrança
+
+O EvFleet possui gestão de assinatura por empresa.
+
+### Regras atuais
+- período de teste permitido apenas no plano `Starter`
+- o trial pode ser obrigatório ou opcional conforme configuração administrativa do aceite legal
+- mudança de plano por checkout só altera o plano ativo após confirmação de pagamento
+- histórico exibido ao cliente mostra apenas pagamentos efetivamente pagos
+- administradores podem aplicar ações manuais como:
+  - marcar como pago
+  - aplicar período de teste
+
+### Status relevantes
+- `ACTIVE`
+- `TRIALING`
+- `PAST_DUE`
+- `CANCELED`
+
+## 5. Login, aceite de termos e privacidade
+
+O login foi endurecido para separar claramente o fluxo do administrador e o fluxo da empresa.
+
+### Regras atuais
+- `ADMIN` não aceita termos pela empresa
+- usuários vinculados à empresa podem ser obrigados a aceitar os termos no login
+- o aceite é persistido na empresa, com versão
+- aceites anteriores continuam válidos até mudança de versão
+- a obrigatoriedade do aceite pode ser ativada ou desativada pela Administração
+
+### Comportamento esperado
+- se a obrigatoriedade estiver desligada, o login segue normalmente
+- se estiver ligada, o aceite vira obrigatório para usuários não admin quando a empresa ainda não aceitou a versão vigente
+
+## 6. Menu lateral atual
+
+Ordem atual da navegação principal:
 
 1. Dashboard
 2. Relatórios
 3. Veículos
 4. Motoristas
-5. Manutenções
-6. Abastecimentos
-7. Débitos e Multas
-8. Gestão de Viagens
-9. Gestão de Documentos
-10. Filiais
-11. Como usar
-12. Usuários (ADMIN)
-13. Administração (ADMIN)
+5. Abastecimentos
+6. Produtos
+7. Manutenções
+8. Gestão de pneus
+9. Débitos e Multas
+10. Gestão de Viagens
+11. Gestão de Documentos
+12. Filiais
+13. Como usar
+14. Suporte
+
+Itens administrativos:
+- Empresas
+- Usuários
+- Administração
+- Assinatura
 
 Observação:
-- A visibilidade dos módulos pode ser habilitada/desabilitada em **Administração > Visibilidade do menu lateral**.
+- a Administração controla a visibilidade do menu lateral
+- algumas páginas operacionais podem ser ocultadas
+- o suporte fica acessível mesmo sem empresa selecionada para o administrador
 
-## 5. Módulos do sistema
+## 7. Módulos do sistema
 
-### 5.1 Dashboard
-- Indicadores de custos e operação.
-- Cards de totais por módulo.
-- Rankings corporativos (veículos e motoristas) com filtros de período/categoria.
-- Modais de detalhamento financeiro com agrupamentos.
+### 7.1 Dashboard
+- indicadores de custo:
+  - combustível
+  - produtos
+  - manutenção
+  - pneus
+  - débitos e multas
+- total consolidado de despesas
+- rankings e detalhes por motorista e veículo
+- cards e modais de detalhamento financeiro
 
-### 5.2 Relatórios
-- Filtros de período e cruzamento de dados.
-- Seletores multi-select para estabelecimento, veículos, motoristas e módulos.
-- Exportação em PDF.
-- Prévia de indicadores no período selecionado.
+### 7.2 Relatórios
+- filtros por período
+- consolidação por módulos
+- exportação em PDF
+- cobertura atual de:
+  - abastecimentos
+  - produtos
+  - manutenções
+  - pneus
+  - débitos
+  - viagens
+  - documentos
+- tradução de labels operacionais para pt-BR
 
-### 5.3 Veículos
-- Cadastro completo:
-  - Placa, marca, modelo, ano, chassi, renavam
-  - Categoria e tipo (leve/pesado)
-  - Combustível, capacidade do tanque, status
-  - Data de aquisição (com opção sem data)
-- Histórico por veículo (edições e eventos relacionados).
-- Upload de anexos/fotos.
-- Ordenação por colunas e filtros.
+### 7.3 Veículos
+- cadastro e edição de veículo
+- vínculo principal por empresa
+- filial opcional
+- histórico do veículo
+- tipos e categorias, incluindo `Implemento`
+- suporte a combustível `ARLA32`
+- status operacional com reflexo automático de manutenção pendente
 
-Regra administrativa:
-- Limite global de cadastro de veículos controlado em Administração.
-- Mensagem ao atingir o limite:
-  - **"Limite máximo atingido para cadastro de veículos. Entre em contato com o suporte."**
+### 7.4 Motoristas
+- cadastro de motoristas
+- vínculo opcional com veículo
+- controle de CNH
+- criação automática do documento de CNH ao cadastrar motorista
+- visualização rápida do número da CNH com atalho para o módulo de documentos
+- alerta de vencimento de CNH com antecedência e contagem regressiva
 
-### 5.4 Motoristas
-- Cadastro de condutores com status.
-- Vínculo com veículo.
-- Controle de ativos/inativos e filtros.
+### 7.5 Abastecimentos
+- cadastro manual de abastecimentos
+- consumo médio
+- comparação por veículo e motorista
+- anomalias de consumo
+- importação moderna de XML com preview + confirm
+- consolidação de itens importáveis por nota fiscal
+- suporte a combustível e `ARLA 32`
 
-### 5.5 Manutenções
-Estrutura em abas:
-- **Manutenções** (preventiva/corretiva/periódica)
-- **Planos de manutenção**
-- **Gestão de Pneus**
+### 7.6 Produtos
+- módulo de produtos comprados na rede de postos
+- foco em itens de conveniência, perfumaria, cosméticos, lubrificantes e similares
+- tabela no padrão operacional do sistema
+- importação de XML com preview + confirm
+- exclusão em lote
+- categorização automática, com grupos como:
+  - `PERFUMARIA`
+  - `COSMETICOS`
+  - `LUBRIFICANTES`
+  - `CONVENIENCIA`
+  - `LIMPEZA`
+  - `OUTROS`
 
-Recursos:
-- Modais padronizados de cadastro/edição.
-- Tabelas com ordenação.
-- Alertas e histórico por veículo.
+### 7.7 Manutenções
+- módulo centrado em:
+  - registros de manutenção
+  - custos
+  - histórico técnico
+  - serviços executados
+  - filtros e listagens
+- a gestão visual de pneus foi removida de dentro de Manutenções
+- agora Manutenções conversa com Gestão de pneus por rota e contexto
 
-Gestão de Pneus (versão atual):
-- Cadastro técnico simplificado
-- Campo de **pressão recomendada**
-- Sem campos de sulco/pressão atual no CRUD principal
+### 7.8 Gestão de pneus
+- módulo oficial de operação visual de pneus
+- mapa de pneus por veículo
+- vinculação por `vehicleId` em query string
+- cadastro de pneu
+- movimentação
+- rodízio e posicionamento
+- estoque, reserva e estepe
+- histórico de movimentação
+- integração com manutenção do veículo e manutenção do pneu
 
-### 5.6 Abastecimentos
-- Registro de veículo, motorista, posto/filial, data, combustível, litros, valor e KM.
-- Cálculo de consumo médio.
-- Comparativo entre veículos.
-- Detecção de anomalias por regra de consumo.
+### 7.9 Débitos e Multas
+- gestão financeira da frota:
+  - IPVA
+  - multas
+  - licenciamento
+  - seguros
+  - pedágios
+  - impostos
+  - outros débitos
+- status rápidos
+- ação rápida de alteração de status direto na tabela
+- notificações de vencimento
 
-### 5.7 Débitos e Multas
-- Gestão consolidada de débitos da frota:
-  - Multa, IPVA, licenciamento, seguro, pedágio, imposto e outros.
-- Status financeiros:
-  - Pendente, vencida, paga, recorrida.
-- Filtros por status/categoria/busca textual.
-- Notificações de vencimento.
+### 7.10 Gestão de Viagens
+- planejamento e execução
+- veículo, motorista, rota, datas, KM e status
+- integração com o dashboard para cálculo de KM rodado
 
-### 5.8 Gestão de Viagens
-- Planejamento e execução:
-  - Veículo, motorista, rota, data de saída/retorno, KM saída/retorno, status.
-- Sugestão de motorista vinculado ao veículo.
-- Atualização de KM para histórico operacional.
+### 7.11 Gestão de Documentos
+- módulo dividido por abas:
+  - Veículos
+  - Motoristas
+  - Documentos gerais
+- suporte a documentos monitoráveis por vencimento
+- exemplos atuais:
+  - CNH
+  - MOPP
+  - exame toxicológico
+  - CRLV
+  - CIV
+  - CIPP
+  - autorização ambiental
+  - RNTRC
+  - RG
+  - CPF
+  - ficha de registro / contrato
+- campos condicionais por tipo de documento
+- ação `Ver anexo` / `Anexar`
+- alteração rápida de status
 
-### 5.9 Gestão de Documentos
-- Cadastro documental por veículo.
-- Upload de arquivo.
-- Controle de vencimento.
-- Notificações para vencendo/vencido (janela de 30 dias).
+### 7.12 Filiais
+- cadastro de filiais por empresa
+- uso opcional para organização operacional e relatórios
+- só aparecem filiais da empresa selecionada ou da empresa do usuário
 
-### 5.10 Filiais
-- Cadastro e manutenção de estabelecimentos.
-- Integração com filtros globais e bloqueio por estabelecimento padrão.
+### 7.13 Como usar
+- base de onboarding no próprio sistema
+- conteúdo visual e textual para orientar operação
 
-### 5.11 Como usar
-- Manual interno no próprio frontend.
-- Feed de vídeos explicativos.
-- Administração de conteúdo de onboarding.
+### 7.14 Suporte
+- módulo de pedidos de suporte do cliente
+- visível para clientes do plano `Starter`
+- uso para:
+  - bugs
+  - melhorias
+  - pedidos relacionados ao software
+- fluxo:
+  - cliente abre pedido
+  - admin responde
+  - admin define prazo
+  - admin conclui
+- notificações:
+  - admin é notificado sobre pedido novo
+  - cliente é notificado sobre resposta
+  - cliente é notificado sobre conclusão
+- apenas administrador pode excluir chamado
 
-### 5.12 Usuários
-- Gestão de usuários e papéis.
-- Regras de acesso por perfil.
+### 7.15 Empresas
+- cadastro de empresas
+- exclusão definitiva com backup
+- tabela operacional + visão financeira
+- ação rápida para saltar da empresa para a tabela de finanças com destaque
 
-### 5.13 Administração
-- Parâmetros gerais do software.
-- Visibilidade de menu lateral.
-- Publicação manual de updates para System Logs.
-- Configurações de estabelecimento padrão do sistema.
+### 7.16 Administração
+- visibilidade do menu lateral
+- limites operacionais
+- aceite legal
+- configurações gerais
+- publicações de atualização do sistema
 
-## 6. Notificações
+## 8. Importação de XML
 
-As notificações ficam no header com:
-- contador de pendências
-- modal de listagem
-- redirecionamento contextual para o módulo relacionado
+O EvFleet possui dois fluxos principais de importação de NF-e:
 
-Eventos contemplados:
-- anomalias de abastecimento
-- manutenção próxima/programada
-- débitos vencendo e vencidos
-- documentos vencendo/vencidos
+### 8.1 XML de Abastecimentos
+- preview por nota
+- confirmação por grupos consolidados
+- combustível e ARLA tratados como itens operacionais de abastecimento
+- bloqueio de duplicidade
 
-Comportamento de destaque:
-- ao redirecionar para a tabela, o item é destacado
-- destaque é removido após interação do usuário (clique/navegação/abertura de modal)
+### 8.2 XML de Produtos
+- preview por nota
+- seleção por item
+- ignora combustível e ARLA
+- categorização automática
+- bloqueio de duplicidade por item da nota
 
-## 7. System Logs
+## 9. Notificações
 
-Formato:
-- modal acionado no rodapé (sem página dedicada)
-- exibe nome do sistema, versão e lista de tópicos
+As notificações ficam no header.
 
-Origem dos logs:
-- apenas lançamentos manuais via **Administração > Informar atualização**
+### Regras atuais
+- `ADMIN` vê apenas notificações de suporte
+- usuários operacionais veem notificações da empresa
+- pendências continuam registradas para conferência
 
-## 8. Regras funcionais importantes
+### Janelas de alerta
+- débitos: até 30 dias antes do vencimento
+- documentos: até 30 dias antes do vencimento
+- manutenções: até 15 dias antes do prazo
+- itens vencidos ou atrasados continuam aparecendo enquanto estiverem pendentes
 
-### 8.1 Limite de veículos
-- Campo em Administração:
-  - **Limite máximo de veículos permitidos no sistema**
-- O cadastro de novos veículos respeita esse limite.
-- Botão de cadastro muda visual conforme limite.
+## 10. Regras funcionais importantes
 
-### 8.2 Escopo por estabelecimento
-- Quando ativado:
-  - estabelecimento padrão é aplicado automaticamente
-  - campos de estabelecimento ficam bloqueados nos fluxos aplicáveis
+### 10.1 Escopo por empresa
+- o sistema trabalha com escopo por empresa
+- usuários veem apenas dados da empresa vinculada
+- admin pode selecionar empresa quando necessário
 
-### 8.3 Ordenação e paginação
-- Tabelas padronizadas com:
-  - ordenação por coluna
-  - paginação (`10` itens por página em módulos principais)
+### 10.2 Veículo em manutenção
+- se existir manutenção pendente do veículo, o status operacional pode refletir isso automaticamente
 
-### 8.4 Validação de formulários
-- Erros de validação por campo (estilo visual vermelho no input).
-- Mensagens em português.
+### 10.3 Documentação automática da CNH
+- ao cadastrar motorista, a base documental da CNH é criada automaticamente
+- depois o anexo pode ser feito pela Gestão de Documentos
 
-## 9. Eventos globais de atualização (frontend)
+### 10.4 Ações rápidas de status
+- documentos
+- débitos
+- manutenções
 
-Eventos usados para sincronizar UI:
-- `evfleet-settings-updated`
-- `evfleet-default-branch-updated`
-- `evfleet-menu-visibility-updated`
-- `evfleet-notifications-updated`
+### 10.5 Foco em rede de postos
+- o sistema não é apenas frota genérica
+- ele foi moldado para operação conectada a posto:
+  - combustível
+  - ARLA
+  - produtos de conveniência
+  - XML de NF-e
+  - custos associados à rotina do posto e da frota
 
-## 10. Fluxo operacional recomendado
+## 11. Fluxo operacional recomendado
 
-1. Configurar Administração (empresa, limite de veículos, estabelecimento padrão).
-2. Cadastrar filiais.
+1. Configurar empresa, assinatura e administração.
+2. Definir visibilidade dos módulos.
 3. Cadastrar veículos.
 4. Cadastrar motoristas.
-5. Registrar abastecimentos e manutenções.
-6. Registrar débitos e documentos.
-7. Acompanhar Dashboard e notificações.
-8. Emitir relatórios por período e filtros de cruzamento.
+5. Validar documentos de veículos e motoristas.
+6. Operar abastecimentos e produtos com importação de XML quando aplicável.
+7. Acompanhar manutenção e gestão de pneus em módulos separados.
+8. Monitorar débitos, viagens e vencimentos.
+9. Usar dashboard e relatórios para controle gerencial.
+10. Usar suporte quando o cliente estiver no plano elegível.
 
-## 11. Boas práticas para operação corporativa
+## 12. Observações finais
 
-- Manter cadastros de veículos e motoristas sempre com status atualizado.
-- Registrar KM em todos os eventos operacionais.
-- Validar periodicamente alertas de manutenção e vencimentos.
-- Usar o módulo de Relatórios para auditoria mensal de custos.
-- Publicar updates relevantes no System Logs para rastreabilidade interna.
-
-## 12. Roadmap recomendado (próximas evoluções)
-
-- Controle de centro de custo por unidade/veículo.
-- Aprovação em fluxo para lançamentos financeiros.
-- SLA de manutenção por tipo de incidente.
-- Exportadores adicionais (CSV/XLSX).
-- Integração com canal externo de notificações (e-mail/WhatsApp backend-driven).
-
+- o produto evoluiu bastante e hoje a documentação precisa acompanhar o fluxo real do sistema
+- o centro do produto é a operação integrada entre rede de postos, produtos, abastecimentos e frota
+- as páginas e regras administrativas foram reorganizadas para reduzir duplicidade e melhorar clareza operacional

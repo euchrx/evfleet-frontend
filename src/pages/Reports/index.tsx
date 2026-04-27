@@ -39,8 +39,20 @@ type VehicleTypeFilter = "LIGHT" | "HEAVY";
 type VehicleStatusFilter = "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "SOLD";
 type SelectOption = { id: string; label: string };
 
-function toCurrency(value: number) {
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+function toCurrency(value: unknown) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(0);
+  }
+
+  return number.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 }
 
 function parseDateSafe(dateValue?: string | null) {
@@ -72,8 +84,10 @@ function formatDate(dateValue?: string | null) {
   return date.toLocaleDateString("pt-BR");
 }
 
-function escapeHtml(value: string) {
-  return value
+function escapeHtml(value: unknown) {
+  if (value === null || value === undefined) return "";
+
+  return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
