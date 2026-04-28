@@ -96,6 +96,8 @@ export async function downloadTripDamdfe(tripId: string) {
 }
 
 export async function generateTripMdfe(tripId: string) {
-  const { data } = await api.post(`/trips/${tripId}/generate-mdfe`);
+  const { data } = await api.post<MdfeProviderResult>(
+    `/trips/${tripId}/mdfe`,
+  );
   return data;
 }
