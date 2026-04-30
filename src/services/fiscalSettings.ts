@@ -21,9 +21,18 @@ export type CompanyFiscalSettings = {
   state: string;
   zipCode: string;
 
+  rntrc?: string | null;
+
   mdfeEnvironment: FiscalEnvironment;
   mdfeSeries: number;
   mdfeNextNumber: number;
+
+  mdfeDefaultInsurerName?: string | null;
+  mdfeDefaultInsurerDocument?: string | null;
+  mdfeDefaultPolicyNumber?: string | null;
+  mdfePaymentPixKey?: string | null;
+  defaultContractorName?: string | null;
+  defaultContractorDocument?: string | null;
 
   certificatePfxUrl?: string | null;
   certificatePasswordEncrypted?: string | null;

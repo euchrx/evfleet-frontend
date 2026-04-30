@@ -22,9 +22,15 @@ const initialForm: UpsertCompanyFiscalSettingsInput = {
   state: "",
   zipCode: "",
 
+  rntrc: "",
+
   mdfeEnvironment: "HOMOLOGATION",
   mdfeSeries: 1,
   mdfeNextNumber: 1,
+
+  mdfeDefaultInsurerName: "",
+  mdfeDefaultInsurerDocument: "",
+  mdfeDefaultPolicyNumber: "",
 
   certificatePfxUrl: "",
   certificatePasswordEncrypted: "",
@@ -68,12 +74,21 @@ export function FiscalSettingsPage() {
         state: data.state ?? "",
         zipCode: data.zipCode ?? "",
 
+        rntrc: data.rntrc ?? "",
+
         mdfeEnvironment: data.mdfeEnvironment ?? "HOMOLOGATION",
         mdfeSeries: data.mdfeSeries ?? 1,
         mdfeNextNumber: data.mdfeNextNumber ?? 1,
 
+        mdfeDefaultInsurerName: data.mdfeDefaultInsurerName ?? "",
+        mdfeDefaultInsurerDocument:
+          data.mdfeDefaultInsurerDocument ?? "",
+        mdfeDefaultPolicyNumber:
+          data.mdfeDefaultPolicyNumber ?? "",
+
         certificatePfxUrl: data.certificatePfxUrl ?? "",
-        certificatePasswordEncrypted: data.certificatePasswordEncrypted ?? "",
+        certificatePasswordEncrypted:
+          data.certificatePasswordEncrypted ?? "",
         certificateExpiresAt: data.certificateExpiresAt
           ? data.certificateExpiresAt.slice(0, 10)
           : "",
@@ -87,7 +102,6 @@ export function FiscalSettingsPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-
     setSaving(true);
 
     try {
@@ -96,8 +110,14 @@ export function FiscalSettingsPage() {
         cnpj: form.cnpj.replace(/\D/g, ""),
         zipCode: form.zipCode.replace(/\D/g, ""),
         state: form.state.toUpperCase(),
+        rntrc: form.rntrc?.replace(/\D/g, ""),
+
         mdfeSeries: Number(form.mdfeSeries),
         mdfeNextNumber: Number(form.mdfeNextNumber),
+
+        mdfeDefaultInsurerDocument:
+          form.mdfeDefaultInsurerDocument?.replace(/\D/g, ""),
+
         certificateExpiresAt: form.certificateExpiresAt || undefined,
       });
 
@@ -122,7 +142,7 @@ export function FiscalSettingsPage() {
           Configurações fiscais
         </h1>
         <p className="text-sm text-slate-500">
-          Dados usados para emissão de MDF-e.
+          Dados fiscais da empresa usados na emissão de MDF-e.
         </p>
       </div>
 
@@ -130,6 +150,7 @@ export function FiscalSettingsPage() {
         onSubmit={handleSubmit}
         className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
       >
+        {/* EMPRESA */}
         <section className="grid gap-4 md:grid-cols-2">
           <h2 className="md:col-span-2 text-sm font-semibold text-slate-900">
             Empresa
@@ -172,6 +193,7 @@ export function FiscalSettingsPage() {
           </Field>
         </section>
 
+        {/* ENDEREÇO */}
         <section className="grid gap-4 md:grid-cols-2">
           <h2 className="md:col-span-2 text-sm font-semibold text-slate-900">
             Endereço fiscal
@@ -201,16 +223,6 @@ export function FiscalSettingsPage() {
               onChange={(e) => updateField("addressDistrict", e.target.value)}
               className="input"
               required
-            />
-          </Field>
-
-          <Field label="Complemento">
-            <input
-              value={form.addressComplement ?? ""}
-              onChange={(e) =>
-                updateField("addressComplement", e.target.value)
-              }
-              className="input"
             />
           </Field>
 
@@ -252,8 +264,9 @@ export function FiscalSettingsPage() {
           </Field>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <h2 className="md:col-span-3 text-sm font-semibold text-slate-900">
+        {/* MDFE */}
+        <section className="grid gap-4 md:grid-cols-4">
+          <h2 className="md:col-span-4 text-sm font-semibold text-slate-900">
             MDF-e
           </h2>
 
@@ -273,33 +286,75 @@ export function FiscalSettingsPage() {
             </select>
           </Field>
 
+          <Field label="RNTRC">
+            <input
+              value={form.rntrc ?? ""}
+              onChange={(e) => updateField("rntrc", e.target.value)}
+              className="input"
+            />
+          </Field>
+
           <Field label="Série">
             <input
               type="number"
-              min={1}
               value={form.mdfeSeries}
               onChange={(e) =>
                 updateField("mdfeSeries", Number(e.target.value))
               }
               className="input"
-              required
             />
           </Field>
 
           <Field label="Próximo número">
             <input
               type="number"
-              min={1}
               value={form.mdfeNextNumber}
               onChange={(e) =>
                 updateField("mdfeNextNumber", Number(e.target.value))
               }
               className="input"
-              required
             />
           </Field>
         </section>
 
+        {/* SEGURO */}
+        <section className="grid gap-4 md:grid-cols-2">
+          <h2 className="md:col-span-2 text-sm font-semibold text-slate-900">
+            Seguro padrão da carga
+          </h2>
+
+          <Field label="Seguradora">
+            <input
+              value={form.mdfeDefaultInsurerName ?? ""}
+              onChange={(e) =>
+                updateField("mdfeDefaultInsurerName", e.target.value)
+              }
+              className="input"
+            />
+          </Field>
+
+          <Field label="Documento">
+            <input
+              value={form.mdfeDefaultInsurerDocument ?? ""}
+              onChange={(e) =>
+                updateField("mdfeDefaultInsurerDocument", e.target.value)
+              }
+              className="input"
+            />
+          </Field>
+
+          <Field label="Apólice">
+            <input
+              value={form.mdfeDefaultPolicyNumber ?? ""}
+              onChange={(e) =>
+                updateField("mdfeDefaultPolicyNumber", e.target.value)
+              }
+              className="input"
+            />
+          </Field>
+        </section>
+
+        {/* CERTIFICADO */}
         <section className="grid gap-4 md:grid-cols-2">
           <h2 className="md:col-span-2 text-sm font-semibold text-slate-900">
             Certificado A1
@@ -310,11 +365,11 @@ export function FiscalSettingsPage() {
               value={form.certificatePfxUrl ?? ""}
               onChange={(e) => updateField("certificatePfxUrl", e.target.value)}
               className="input"
-              placeholder="base64:..."
+              autoComplete="off"
             />
           </Field>
 
-          <Field label="Senha do certificado">
+          <Field label="Senha">
             <input
               type="password"
               value={form.certificatePasswordEncrypted ?? ""}
@@ -322,6 +377,7 @@ export function FiscalSettingsPage() {
                 updateField("certificatePasswordEncrypted", e.target.value)
               }
               className="input"
+              autoComplete="new-password"
             />
           </Field>
 
@@ -341,9 +397,9 @@ export function FiscalSettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-medium text-white"
           >
-            {saving ? "Salvando..." : "Salvar configurações"}
+            {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>
       </form>

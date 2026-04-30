@@ -23,13 +23,41 @@ export type UpdateTripInput = Partial<{
   destination: string;
   reason?: string;
   departureKm: number;
-  returnKm?: number;
+  returnKm?: number | null;
   departureAt: string;
-  returnAt?: string;
+  returnAt?: string | null;
   status?: TripStatus;
-  notes?: string;
+  notes?: string | null;
   vehicleId: string;
   driverId?: string | null;
+
+  originState?: string | null;
+  originCityName?: string | null;
+  originCityIbgeCode?: string | null;
+  originZipCode?: string | null;
+
+  destinationState?: string | null;
+  destinationCityName?: string | null;
+  destinationCityIbgeCode?: string | null;
+  destinationZipCode?: string | null;
+
+  cargoDescription?: string | null;
+  cargoNcm?: string | null;
+  cargoValue?: number | null;
+  cargoQuantity?: number | null;
+  cargoUnit?: "KG" | "TON" | null;
+
+  contractorName?: string | null;
+  contractorDocument?: string | null;
+
+  paymentIndicator?: "PAID" | "UNPAID" | null;
+  paymentValue?: number | null;
+  paymentPixKey?: string | null;
+
+  insuranceCompanyName?: string | null;
+  insuranceCompanyDocument?: string | null;
+  insurancePolicyNumber?: string | null;
+  insuranceEndorsement?: string | null;
 }>;
 
 export type AddTripProductInput = {

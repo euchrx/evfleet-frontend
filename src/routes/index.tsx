@@ -28,9 +28,10 @@ import { BillingSuccessPage } from "../pages/BillingSuccess";
 import { PrivateRoute } from "./PrivateRoute";
 import { RoleRoute } from "./RoleRoute";
 import { TripDetailsPage } from "../pages/Trips/TripDetailsPage";
-import { TripsDashboardPage } from "../pages/Trips/TripsDashboardPage";
+import { TripEditPage } from "../pages/Trips/TripEditPage";
 import { DangerousProductsPage } from "../pages/Trips/DangerousProductsPage";
 import { FiscalSettingsPage } from "../pages/FiscalSettings";
+import { TripAddPage } from "../pages/Trips/TripAddPage";
 
 export function AppRoutes() {
   return (
@@ -56,9 +57,10 @@ export function AppRoutes() {
             <Route path="/support" element={<SupportPage />} />
             <Route path="/retail-products" element={<Navigate to="/products" replace />} />
             <Route path="/trips" element={<TripsPage />} />
-            <Route path="/trips/dashboard" element={<TripsDashboardPage />} />
             <Route path="/trips/:id" element={<TripDetailsPage />} />
-            <Route path="/dangerous-products" element={<DangerousProductsPage />} />´
+            <Route path="/trips/:id/edit" element={<TripEditPage />} />
+            <Route path="/trips/new" element={<TripAddPage />} />
+            <Route path="/dangerous-products" element={<DangerousProductsPage />} />
 
             <Route path="/vehicle-documents" element={<VehicleDocumentsPage />} />
             <Route path="/debts" element={<DebtsPage />} />

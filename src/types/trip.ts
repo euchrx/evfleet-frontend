@@ -120,6 +120,34 @@ export type Trip = {
   vehicleId: string;
   driverId?: string | null;
 
+  originState?: string | null;
+  originCityName?: string | null;
+  originCityIbgeCode?: string | null;
+  originZipCode?: string | null;
+
+  destinationState?: string | null;
+  destinationCityName?: string | null;
+  destinationCityIbgeCode?: string | null;
+  destinationZipCode?: string | null;
+
+  cargoDescription?: string | null;
+  cargoNcm?: string | null;
+  cargoValue?: number | string | null;
+  cargoQuantity?: number | string | null;
+  cargoUnit?: "KG" | "TON" | null;
+
+  contractorName?: string | null;
+  contractorDocument?: string | null;
+
+  paymentIndicator?: "PAID" | "UNPAID" | null;
+  paymentValue?: number | string | null;
+  paymentPixKey?: string | null;
+
+  insuranceCompanyName?: string | null;
+  insuranceCompanyDocument?: string | null;
+  insurancePolicyNumber?: string | null;
+  insuranceEndorsement?: string | null;
+
   vehicle?: {
     id: string;
     plate: string;

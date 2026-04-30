@@ -53,6 +53,152 @@ function openPrintableHtml(html: string, title = "Documento") {
   }, 300);
 }
 
+function buildMdfeChecklist(trip: Trip) {
+  const products = trip.products || [];
+  const missingFispq = products.filter(
+    (item) => !item.dangerousProduct?.fispqUrl,
+  );
+
+  return [
+    {
+      key: "vehicle",
+      label: "Veículo de tração",
+      description: trip.vehicle?.plate
+        ? `Veículo ${trip.vehicle.plate} vinculado à viagem.`
+        : "Nenhum veículo vinculado à viagem.",
+      passed: !!trip.vehicleId,
+      action: {
+        label: "Editar viagem",
+        to: `/trips/${trip.id}/edit`,
+      },
+    },
+    {
+      key: "driver",
+      label: "Motorista",
+      description: trip.driver?.name
+        ? `Motorista ${trip.driver.name} vinculado.`
+        : "Nenhum motorista vinculado à viagem.",
+      passed: !!trip.driverId,
+      action: {
+        label: "Editar viagem",
+        to: `/trips/${trip.id}/edit`,
+      },
+    },
+    {
+      key: "route",
+      label: "Rota fiscal",
+      description:
+        trip.originState &&
+          trip.destinationState &&
+          trip.originCityIbgeCode &&
+          trip.destinationCityIbgeCode
+          ? `${trip.originState} → ${trip.destinationState}`
+          : "Informe UF e código IBGE de origem/destino.",
+      passed:
+        !!trip.originState &&
+        !!trip.destinationState &&
+        !!trip.originCityIbgeCode &&
+        !!trip.destinationCityIbgeCode,
+      action: {
+        label: "Editar rota fiscal",
+        to: `/trips/${trip.id}/edit`,
+      },
+    },
+    {
+      key: "cargo",
+      label: "Carga transportada",
+      description:
+        products.length > 0
+          ? `${products.length} produto(s) vinculado(s).`
+          : "Adicione pelo menos um produto/carga à viagem.",
+      passed: products.length > 0,
+      action: {
+        label: "Adicionar carga",
+        to: `/trips/${trip.id}`,
+      },
+    },
+    {
+      key: "fispq",
+      label: "FISPQ dos produtos",
+      description:
+        missingFispq.length === 0
+          ? "Todos os produtos estão com FISPQ."
+          : `${missingFispq.length} produto(s) sem FISPQ.`,
+      passed: products.length > 0 && missingFispq.length === 0,
+      action: {
+        label: "Corrigir FISPQ",
+        to: "/dangerous-products",
+      },
+    },
+    {
+      key: "ncm",
+      label: "NCM predominante",
+      description: trip.cargoNcm
+        ? `NCM ${trip.cargoNcm} informado.`
+        : "Informe o NCM do produto predominante da carga.",
+      passed: !!trip.cargoNcm,
+      action: {
+        label: "Editar dados fiscais",
+        to: `/trips/${trip.id}/edit`,
+      },
+    },
+    {
+      key: "cargo-values",
+      label: "Valor e quantidade da carga",
+      description:
+        trip.cargoValue && trip.cargoQuantity
+          ? "Valor e quantidade informados."
+          : "Informe valor e quantidade total da carga.",
+      passed:
+        Number(trip.cargoValue || 0) > 0 &&
+        Number(trip.cargoQuantity || 0) > 0,
+      action: {
+        label: "Editar carga fiscal",
+        to: `/trips/${trip.id}/edit`,
+      },
+    },
+    {
+      key: "payment",
+      label: "Pagamento/frete",
+      description:
+        trip.paymentValue && Number(trip.paymentValue) > 0
+          ? "Dados de pagamento/frete informados."
+          : "Informe o valor do frete/pagamento.",
+      passed: Number(trip.paymentValue || 0) > 0,
+      action: {
+        label: "Editar pagamento",
+        to: `/trips/${trip.id}/edit`,
+      },
+    },
+    {
+      key: "insurance",
+      label: "Seguro da carga",
+      description:
+        trip.insuranceCompanyName &&
+          trip.insuranceCompanyDocument &&
+          trip.insurancePolicyNumber
+          ? "Dados do seguro informados."
+          : "Informe seguradora, documento e apólice.",
+      passed:
+        !!trip.insuranceCompanyName &&
+        !!trip.insuranceCompanyDocument &&
+        !!trip.insurancePolicyNumber,
+      action: {
+        label: "Editar seguro",
+        to: `/trips/${trip.id}/edit`,
+      },
+    },
+    {
+      key: "mdfe",
+      label: "MDF-e",
+      description: trip.mdfe
+        ? `MDF-e com status ${trip.mdfe.status}.`
+        : "MDF-e ainda não gerado.",
+      passed: !!trip.mdfe,
+    },
+  ];
+}
+
 function getPendingComplianceResults(trip: Trip) {
   const last = trip.complianceChecks?.[0];
 
@@ -166,7 +312,10 @@ export function TripDetailsPage() {
 
       <ActionsCard trip={trip} reload={load} />
 
-      <MdfeActions tripId={trip.id} />
+      <MdfeActions
+        tripId={trip.id}
+        canGenerateMdfe={buildMdfeChecklist(trip).every((item) => item.passed || item.key === "mdfe")}
+      />
 
       <ComplianceActionsCard trip={trip} />
 
@@ -349,7 +498,7 @@ function ActionsCard({
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <ActionButton
           title="Validar compliance"
           description="Reprocessa as regras bloqueantes da viagem."
@@ -387,6 +536,36 @@ function ActionsCard({
           tone="green"
           onClick={() => runAction("START", () => startTrip(trip.id))}
         />
+
+        <Link
+          to={`/trips/${trip.id}/edit`}
+          className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-slate-800 transition hover:bg-slate-100"
+        >
+          <p className="text-sm font-bold">Editar viagem</p>
+          <p className="mt-1 text-xs opacity-80">
+            Rota, carga fiscal, seguro e pagamento.
+          </p>
+        </Link>
+
+        <Link
+          to="/dangerous-products"
+          className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-slate-800 transition hover:bg-slate-100"
+        >
+          <p className="text-sm font-bold">Produtos perigosos</p>
+          <p className="mt-1 text-xs opacity-80">
+            FISPQ, ONU, NCM e classe de risco.
+          </p>
+        </Link>
+
+        <Link
+          to="/vehicle-documents"
+          className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-slate-800 transition hover:bg-slate-100"
+        >
+          <p className="text-sm font-bold">Documentos</p>
+          <p className="mt-1 text-xs opacity-80">
+            CRLV, CIV, CIPP, MOPP e documentos da frota.
+          </p>
+        </Link>
       </div>
     </section>
   );
@@ -538,54 +717,80 @@ function ComplianceActionsCard({ trip }: { trip: Trip }) {
 // ================= COMPLIANCE =================
 
 function ComplianceCard({ trip }: { trip: Trip }) {
-  const last = trip.complianceChecks?.[0];
+  const checklist = buildMdfeChecklist(trip);
+  const completed = checklist.filter((item) => item.passed).length;
+  const total = checklist.length;
+  const percent = Math.round((completed / total) * 100);
+  const blocked = checklist.some((item) => !item.passed);
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex flex-col gap-1">
-        <h3 className="text-lg font-bold text-slate-900">Compliance</h3>
-        <p className="text-sm text-slate-500">
-          Resultado da última validação operacional da viagem.
-        </p>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900">
+            Checklist MDF-e
+          </h3>
+          <p className="text-sm text-slate-500">
+            Conferência fiscal e operacional antes da emissão.
+          </p>
+        </div>
+
+        <span
+          className={`rounded-full px-4 py-2 text-xs font-bold ${blocked
+            ? "bg-red-100 text-red-700"
+            : "bg-green-100 text-green-700"
+            }`}
+        >
+          {blocked ? "PENDENTE" : "PRONTO"} · {percent}%
+        </span>
       </div>
 
-      {!last ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500">
-          Nenhuma validação realizada.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {last.results?.map((result) => (
-            <div
-              key={result.id}
-              className={`rounded-2xl border p-4 ${result.passed
-                ? "border-green-200 bg-green-50"
-                : result.severity === "BLOCKING"
-                  ? "border-red-200 bg-red-50"
-                  : "border-amber-200 bg-amber-50"
-                }`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="font-bold text-slate-900">{result.title}</p>
-                  <p className="mt-1 text-sm text-slate-600">{result.message}</p>
-                </div>
+      <div className="mb-5 h-3 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className={`h-full rounded-full ${blocked ? "bg-red-500" : "bg-green-500"
+            }`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
 
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-bold ${result.passed
-                    ? "bg-green-100 text-green-700"
-                    : result.severity === "BLOCKING"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-amber-100 text-amber-700"
-                    }`}
-                >
-                  {result.passed ? "OK" : result.severity}
-                </span>
+      <div className="grid gap-3 lg:grid-cols-2">
+        {checklist.map((item) => (
+          <div
+            key={item.key}
+            className={`rounded-2xl border p-4 ${item.passed
+              ? "border-green-200 bg-green-50"
+              : "border-red-200 bg-red-50"
+              }`}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-bold text-slate-900">{item.label}</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {item.description}
+                </p>
+
+                {!item.passed && item.action ? (
+                  <Link
+                    to={item.action.to}
+                    className="mt-3 inline-flex rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700"
+                  >
+                    {item.action.label}
+                  </Link>
+                ) : null}
               </div>
+
+              <span
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${item.passed
+                  ? "bg-green-100 text-green-700"
+                  : "bg-red-100 text-red-700"
+                  }`}
+              >
+                {item.passed ? "OK" : "PENDENTE"}
+              </span>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
