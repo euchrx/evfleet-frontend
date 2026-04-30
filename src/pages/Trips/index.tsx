@@ -1,14 +1,10 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  generateEmergencySheet,
-  generateMdfe,
   getTrips,
   startTrip,
-  validateTripCompliance,
 } from "../../services/trips";
 import { useBranch } from "../../contexts/BranchContext";
-import { useCompanyScope } from "../../contexts/CompanyScopeContext";
 import { useStatusToast } from "../../contexts/StatusToastContext";
 import type { Trip, TripStatus } from "../../types/trip";
 import { formatVehicleLabel } from "../../utils/vehicleLabel";
@@ -51,44 +47,6 @@ function statusClass(status: TripStatus) {
   return map[status] ?? map.DRAFT;
 }
 
-function mdfeLabel(status?: string | null) {
-  const labels: Record<string, string> = {
-    DRAFT: "Rascunho",
-    PROCESSING: "Processando",
-    AUTHORIZED: "Autorizado",
-    REJECTED: "Rejeitado",
-    CANCELED: "Cancelado",
-    CLOSED: "Encerrado",
-    ERROR: "Erro",
-  };
-
-  return status ? labels[status] || status : "Não gerado";
-}
-
-function mdfeClass(status?: string | null) {
-  if (status === "AUTHORIZED") return "border-green-200 bg-green-50 text-green-700";
-  if (status === "PROCESSING") return "border-amber-200 bg-amber-50 text-amber-700";
-  if (status === "REJECTED" || status === "ERROR") return "border-red-200 bg-red-50 text-red-700";
-  if (status === "CLOSED") return "border-slate-200 bg-slate-100 text-slate-700";
-  if (status === "CANCELED") return "border-slate-200 bg-slate-100 text-slate-500";
-  return "border-slate-200 bg-white text-slate-500";
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return "-";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function getTripFiscalStage(trip: Trip): FiscalStage {
   if (!trip.mdfe) return "MISSING";
 
@@ -123,42 +81,8 @@ function hasBlockingCompliance(trip: Trip) {
   );
 }
 
-function getOperationLabel(trip: Trip) {
-  const fiscalStage = getTripFiscalStage(trip);
-
-  if (trip.status === "COMPLETED") return "Finalizada";
-  if (trip.status === "IN_PROGRESS") return "Em transporte";
-  if (fiscalStage === "CLOSED") return "MDF-e encerrado";
-  if (fiscalStage === "AUTHORIZED") return "Pronta para iniciar";
-  if (trip.status === "BLOCKED" || hasBlockingCompliance(trip)) return "Bloqueada";
-  if (!hasEmergencySheet(trip)) return "Aguardando ficha";
-  if (fiscalStage === "MISSING") return "Aguardando MDF-e";
-  if (fiscalStage === "REJECTED") return "Corrigir MDF-e";
-
-  return "Em liberação";
-}
-
-function getOperationClass(trip: Trip) {
-  const label = getOperationLabel(trip);
-
-  if (label === "Bloqueada" || label === "Corrigir MDF-e") {
-    return "border-red-200 bg-red-50 text-red-700";
-  }
-
-  if (label === "Pronta para iniciar" || label === "MDF-e encerrado") {
-    return "border-green-200 bg-green-50 text-green-700";
-  }
-
-  if (label === "Em transporte") {
-    return "border-blue-200 bg-blue-50 text-blue-700";
-  }
-
-  return "border-amber-200 bg-amber-50 text-amber-700";
-}
-
 export function TripsPage() {
   const { selectedBranchId } = useBranch();
-  const { currentCompany } = useCompanyScope();
   const { showToast } = useStatusToast();
 
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -615,27 +539,5 @@ function MetricCard({
       </p>
       <p className="mt-1 text-2xl font-bold">{value}</p>
     </div>
-  );
-}
-
-function MiniPill({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-        }`}
-    >
-      {ok ? "✓" : "!"} {label}
-    </span>
-  );
-}
-
-function DocumentLine({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <p
-      className={`text-xs font-semibold ${ok ? "text-green-700" : "text-red-600"
-        }`}
-    >
-      {ok ? "✓" : "•"} {label}
-    </p>
   );
 }

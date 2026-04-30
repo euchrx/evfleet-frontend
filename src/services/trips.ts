@@ -21,7 +21,7 @@ export type CreateTripInput = {
 export type UpdateTripInput = Partial<{
   origin: string;
   destination: string;
-  reason?: string;
+  reason?: string | null;
   departureKm: number;
   returnKm?: number | null;
   departureAt: string;
